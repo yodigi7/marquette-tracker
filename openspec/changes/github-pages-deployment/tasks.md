@@ -21,6 +21,6 @@
 ## 4. Validate the published PWA
 
 - [x] 4.1 Run `pnpm test`, `pnpm lint`, and `pnpm build` from the intended `main` revision; verify all required gates pass and the build artifact is generated from the committed deployment configuration.
-- [ ] 4.2 After Pages is enabled, manually verify the project root and representative hash links (`#/`, `#/status`, `#/history`, `#/settings`, and `#/cycle/<id>`) load the intended views from `https://yodigi7.github.io/marquette-tracker/` without a server route fallback.
-- [ ] 4.3 Verify the deployed manifest, service-worker scope, install prompt/start URL, offline reload, and same-browser IndexedDB persistence; confirm that deployment introduces no network data store or synchronization behavior.
+- [x] 4.2 After Pages is enabled, manually verify the project root and representative hash links (`#/`, `#/status`, `#/history`, `#/settings`, and `#/cycle/<id>`) load the intended views from `https://yodigi7.github.io/marquette-tracker/` without a server route fallback.
+- [x] 4.3 Verify the deployed manifest, service-worker scope, install prompt/start URL, offline reload, and same-browser IndexedDB persistence; confirm that deployment introduces no network data store or synchronization behavior.
 - [x] 4.4 Document the rollback procedure for a bad Pages release (revert the deployment commit on `main` or rerun the last known-good revision) and verify the recovery path is understood before marking the change complete.
