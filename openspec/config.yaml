@@ -1,0 +1,44 @@
+schema: spec-driven
+
+# Project context (optional)
+# Shown to AI when creating artifacts. Add tech stack, conventions, style guides, domain knowledge, etc.
+context: |
+  Marquette Fertility Tracker — offline-first PWA tracking a woman's fertility cycle using the Marquette
+  Method with the ClearBlue Fertility Monitor. Solo hobby project (MVP: personal use, single user).
+
+  Tech stack: Vite + React 19 + TypeScript (strict), Tailwind v4, shadcn/ui, Zustand, IndexedDB via Dexie,
+  Recharts, Vitest, vite-plugin-pwa. Package manager: pnpm. No backend in MVP (deferred FastAPI).
+
+  Domain: Marquette Institute cycling protocol (Fehring et al.), cycles 21-42 days. Day 1 = first day of
+  menses. Fertile-window begin/end per official rules (see AGENTS.md for the tables). All computed statuses
+  are derived at read time from raw records — never stored.
+
+  Non-negotiables: algorithm ON by default with user-facing toggle; offline-first, local storage only
+  (sync-ready schema: UUID keys, version/synced flags); fully digital (no print/export in MVP); manual
+  entry only; no reminders; medical disclaimer required (aid, not a medical device).
+
+  Conventions: TypeScript strict, no `any`; pure engine in src/core/engine must not import React/Dexie/browser
+  APIs (portable to Python later — logic parity); tests-first (table-driven) for any engine change via
+  `pnpm test`; keep deps minimal (no new dependency without user awareness); feature code in src/features/**,
+  shared UI in src/components (prefer shadcn/ui).
+
+  Command gates before a milestone is done: `pnpm test`, `pnpm lint`, `pnpm build` all green.
+
+# Per-artifact rules (optional)
+rules:
+  proposal:
+    - Keep proposals focused on the change at hand, no broader roadmap
+    - List any new dependency explicitly (hobby-project discipline)
+  tasks:
+    - Preserve file paths and test-first ordering in task descriptions
+    - Label parallel tasks [P] and sequence shared-file edits explicitly
+
+# Per-operation guidance (optional)
+operations:
+  apply:
+    guidance:
+      - Write/verify the failing tests for a task before implementing, especially for src/core/engine changes
+      - Run `pnpm test` after each task touching the engine
+  archive:
+    guidance:
+      - Summarize the archive outcome before finishing

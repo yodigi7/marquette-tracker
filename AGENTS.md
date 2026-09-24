@@ -79,7 +79,7 @@ src/
 
 - `Cycle`: id (UUID), cycleNo, day1 (date, = first day of menses), closedAt, notes.
 - `DayRecord`: id (UUID), cycleId, date, dayInCycle, monitor (none/low/high/peak), mucus, blood flow, intercourse (bool + optional time), bbt, symptoms (array), medications, pregnancy test (neg/pos), notes — **all optional**.
-- `Settings`: goal (TTA / TTC / track-only), algorithmEnabled (bool), postPeakDays (default 3), historyWindow (default 6; used for calendar-rule peaks), theme.
+- `Settings`: goal (TTA / TTC / track-only), algorithmEnabled (bool), postPeakDays (default 3), historyWindow (default 6; used for calendar-rule peaks), theme (system/light/dark), weekStart (monday default / sunday), cycleMinLength/cycleMaxLength (band, default 21–42), overlayMucus/overlayBbt/overlayIntercourse (cycle-chart overlay persistence, default off).
 - Records carry sync-friendly metadata (UUID keys, `version`/`synced` flags) so a cloud sync layer can be added later.
 
 ## Views
@@ -88,7 +88,7 @@ src/
 2. **Calendar** — month grid: menses, monitor icons, fertile-window shading; predicted vs confirmed windows visually distinct.
 3. **Cycle chart** — CBPM-style strip chart per cycle (Low/High/Peak bands) with optional mucus/BBT/intercourse overlays (Recharts).
 4. **History/Stats** — cycle table, avg/median cycle length, peak variability, fertile-day counts, forecast panel.
-5. **Settings** — goal, algorithm toggle, algorithm params.
+5. **Settings** — `/settings` view with Core (goal, algorithm toggle, post-Peak days, history window, theme), Display & protocol (week-start, cycle band, chart overlays), and Danger zone (clear all data).
 
 ## Predictions / forecasting
 
@@ -106,11 +106,22 @@ src/
 
 ## Development workflow
 
-All feature work is driven by **spec-kit** (see `/.speckit.` commands). It is invoked via slash commands only — it never auto-triggers.
+All feature work is driven by **OpenSpec** (via slash commands, never auto-triggered). The spec-system layout:
 
-- Before implementing, find the active feature via `.specify/feature.json`, then read its `specs/<feature>/spec.md` and `plan.md`. Those are the authoritative spec — implement what they say, no more (**YAGNI**).
-- Run `/speckit.implement` to execute the plan's tasks (`tasks.md`), which enforces tests-before-code ordering per phase.
-- `npm run test` is required for any change touching `core/engine`.
+- `openspec/specs/` — authoritative project spec (what the app does now; grows as changes archive).
+- `openspec/changes/*/` — active/in-flight changes: `proposal.md`, `specs/<capability>/spec.md` (delta), `design.md`, `tasks.md`.
+- `docs/specs-archive/` — historical speckit feature specs (shipped milestones; **read-only, do not edit**).
+- `docs/constitution.md` — archived project constitution; `AGENTS.md` remains authoritative.
+
+Workflow commands (see `.opencode/commands/opsx-*.md`):
+
+- `/opsx-propose` — draft a change (`openspec new change <name>` + proposal/specs).
+- `/opsx-apply` — implement the change's `tasks.md` (tests-before-code per task).
+- `/opsx-archive` — archive a completed change into `openspec/specs/` after all tasks are done and validation passes.
+- `openspec validate` — lint specs; `openspec status --change <name>` — change progress.
+
+- Before implementing, read `openspec/changes/<name>/specs/**/spec.md`, `design.md`, and `tasks.md` — those are the authoritative spec; implement what they say, no more (**YAGNI**).
+- `npm run test` is required for any change touching `core/engine` (table-driven tests written first).
 
 ## Conventions
 
