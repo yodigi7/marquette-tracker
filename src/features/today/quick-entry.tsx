@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -76,6 +77,15 @@ export function QuickEntry({ cycleId, date, dayInCycle, existing, onSaved }: Qui
       notes: notes || undefined,
     })
     toast(`${date} saved`)
+    onSaved()
+  }
+
+  async function remove() {
+    if (!existing) {
+      return
+    }
+    await useAppStore.getState().removeDayRecord(existing.id)
+    toast(`${date} deleted`)
     onSaved()
   }
 
@@ -202,10 +212,23 @@ export function QuickEntry({ cycleId, date, dayInCycle, existing, onSaved }: Qui
           <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything else…" className="resize-none" />
         </div>
       </CardContent>
-      <CardFooter className="justify-end">
-        <Button type="button" onClick={() => void save()}>
-          Save
-        </Button>
+      <CardFooter className="justify-between">
+        {existing && (
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            data-testid="delete-record"
+            onClick={() => void remove()}
+          >
+            Delete
+          </Button>
+        )}
+        <div className={cn('flex gap-2', !existing && 'ml-auto')}>
+          <Button type="button" onClick={() => void save()}>
+            Save
+          </Button>
+        </div>
       </CardFooter>
     </Card>
   )
