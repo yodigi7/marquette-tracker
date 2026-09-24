@@ -2,8 +2,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { statusForCycleDay } from '@/core/engine/marquette'
-import type { FertileWindow } from '@/core/engine/types'
+import { dayInfo } from '@/core/cycleStatus'
 import { cycleForDate, cycleResultsByCycleId, latestOpenCycle } from '@/core/store/selectors'
 import { useAppStore } from '@/core/store/useAppStore'
 import { QuickEntry } from './quick-entry'
@@ -33,8 +32,7 @@ export function TodayView() {
   }
 
   const result = results.get(cycle.id)
-  const status = result ? statusForCycleDay(result.fertileWindow, result.peakDay !== null, cycleDay) : null
-  const source = result ? extrapolationSource(result.fertileWindow, result.peakDay !== null, cycleDay) : null
+  const info = result ? dayInfo(result.fertileWindow, result.peakDay !== null, cycleDay) : null
   const windowLine = result ? windowDescription(result.fertileWindow, result.peakDay !== null) : ''
   const nextPeriod = output?.forecast?.expectedPeriodStart ?? null
   const record = dayRecords.find((r) => r.cycleId === cycle.id && r.date === selected)
@@ -48,9 +46,9 @@ export function TodayView() {
         <DatePicker date={selected} onChange={setSelected} />
       </div>
       <StatusCard
-        status={status}
+        status={info?.status ?? null}
         cycleDay={cycleDay}
-        source={source}
+        source={info?.source ?? null}
         windowLine={windowLine}
         nextPeriod={nextPeriod}
         algorithmEnabled={settings.algorithmEnabled}
@@ -89,15 +87,4 @@ function DatePicker({ date, onChange }: { date: string; onChange(d: string): voi
 function parseLocal(dateKey: string): Date {
   const [y, m, d] = dateKey.split('-').map(Number)
   return new Date(y, m - 1, d)
-}
-
-/** Whether the extrapolated status rests on confirmed readings or calendar assumptions. */
-function extrapolationSource(window: FertileWindow, peakKnown: boolean, day: number): 'confirmed' | 'predicted' {
-  if (day < window.begin) {
-    return 'predicted'
-  }
-  if (window.end === null || day <= window.end) {
-    return window.beginRule === 'first-high-or-peak' ? 'confirmed' : 'predicted'
-  }
-  return peakKnown ? 'confirmed' : 'predicted'
 }

@@ -35,7 +35,8 @@ src/
 
 Milestone 1 (scaffold), Milestone 2 (Marquette engine + table-driven tests), and Milestone 3 (Dexie storage + Zustand store) complete: toolchain, shadcn/ui, PWA shell, routing skeleton, Vitest harness, pure-TS engine (`computeAll` + forecasting), and the IndexedDB/Zustand data layer with sync-ready rows and engine recompute on every write.
 Milestone 4 (Today view) complete: start-cycle flow, status/forecast card with confirmed-vs-predicted tag, quick-entry form (monitor/mucus/flow/BBT/intercourse/symptoms/pregnancy/notes), backfill date picker, "algorithm off" notice, and view + lib tests (45 tests total, all green).
-Milestone 5 (Calendar view) is next.
+Milestone 5 (Calendar view) complete: Monday-first month grid with per-day status shading (predicted vs confirmed vs forecast ring), menses + monitor dots, month nav/legend; shared `core/dateKeys` + `cycleStatus` extracted and reused by Today (58 tests total).
+Milestone 6 (Cycle strip chart) is next.
 
 ## Medical disclaimer
 
