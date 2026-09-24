@@ -152,9 +152,9 @@ function LegendDot({ className, label }: { className: string; label: string }) {
 function EmptyChart() {
   return (
     <div data-testid="cycle-chart-empty" className="flex flex-col items-center gap-4 py-16 text-center">
-      <p className="text-sm text-muted-foreground">No cycle chart yet — start a cycle on the Today view to see your strip chart.</p>
+      <p className="text-sm text-muted-foreground">No cycle chart yet — log a day from Calendar to see your strip chart.</p>
       <Button asChild>
-        <Link to="/">Start a cycle</Link>
+        <Link to="/">Open Calendar</Link>
       </Button>
     </div>
   )

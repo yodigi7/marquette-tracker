@@ -21,7 +21,6 @@ This is a **solo hobby project**. MVP is small and lean, but data model + algori
 - **No export** for now (JSON backup may come later; storage schema must keep that future-proofed).
 - **Offline-first, local storage only** — IndexedDB. No cloud sync in MVP, no encryption required. Schema must be sync-ready later (UUIDs, version flags).
 - **No Python backend in MVP** — deferred entirely. The algorithm module must be framework-agnostic pure TS so it can be ported to Python/FastAPI later for logic parity.
-- **Include a medical disclaimer**: the app is an aid/support tool, not a medical device; recommend verifying interpretation with a Marquette-certified instructor.
 
 ## Tech stack (decided)
 
@@ -66,7 +65,7 @@ Fertile-window **end**:
 ```
 src/
   app/          # App shell: router, layout, providers
-  features/     # Feature modules (today, calendar, cycle-chart, history, settings)
+  features/     # Feature modules (calendar, status, cycle-chart, history, settings)
   core/engine/  # PURE framework-agnostic marquette.ts + types (no React/IDB imports)
   core/store/   # Zustand stores + Dexie repositories
   components/   # Shared UI components
@@ -84,8 +83,8 @@ src/
 
 ## Views
 
-1. **Today** — today's status card (confirmed/predicted fertile-safe status) + quick-entry form.
-2. **Calendar** — month grid: menses, monitor icons, fertile-window shading; predicted vs confirmed windows visually distinct.
+1. **Calendar** — month grid and the sole daily-input surface: menses, monitor icons, fertile-window shading, and per-day entry dialog.
+2. **Status** — date-selectable read-only status summary at `/status`.
 3. **Cycle chart** — CBPM-style strip chart per cycle (Low/High/Peak bands) with optional mucus/BBT/intercourse overlays (Recharts).
 4. **History/Stats** — cycle table, avg/median cycle length, peak variability, fertile-day counts, forecast panel.
 5. **Settings** — `/settings` view with Core (goal, algorithm toggle, post-Peak days, history window, theme), Display & protocol (week-start, cycle band, chart overlays), and Danger zone (clear all data).
@@ -110,8 +109,6 @@ All feature work is driven by **OpenSpec** (via slash commands, never auto-trigg
 
 - `openspec/specs/` — authoritative project spec (what the app does now; grows as changes archive).
 - `openspec/changes/*/` — active/in-flight changes: `proposal.md`, `specs/<capability>/spec.md` (delta), `design.md`, `tasks.md`.
-- `docs/specs-archive/` — historical speckit feature specs (shipped milestones; **read-only, do not edit**).
-- `docs/constitution.md` — archived project constitution; `AGENTS.md` remains authoritative.
 
 Workflow commands (see `.opencode/commands/opsx-*.md`):
 

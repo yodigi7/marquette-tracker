@@ -3,9 +3,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { addDays } from '@/core/engine/dateUtils'
 import { useAppStore } from '@/core/store/useAppStore'
-import { todayKey } from '@/features/today/lib'
+import { todayKey } from '@/core/dateKeys'
 import { CalendarView } from '@/features/calendar'
-import { TodayView } from '@/features/today'
+import { StatusView } from '@/features/status'
 
 const store = () => useAppStore.getState()
 
@@ -14,9 +14,9 @@ beforeEach(async () => {
   await useAppStore.getState().hydrate()
   await useAppStore.getState().clearAllData()
 
-  const cycle = await store().setNewCycle(todayKey())
-  await store().addDayRecord(cycle.id, addDays(todayKey(), 5), 6, { monitor: 'high' })
-  await store().addDayRecord(cycle.id, addDays(todayKey(), 6), 7, { monitor: 'peak' })
+  const cycle = await store().setNewCycle(addDays(todayKey(), -10))
+  await store().addDayRecord(cycle.id, addDays(todayKey(), -5), 6, { monitor: 'high' })
+  await store().addDayRecord(cycle.id, addDays(todayKey(), -4), 7, { monitor: 'peak' })
 })
 
 afterEach(() => {
@@ -49,9 +49,21 @@ describe('Algorithm off = logging only (US2)', () => {
     expect(monitorDot.length).toBeGreaterThan(0)
   })
 
-  it('Today shows the logging-only card when the algorithm is off', async () => {
+  it('restores interpretation when the algorithm is re-enabled', async () => {
     await store().updateSettings({ algorithmEnabled: false })
-    render(<TodayView />)
+    const { rerender } = render(<StatusView />)
+    expect(screen.getByText(/algorithm is off/i)).toBeInTheDocument()
+
+    await store().updateSettings({ algorithmEnabled: true })
+    rerender(<StatusView />)
+
+    expect(screen.getByText('confirmed')).toBeInTheDocument()
+    expect(screen.getByText(/Fertile from cycle day/i)).toBeInTheDocument()
+  })
+
+  it('Status shows the logging-only card when the algorithm is off', async () => {
+    await store().updateSettings({ algorithmEnabled: false })
+    render(<StatusView />)
     expect(screen.getByText(/algorithm is off/i)).toBeInTheDocument()
   })
 })

@@ -1,7 +1,8 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
+import { addDays } from '@/core/engine/dateUtils'
 import { createDb } from '../db'
-import { createAppStore } from '../useAppStore'
+import { createAppStore, FutureDateError } from '../useAppStore'
 
 function setup() {
   const db = createDb()
@@ -139,5 +140,145 @@ describe('settings & data lifecycle', () => {
     expect(s.dayRecords).toEqual([])
     expect(s.output?.cycles).toEqual([])
     expect(s.settings.goal).toBe('track-only')
+  })
+})
+describe('cycle placement from logged days', () => {
+  const march = (day: number) => `2026-03-${String(day).padStart(2, '0')}`
+
+  it('creates a cycle from backfilled days when the app is empty', async () => {
+    const { store } = setup()
+    await store.getState().addDayRecord('', march(1), 1, { bloodFlow: 'medium' })
+    await store.getState().addDayRecord('', march(2), 2, { bloodFlow: 'light' })
+
+    const s = state(store)
+    expect(s.cycles).toHaveLength(1)
+    expect(s.cycles[0].day1).toBe(march(1))
+    expect(s.cycles[0].closedAt).toBeNull()
+    expect(s.dayRecords.map((r) => r.dayInCycle)).toEqual([1, 2])
+    expect(s.dayRecords.every((r) => r.cycleId === s.cycles[0].id)).toBe(true)
+  })
+
+  it('merges an earlier menses day into a cycle logged later, moving Day 1 back', async () => {
+    const { store } = setup()
+    await store.getState().addDayRecord('', march(20), 1, { bloodFlow: 'medium' })
+    expect(state(store).cycles[0].day1).toBe(march(20))
+
+    await store.getState().addDayRecord('', march(15), 1, { bloodFlow: 'medium' })
+
+    const s = state(store)
+    expect(s.cycles).toHaveLength(1)
+    expect(s.cycles[0].day1).toBe(march(15))
+    expect(s.dayRecords.find((r) => r.date === march(15))!.dayInCycle).toBe(1)
+    expect(s.dayRecords.find((r) => r.date === march(20))!.dayInCycle).toBe(6)
+  })
+
+  it('splits a new cycle when a menses day follows a logged no-menses day', async () => {
+    const { store } = setup()
+    await store.getState().addDayRecord('', march(1), 1, { bloodFlow: 'medium' })
+    await store.getState().addDayRecord('', march(4), 1, { monitor: 'low' })
+    await store.getState().addDayRecord('', march(10), 1, { bloodFlow: 'heavy' })
+
+    const s = state(store)
+    expect(s.cycles.map((c) => c.day1)).toEqual([march(1), march(10)])
+    expect(s.cycles[0].closedAt).toBe(march(9))
+    expect(s.cycles[1].closedAt).toBeNull()
+    expect(s.dayRecords.find((r) => r.date === march(4))!.cycleId).toBe(s.cycles[0].id)
+  })
+
+  it('re-derives the live cycle instead of protecting it', async () => {
+    const { store } = setup()
+    // An in-progress cycle derived purely from logged days: menses 20 Mar, still
+    // being logged on 25 Mar. Nothing declares it, so nothing shields it.
+    await store.getState().addDayRecord('', march(20), 1, { bloodFlow: 'heavy' })
+    await store.getState().addDayRecord('', march(25), 6, { monitor: 'low' })
+    expect(state(store).cycles).toHaveLength(1)
+    expect(state(store).cycles[0].day1).toBe(march(20))
+    expect(state(store).cycles[0].closedAt).toBeNull()
+
+    // Backfilling an earlier menses day that the rule groups with the live cycle.
+    await store.getState().addDayRecord('', march(18), 1, { bloodFlow: 'medium' })
+
+    const s = state(store)
+    // One open cycle, Day 1 moved back, no empty leftover for the old Day 1.
+    expect(s.cycles).toHaveLength(1)
+    expect(s.cycles[0].day1).toBe(march(18))
+    expect(s.cycles[0].closedAt).toBeNull()
+    expect(s.dayRecords.find((r) => r.date === march(18))!.dayInCycle).toBe(1)
+    expect(s.dayRecords.find((r) => r.date === march(20))!.dayInCycle).toBe(3)
+    expect(s.dayRecords.find((r) => r.date === march(25))!.dayInCycle).toBe(8)
+    expect(s.dayRecords.every((r) => r.cycleId === s.cycles[0].id)).toBe(true)
+  })
+
+  it('keeps a declared cycle start as a boundary and honours its cycle days', async () => {
+    const { store } = setup()
+    const declared = await store.getState().setNewCycle(march(1))
+    expect(declared.pinned).toBe(true)
+
+    await store.getState().addDayRecord(declared.id, march(1), 1, { bloodFlow: 'heavy' })
+    await store.getState().addDayRecord(declared.id, march(14), 14, { monitor: 'peak' })
+
+    const s = state(store)
+    expect(s.cycles).toHaveLength(1)
+    expect(s.cycles[0].id).toBe(declared.id)
+    expect(s.dayRecords.find((r) => r.date === march(14))!.dayInCycle).toBe(14)
+  })
+
+  it('renumbers cycles and leaves only the last one open', async () => {
+    const { store } = setup()
+    await store.getState().addDayRecord('', march(1), 1, { bloodFlow: 'medium' })
+    await store.getState().addDayRecord('', march(4), 1, { monitor: 'low' })
+    await store.getState().addDayRecord('', march(10), 1, { bloodFlow: 'heavy' })
+
+    const s = state(store)
+    expect(s.cycles.map((c) => c.cycleNo)).toEqual([1, 2])
+    expect(s.cycles.filter((c) => c.closedAt === null)).toHaveLength(1)
+  })
+
+  it('feeds backfilled cycles into engine output and the forecast', async () => {
+    const { store } = setup()
+    // Derived cycles only: menses 1 Mar, logged no-menses 5 Mar, menses 12 Mar.
+    await store.getState().addDayRecord('', march(1), 1, { bloodFlow: 'medium' })
+    await store.getState().addDayRecord('', march(5), 1, { monitor: 'low' })
+    await store.getState().addDayRecord('', march(12), 1, { bloodFlow: 'heavy' })
+
+    const output = state(store).output!
+    expect(output.cycles).toHaveLength(2)
+    expect(output.cycles[0].day1).toBe(march(1))
+    expect(output.cycles[0].length).toBe(11)
+    expect(output.cycles[0].days.map((d) => d.day)).toEqual([1, 5])
+    expect(output.cycles[1].day1).toBe(march(12))
+    expect(output.cycles[1].days.map((d) => d.day)).toEqual([1])
+
+    const forecast = output.forecast!
+    expect(forecast.basedOnCycles).toBe(1)
+    expect(forecast.meanLength).toBe(11)
+    expect(forecast.expectedPeriodStart).toBe('2026-03-23')
+    expect(forecast.nextFertileWindow.begin).toBe('2026-03-17')
+  })
+
+  it('rejects a future date without writing a record', async () => {
+    const { store } = setup()
+    const tomorrow = addDays(new Date().toISOString().slice(0, 10), 1)
+    await expect(store.getState().addDayRecord('', tomorrow, 1, { monitor: 'high' })).rejects.toBeInstanceOf(
+      FutureDateError,
+    )
+    expect(state(store).dayRecords).toHaveLength(0)
+  })
+
+  it('re-derives the remaining structure after a delete', async () => {
+    const { store } = setup()
+    // M on 1 and 10 with a logged no-menses day on 4 between them: two cycles.
+    await store.getState().addDayRecord('', march(1), 1, { bloodFlow: 'medium' })
+    await store.getState().addDayRecord('', march(4), 1, { monitor: 'low' })
+    await store.getState().addDayRecord('', march(10), 1, { bloodFlow: 'heavy' })
+    expect(state(store).cycles.map((c) => c.day1)).toEqual([march(1), march(10)])
+
+    // Removing the bridging no-menses day lets the menses days share one cycle.
+    const bridge = state(store).dayRecords.find((r) => r.date === march(4))!
+    await store.getState().removeDayRecord(bridge.id)
+
+    const s = state(store)
+    expect(s.cycles.map((c) => c.day1)).toEqual([march(1)])
+    expect(s.dayRecords.find((r) => r.date === march(10))!.dayInCycle).toBe(10)
   })
 })

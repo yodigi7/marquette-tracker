@@ -6,6 +6,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: '/marquette-tracker/',
   plugins: [
     react(),
     tailwindcss(),
@@ -19,7 +20,8 @@ export default defineConfig({
         theme_color: '#0c0a09',
         background_color: '#fafaf9',
         display: 'standalone',
-        start_url: '/',
+        start_url: './',
+        scope: './',
         lang: 'en',
         categories: ['health', 'lifestyle'],
         icons: [

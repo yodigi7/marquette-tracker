@@ -22,12 +22,17 @@ function bumpPatch(current: { version: number }): { version: number; synced: boo
   return { version: current.version + 1, synced: false, updatedAt: nowIso() }
 }
 
+export type CyclePatch = Partial<Pick<CycleEntity, 'day1' | 'closedAt' | 'cycleNo' | 'notes' | 'pinned'>>
+
 export interface CycleRepository {
   list(): Promise<CycleEntity[]>
   get(id: string): Promise<CycleEntity | undefined>
-  create(input: { day1: DateKey; notes?: string }): Promise<CycleEntity>
+  create(input: { day1: DateKey; notes?: string; pinned?: boolean }): Promise<CycleEntity>
   updateClosedAt(id: string, closedAt: DateKey | null): Promise<void>
+  update(id: string, patch: CyclePatch): Promise<void>
 }
+
+export type DayRecordPatch = Partial<Omit<DayRecordEntity, 'id' | keyof SyncMeta>>
 
 export interface DayRecordRepository {
   listByCycle(cycleId: string): Promise<DayRecordEntity[]>
@@ -38,6 +43,7 @@ export interface DayRecordRepository {
     dayInCycle: number,
     patch: Partial<DayRecordEntity>,
   ): Promise<DayRecordEntity>
+  update(id: string, patch: DayRecordPatch): Promise<void>
   remove(id: string): Promise<void>
 }
 
@@ -70,6 +76,7 @@ export function createRepositories(db: AppDb): Repositories {
         cycleNo: maxCycleNo + 1,
         closedAt: null,
         notes: input.notes ?? '',
+        pinned: input.pinned ?? false,
         ...freshMeta(),
       }
       await db.cycles.add(entity)
@@ -81,6 +88,13 @@ export function createRepositories(db: AppDb): Repositories {
         return
       }
       await db.cycles.update(id, { closedAt, ...bumpPatch(current) })
+    },
+    async update(id, patch) {
+      const current = await db.cycles.get(id)
+      if (!current) {
+        return
+      }
+      await db.cycles.update(id, { ...patch, ...bumpPatch(current) })
     },
   }
 
@@ -107,6 +121,13 @@ export function createRepositories(db: AppDb): Repositories {
       }
       await db.dayRecords.add(entity)
       return entity
+    },
+    async update(id, patch) {
+      const current = await db.dayRecords.get(id)
+      if (!current) {
+        return
+      }
+      await db.dayRecords.update(id, { ...patch, ...bumpPatch(current) })
     },
     async remove(id) {
       await db.dayRecords.delete(id)

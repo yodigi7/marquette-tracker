@@ -1,3 +1,4 @@
+import { Heart } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { DayInfo } from '@/core/cycleStatus'
 import type { DayRecordEntity } from '@/core/store/entities'
@@ -57,7 +58,11 @@ export function DayCell({ dateKey, dayNumber, info, forecast, menses, monitor, i
         {monitor && monitor !== 'none' && (
           <span title={`Monitor: ${monitor}`} className={cn('h-1.5 w-1.5 rounded-full', MONITOR_DOTS[monitor])} />
         )}
-        {intercourse && <span title="Intercourse" className="h-1.5 w-1.5 rounded-full bg-teal-500" />}
+        {intercourse && (
+          <span title="Intercourse" className="inline-flex">
+            <Heart aria-hidden="true" className="size-2 fill-red-500 text-red-500" />
+          </span>
+        )}
         {menses && <span title="Menses" className="h-1.5 w-1.5 rounded-full bg-red-500" />}
         {ovulation && <span title="Predicted ovulation" className="h-1.5 w-1.5 rounded-full border-2 border-violet-600 bg-white" />}
       </span>

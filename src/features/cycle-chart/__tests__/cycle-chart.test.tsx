@@ -39,13 +39,13 @@ describe('CycleChartView', () => {
     expect(document.querySelector('.recharts-reference-area')).toBeNull()
   })
 
-  it('shows the empty state with a start-a-cycle action when no cycles exist', async () => {
+  it('shows the empty state with a Calendar action when no cycles exist', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     try {
       await resetStore()
       renderAt('missing')
       expect(screen.getByTestId('cycle-chart-empty')).toBeInTheDocument()
-      expect(screen.getByRole('link', { name: /start a cycle/i })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /calendar/i })).toHaveAttribute('href', '/')
       expect(screen.queryByTestId('day-band')).toBeNull()
       expect(errorSpy).not.toHaveBeenCalled()
     } finally {

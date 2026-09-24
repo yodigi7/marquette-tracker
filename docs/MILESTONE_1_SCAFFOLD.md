@@ -128,7 +128,7 @@ Then add the component set required by this project (all shadcn, keeps UX consis
 pnpm dlx shadcn@latest add button card input select label switch dialog table tooltip tabs badge separator sonner calendar popover
 ```
 
-- `calendar`, `popover` are date-picker primitives for the Today/backfill flows; `sonner` for future toasts; the rest cover the 5 views.
+- `calendar`, `popover` are date-picker primitives for the Calendar/Status flows; `sonner` for future toasts; the rest cover the 5 views.
 
 ### T6 — PWA (`vite-plugin-pwa`)
 
@@ -244,8 +244,8 @@ src/
     engine/             # types.ts / marquette.ts / predict.ts  (M2; smoke test only now)
     store/              # db.ts / repositories / zustand  (M3)
   features/
-    today/
     calendar/
+    status/
     cycle-chart/
     history/
     settings/
@@ -268,7 +268,7 @@ pnpm preview                # manual: open http://localhost:4173
 ```
 
 Manual checks (browser):
-1. `pnpm dev` at 5173; routes `/`, `/calendar`, `/history`, `/settings` all render `FeaturePlaceholder` without console errors.
+1. `pnpm dev` at 5173; routes `/`, `/status`, `/history`, `/settings` all render `FeaturePlaceholder` without console errors.
 2. `pnpm build && pnpm preview`: DevTools → Application → Service Workers registered & fetched from `dist/`; Manifest valid (icons + `display: standalone`); tick "Offline" → reload → app still renders.
 3. No `react-`/proxy warnings in console.
 
@@ -286,7 +286,7 @@ Manual checks (browser):
 
 - Marquette engine (`core/engine`) — Milestone 2.
 - Data layer (`core/store`: Dexie schema, repositories, migrations) — Milestone 3.
-- Any Today/Calendar/Chart/History/Settings feature logic — Milestones 5–6).
+- Any Calendar/Status/Chart/History/Settings feature logic — Milestones 5–6).
 - Reminders, export, backend, cloud sync — post-MVP backlog.
 
 ## 5. Risks & mitigations

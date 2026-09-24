@@ -20,6 +20,38 @@ Vite 8 · React 19 · TypeScript 6 (strict) · Tailwind CSS v4 · shadcn/ui (Rad
 | `pnpm preview` | Preview the production build (verify offline behavior) |
 | `pnpm lint` | Oxlint |
 
+## Deployment
+
+The production PWA is published to GitHub Pages at:
+
+```text
+https://yodigi7.github.io/marquette-tracker/
+```
+
+The app uses hash-based routes so direct links work on the static Pages host:
+
+```text
+/#/
+#/status
+#/history
+#/settings
+#/cycle/<id>
+```
+
+### One-time repository setup
+
+In **Settings -> Pages**, set **Build and deployment -> Source** to **GitHub Actions**.
+
+After that setup, every push to `main` runs the deployment workflow automatically. The workflow can also be started manually from the repository's **Actions** tab for a recovery rebuild.
+
+The workflow installs the locked pnpm dependencies, runs tests, lint, and the production build, then publishes `dist/` to GitHub Pages. Use `pnpm build && pnpm preview` locally to verify the production PWA and offline shell before pushing.
+
+Cycle records and settings remain in the browser's IndexedDB; the Pages deployment does not upload or synchronize user data.
+
+### Rollback
+
+If a release is unhealthy, revert the deployment commit on `main` and let the workflow publish the reverted revision, or manually rerun the workflow for the last known-good `main` commit. Verify the Pages URL and offline shell after recovery.
+
 ## Project layout
 
 ```
@@ -28,20 +60,16 @@ src/
   components/    # Shared UI (shadcn/ui in components/ui, lib/utils)
   core/engine/   # Pure, framework-agnostic Marquette algorithm (M2)
   core/store/    # Zustand stores + Dexie repositories (M3)
-  features/      # today / calendar / cycle-chart / history / settings
+  features/      # calendar / status / cycle-chart / history / settings
 ```
 
 ## Status
 
 Milestone 1 (scaffold), Milestone 2 (Marquette engine + table-driven tests), and Milestone 3 (Dexie storage + Zustand store) complete: toolchain, shadcn/ui, PWA shell, routing skeleton, Vitest harness, pure-TS engine (`computeAll` + forecasting), and the IndexedDB/Zustand data layer with sync-ready rows and engine recompute on every write.
-Milestone 4 (Today view) complete: start-cycle flow, status/forecast card with confirmed-vs-predicted tag, quick-entry form (monitor/mucus/flow/BBT/intercourse/symptoms/pregnancy/notes), backfill date picker, "algorithm off" notice, and view + lib tests (45 tests total, all green).
-Milestone 5 (Calendar view) complete: Monday-first month grid with per-day status shading (predicted vs confirmed vs forecast ring), menses + monitor dots, month nav/legend; shared `core/dateKeys` + `cycleStatus` extracted and reused by Today (58 tests total).
+Milestone 4 (Status view) complete: date-selectable read-only status/forecast card with confirmed-vs-predicted information and an "algorithm off" notice.
+Milestone 5 (Calendar view) complete: Calendar is the daily-input surface with a month grid, per-day entry dialog, status shading, raw markers, and month navigation.
 Milestone 6 (Cycle strip chart) complete: Recharts CBPM-style strip per cycle with monitor band colors, fertile-window shading (confirmed vs predicted, hidden when the algorithm is off), overlay toggles for BBT/mucus/intercourse, and a cycle selector with `/cycle/:id` routing — plus view/lib/selector tests (104 tests total, all green).
 Milestone 7 (History/Stats) complete: forecast panel (predicted tags on every projection), cycle stats (length/peak/fertile-day averages), and a per-cycle table — plus view tests (104 tests total, all green).
 Milestone 8 (Settings) complete: goal, algorithm on/off (log-only when off, app-wide), post-Peak days, history window, theme (system/light/dark), calendar week-start (Monday/Sunday), configurable cycle-length protocol band (default 21–42), persisted chart overlay toggles (BBT/mucus/intercourse), and a confirmed clear-all-data danger zone (123 tests total, all green).
 
-**Remaining before first release**: place the medical disclaimer on a visible screen (Today or footer — currently README-only), remove the demo-seed block and `src/core/store/seedDemo.ts` (`TODO(remove-after-dev)`).
-
-## Medical disclaimer
-
-This application is an aid/support tool, not a medical device. Fertility interpretation should be verified with a Marquette-certified instructor.
+**Remaining before first release**: remove the demo-seed block and `src/core/store/seedDemo.ts` (`TODO(remove-after-dev)`).

@@ -33,8 +33,8 @@ src/
   core/engine/    # types.ts, marquette.ts, predict.ts (pure, zero deps)
   core/store/     # db.ts (Dexie), repositories, Zustand slices
   features/
-    today/        # Today view + quick entry form
-    calendar/     # Month grid
+    calendar/     # Month grid + daily entry
+    status/       # Date-selectable read-only status
     cycle-chart/  # CBPM-style strip chart (Recharts)
     history/      # Stats + forecast
     settings/     # Settings form
@@ -108,21 +108,21 @@ Input: ordered `DayRecord[]` of one cycle + `Settings` + reference to previous c
 - `src/core/store/useAppStore.ts` (Zustand): state = `cycles`, `dayRecords`, `settings`, `derivedByCycle: Map<cycleId, CycleDerived>`, `selectedCycleId`; actions:
   - `addDayRecord`, `updateDayRecord`, `deleteDayRecord`
   - `startNewCycle(day1)` (creates cycle; closes previous with `closedAt` = day before)
-  - `markMenses(cycleId, dayInCycle)` helper (Day 1 entry from Today view)
+  - `markMenses(cycleId, dayInCycle)` helper (legacy/internal compatibility)
   - `updateSettings`
   - After every mutation: recompute `derivedByCycle` via engine + persist to Dexie (single source of truth: Dexie; store is in-memory mirror + recompute cache). Every write bumps `version`; `synced` stays false.
 - Selectors helpers: `getCycleFor(date)`, `todayRecord()`, `latestCycle()`, `cyclesByRecency`.
 - Migration seam: Dexie `version(1)` with upgrade stub documented so future schema changes (sync flags) are easy.
 
-**Acceptance:** CRUD persists across reload; editing a record updates derived windows; starting a cycle on Day-1-from-Today closes previous cycle.
+**Acceptance:** CRUD persists across reload; editing a record updates derived windows; saving Calendar records derives cycle structure from the full logged history.
 
 ---
 
 ## Phase 5 — Layout & routes
 
-- `src/app/router.tsx`: React Router routes `/`, `/calendar`, `/history` (+ `/:cycleId` detail), `/settings`; bottom/ tab nav mobile-first for the 5 views; responsive top bar on desktop.
+- `src/app/router.tsx`: React Router routes `/` (Calendar), `/status`, `/history` (+ `/cycle/:cycleId` detail), `/settings`; responsive top bar on desktop.
 - `src/app/Providers.tsx`: theme provider (light/dark toggle in settings), Dexie init + store hydration gate (splash until ready).
-- Medical disclaimer component on Today view + Settings footer (short, per AGENTS.md).
+- Status view at `/status` provides the read-only date-selectable status summary.
 - App manifest name: "Marquette Tracker" (placeholder; refine later).
 
 **Acceptance:** all routes render; offline load works via service worker (`npm run build && npm run preview`).
@@ -131,20 +131,17 @@ Input: ordered `DayRecord[]` of one cycle + `Settings` + reference to previous c
 
 ## Phase 6 — Feature views (in order)
 
-### 6.1 Today (`features/today`)
-- Status card: today's `DayStatus` (fertile/safe/etc.) with `confirmed` vs `predicted` label, computed fertile window + next predicted period info, disclaimer line.
-- Quick entry form (shadcn `card` + inputs, all optional 1-tap):
-  - Monitor: Low / High / Peak buttons
-  - Mucus: L/H/P; Blood flow: none/light/medium/heavy
-  - Intercourse toggle + optional time; BBT number input; symptoms multi-select chips (free-text tags); pregnancy test neg/pos; notes textarea
-- Multi-day editing for backfill: calendar popover to pick a past date.
-- If today outside any cycle: promote “Start cycle (Day 1 menses)” CTA.
-- **Acceptance:** entries save instantly (optimistic via store), status updates on save.
+### 6.1 Status (`features/status/`)
+- Date picker for inspecting a selected date's derived status.
+- Status card with `DayStatus` (fertile/safe/etc.), `confirmed` vs `predicted` source, computed fertile-window explanation, and next predicted period info.
+- Read-only view with no daily-entry or start-cycle controls.
+- **Acceptance:** selected dates show derived status or a no-cycle state without writing data.
 
 ### 6.2 Calendar view (`features/calendar/`)
-- Month grid (shadcn pattern): each day cell shows monitor icon/ dot, menses color, fertile-window background: solid = confirmed, hatched = predicted.
+- Month grid (shadcn pattern): each day cell shows monitor icon/dot, menses color, fertile-window background, and raw observation markers.
 - Month nav arrows; tap day → quick-entry dialog (log that date).
-- **Acceptance:** predicted vs confirmed windows visually distinct.
+- Calendar is the sole daily-input surface; the first eligible opening of the day may open today's dialog automatically.
+- **Acceptance:** daily records save through the placement-aware store path and predicted vs confirmed windows remain visually distinct.
 
 ### 6.3 Cycle chart (`features/cycle-chart/`)
 - Recharts: percent-based forced-scatter of monitor readings per cycle day: bar/area band per day colored Low (subtle) / High (green) / Peak (gray), overlay optional mucus and BBT (line, right axis) plus intercourse markers.
@@ -180,7 +177,7 @@ Input: ordered `DayRecord[]` of one cycle + `Settings` + reference to previous c
 ## Phase 7 — Hardening / final MVP
 
 - Full test sweep engine + a few store tests (dexie mock: use `fake-indexeddb` dev dep for store tests).
-- Manual QA walkthrough to e2e-style flow: create 3–4 cycles fixture (script in tests seeds Dexie) → verify Today/calendar/chart/history numbers against hand-computed Marquette expectations; fix mismatches.
+- Manual QA walkthrough to e2e-style flow: create 3–4 cycles fixture (script in tests seeds Dexie) → verify Calendar/Status/chart/history numbers against hand-computed Marquette expectations; fix mismatches.
 - `npm run build` clean + tsc strict; lighthouse-ish sanity: installable, offline, responsive.
 - Finalize README + plan status.
 
@@ -195,7 +192,7 @@ Input: ordered `DayRecord[]` of one cycle + `Settings` + reference to previous c
 ## Definition of done (MVP)
 
 1. Marquette engine matches the AGENTS.md rules on the test fixtures; `npm run test` green.
-2. Today/Calendar/Cycle chart/History/Settings all functional offline; PWA installable.
+2. Calendar/Status/Cycle chart/History/Settings all functional offline; PWA installable.
 3. Toggle disables computed windows globally.
-4. Predictions visible and clearly labeled; disclaimers present.
+4. Predictions visible and clearly labeled.
 5. `npm run build` passes; README documents `dev`/`test`/`build`.

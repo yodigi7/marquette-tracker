@@ -14,6 +14,8 @@ export interface CycleEntity extends SyncMeta {
   cycleNo: number
   closedAt: DateKey | null
   notes: string
+  /** Declared via "Start a new cycle": day1 always opens a cycle during placement. */
+  pinned?: boolean
 }
 
 export interface DayRecordEntity extends SyncMeta {

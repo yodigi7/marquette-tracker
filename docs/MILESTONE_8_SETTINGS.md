@@ -30,7 +30,7 @@ src/core/store/seedDemo.ts   # TEMP demo seeding — remove before release (TODO
 
 ## 2. Behavior spec
 
-- **Core settings**: goal select (track-only / avoid / achieve), algorithm switch (on by default; off ⇒ no fertile-window status, shading, or window band in Today/Calendar/Cycle chart while raw readings stay logged), post-Peak days (integer 0–10), history window (integer 1–12). Numeric inputs commit on blur/Enter and reject out-of-range values with an inline error without writing.
+- **Core settings**: goal select (track-only / avoid / achieve), algorithm switch (on by default; off ⇒ no fertile-window status, shading, or window band in Status/Calendar/Cycle chart while raw readings stay logged), post-Peak days (integer 0–10), history window (integer 1–12). Numeric inputs commit on blur/Enter and reject out-of-range values with an inline error without writing.
 - **Theme**: system/light/dark, applied live via `next-themes <ThemeProvider attribute="class">` (previously installed but unwired), persisted to settings.
 - **Display & protocol**: week-start select (Monday default / Sunday), cycle band min/max (integer 15–60, min < max enforced in the UI; defaults 21–42). The band feeds the engine: cycles outside it trigger the existing "consult a teacher" style warning and are excluded from the forecast band filter.
 - **Chart overlays**: the Cycle chart's BBT/mucus/intercourse toggles seed from and persist to `settings.overlayMucus/overlayBbt/overlayIntercourse` instead of ephemeral local state.
@@ -38,12 +38,12 @@ src/core/store/seedDemo.ts   # TEMP demo seeding — remove before release (TODO
 
 ## 3. Engine deviation (tracked in spec-kit tasks/plan)
 
-The user-facing requirement "no engine changes" was interpreted one way and the plan flagged a deliberate exception: the cycle band (21–42) is hard-coded as `CYCLE_LENGTH_MIN/MAX` in `core/engine/marquette.ts`. Making the band configurable required parameterizing the engine — `EngineSettings` gains `cycleMinLength`/`cycleMaxLength`, consumed by `predict.ts` (band filter) and `engineSdk.ts` (`collectWarnings(results, settings)`). Defaults equal the former constants, so behavior is byte-identical under default settings. Table-driven `band-shift` tests were written first per the constitution (T015 RED before T018).
+The user-facing requirement "no engine changes" was interpreted one way and the plan flagged a deliberate exception: the cycle band (21–42) is hard-coded as `CYCLE_LENGTH_MIN/MAX` in `core/engine/marquette.ts`. Making the band configurable required parameterizing the engine — `EngineSettings` gains `cycleMinLength`/`cycleMaxLength`, consumed by `predict.ts` (band filter) and `engineSdk.ts` (`collectWarnings(results, settings)`). Defaults equal the former constants, so behavior is byte-identical under default settings. Table-driven `band-shift` tests were written first (T015 RED before T018).
 
 ## 4. Test matrix
 
 - `settings.test.tsx` (7): goal select, algorithm toggle, numeric validation (out-of-range rejected, not written), theme select persists.
-- `algorithm-off.test.tsx` (3): Today status card, Calendar shading, and Cycle strip show no interpretation when off; recordings still displayed.
+- `algorithm-off.test.tsx` (3): Status, Calendar, and Cycle strip show no interpretation when off; recordings still displayed.
 - `clear-data.test.tsx` (2): execute disabled until ack; wipe + defaults restore + dialog closes + no re-seed.
 - `grid.test.ts` (+2): Monday (default) preserved; Sunday-first slicing + labels.
 - `overlays.test.tsx` (+2): strip mounts overlays seeded from settings; a toggle call persists via `updateSettings`.

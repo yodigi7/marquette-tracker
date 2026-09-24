@@ -15,7 +15,7 @@ context: |
 
   Non-negotiables: algorithm ON by default with user-facing toggle; offline-first, local storage only
   (sync-ready schema: UUID keys, version/synced flags); fully digital (no print/export in MVP); manual
-  entry only; no reminders; medical disclaimer required (aid, not a medical device).
+  entry only; no reminders.
 
   Conventions: TypeScript strict, no `any`; pure engine in src/core/engine must not import React/Dexie/browser
   APIs (portable to Python later — logic parity); tests-first (table-driven) for any engine change via
