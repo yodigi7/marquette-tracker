@@ -104,6 +104,14 @@ src/
 - `npm run test` — Vitest (engine tests are required for any engine change)
 - `npm run build` — production build (PWA)
 
+## Development workflow
+
+All feature work is driven by **spec-kit** (see `/.speckit.` commands). It is invoked via slash commands only — it never auto-triggers.
+
+- Before implementing, find the active feature via `.specify/feature.json`, then read its `specs/<feature>/spec.md` and `plan.md`. Those are the authoritative spec — implement what they say, no more (**YAGNI**).
+- Run `/speckit.implement` to execute the plan's tasks (`tasks.md`), which enforces tests-before-code ordering per phase.
+- `npm run test` is required for any change touching `core/engine`.
+
 ## Conventions
 
 - TypeScript strict mode. No `any` leaks into the engine.
