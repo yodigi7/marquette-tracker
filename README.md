@@ -37,7 +37,8 @@ Milestone 1 (scaffold), Milestone 2 (Marquette engine + table-driven tests), and
 Milestone 4 (Today view) complete: start-cycle flow, status/forecast card with confirmed-vs-predicted tag, quick-entry form (monitor/mucus/flow/BBT/intercourse/symptoms/pregnancy/notes), backfill date picker, "algorithm off" notice, and view + lib tests (45 tests total, all green).
 Milestone 5 (Calendar view) complete: Monday-first month grid with per-day status shading (predicted vs confirmed vs forecast ring), menses + monitor dots, month nav/legend; shared `core/dateKeys` + `cycleStatus` extracted and reused by Today (58 tests total).
 Milestone 6 (Cycle strip chart) complete: Recharts CBPM-style strip per cycle with monitor band colors, fertile-window shading (confirmed vs predicted, hidden when the algorithm is off), overlay toggles for BBT/mucus/intercourse, and a cycle selector with `/cycle/:id` routing — plus view/lib/selector tests (104 tests total, all green).
-Milestone 7 (History/Stats) is next.
+Milestone 7 (History/Stats) complete: forecast panel (predicted tags on every projection), cycle stats (length/peak/fertile-day averages), and a per-cycle table — plus view tests (104 tests total, all green).
+Milestone 8 (Settings) is next.
 
 ## Medical disclaimer
 
