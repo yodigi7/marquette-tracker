@@ -6,7 +6,7 @@ import { addDays } from '@/core/engine/dateUtils'
 import { dayInCycle, dateKeyLocal } from '@/core/dateKeys'
 import type { CycleResult } from '@/core/engine/types'
 import { cycleForDate, latestOpenCycle } from '@/core/store/selectors'
-import type { CycleEntity, DayRecordEntity } from '@/core/store/entities'
+import type { CycleEntity, DayRecordEntity, WeekStart } from '@/core/store/entities'
 
 export interface MonthGrid {
   /** 42 slots; slots outside the month are empty strings. */
@@ -15,9 +15,11 @@ export interface MonthGrid {
   month: number
 }
 
-export function monthGrid(year: number, monthIndex: number): MonthGrid {
+export type { WeekStart } from '@/core/store/entities'
+
+export function monthGrid(year: number, monthIndex: number, weekStart: WeekStart = 'monday'): MonthGrid {
   const first = new Date(year, monthIndex, 1)
-  const offset = (first.getDay() + 6) % 7
+  const offset = weekStart === 'sunday' ? first.getDay() : (first.getDay() + 6) % 7
   const start = new Date(year, monthIndex, 1 - offset)
 
   const weeks: string[][] = []
@@ -44,6 +46,12 @@ export function shiftMonth(year: number, monthIndex: number, delta: number): { y
 
 /** Weekday short labels, Monday-first. */
 export const WEEKDAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
+
+const WEEKDAY_LABELS_SUNDAY = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+
+export function weekdayLabels(weekStart: WeekStart = 'monday'): string[] {
+  return weekStart === 'sunday' ? WEEKDAY_LABELS_SUNDAY : WEEKDAY_LABELS
+}
 
 export interface CellInfo {
   info: DayInfo | null

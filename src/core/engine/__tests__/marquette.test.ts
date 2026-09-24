@@ -1,12 +1,21 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_HISTORY_WINDOW, DEFAULT_POST_PEAK_DAYS, computeCycle, statusForCycleDay } from '../marquette'
+import {
+  DEFAULT_HISTORY_WINDOW,
+  DEFAULT_POST_PEAK_DAYS,
+  computeCycle,
+  statusForCycleDay,
+} from '../marquette'
+import { computeAll } from '../engineSdk'
+import { CYCLE_LENGTH_MIN, CYCLE_LENGTH_MAX } from '../marquette'
 import type { CycleHistory, CycleInput, DayRecordInput, EngineSettings } from '../types'
 
 function settings(overrides: Partial<EngineSettings> = {}): EngineSettings {
   return {
     postPeakDays: DEFAULT_POST_PEAK_DAYS,
     historyWindow: DEFAULT_HISTORY_WINDOW,
+    cycleMinLength: CYCLE_LENGTH_MIN,
+    cycleMaxLength: CYCLE_LENGTH_MAX,
     ...overrides,
   }
 }
@@ -222,3 +231,54 @@ function addDaysTo(start: string, n: number): string {
   const date = new Date(Date.UTC(y, m - 1, d + n))
   return date.toISOString().slice(0, 10)
 }
+
+describe('cycle band configurability (band-shift)', () => {
+  function cyclesOfLengths(lengths: number[]): CycleInput[] {
+    const cycles: CycleInput[] = []
+    let day1 = '2026-01-01'
+    for (let i = 0; i <= lengths.length; i++) {
+      cycles.push({ id: `c${i + 1}`, day1 })
+      if (i < lengths.length) {
+        day1 = addDaysTo(day1, lengths[i])
+      }
+    }
+    return cycles
+  }
+
+  function run(lengths: number[], band?: { min: number; max: number }) {
+    const engineSettings = band
+      ? settings({ cycleMinLength: band.min, cycleMaxLength: band.max })
+      : settings()
+    return computeAll(cyclesOfLengths(lengths), [], engineSettings)
+  }
+
+  function outOfBandWarnings(out: ReturnType<typeof computeAll>) {
+    return out.warnings.filter((w) => w.kind === 'cycle-out-of-band')
+  }
+
+  it('default band 21-42 flags none of 28/30/32, outOfBandCount 0', () => {
+    const out = run([28, 30, 32])
+    expect(outOfBandWarnings(out)).toHaveLength(0)
+    expect(out.forecast?.outOfBandCount).toBe(0)
+  })
+
+  it('boundary: lengths equal to the band edge are in-band, one past it is out', () => {
+    const inside = run([21, 42])
+    expect(outOfBandWarnings(inside)).toHaveLength(0)
+    expect(inside.forecast?.outOfBandCount).toBe(0)
+
+    const outside = run([20, 43, 28])
+    expect(outOfBandWarnings(outside)).toHaveLength(2)
+    expect(outside.forecast?.outOfBandCount).toBe(2)
+  })
+
+  it('shifted band [24,39] flags 23 and 40, accepts 24 and 39', () => {
+    const flagged = run([23, 40, 28], { min: 24, max: 39 })
+    expect(outOfBandWarnings(flagged)).toHaveLength(2)
+    expect(flagged.forecast?.outOfBandCount).toBe(2)
+
+    const accepted = run([24, 39, 28], { min: 24, max: 39 })
+    expect(outOfBandWarnings(accepted)).toHaveLength(0)
+    expect(accepted.forecast?.outOfBandCount).toBe(0)
+  })
+})

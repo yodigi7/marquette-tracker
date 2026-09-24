@@ -1,8 +1,13 @@
+import 'fake-indexeddb/auto'
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes } from 'react-router'
+import { useAppStore } from '@/core/store/useAppStore'
 import type { StripModel } from '../lib'
+import { CycleChartView } from '../index'
 import { StripChart } from '../strip-chart'
-import { installChartShim } from './helpers'
+import { installChartShim, seedCycles } from './helpers'
 
 installChartShim()
 
@@ -118,5 +123,40 @@ describe('StripChart overlays (US2)', () => {
     expect(screen.queryByTestId('overlay-intercourse-point')).toBeNull()
     expect(screen.getAllByTestId('day-band')).toHaveLength(20)
     expect(screen.getByTestId('fertile-window-band')).toBeInTheDocument()
+  })
+})
+
+describe('CycleChartView overlay settings (US4)', () => {
+  function renderAt(cycleId: string) {
+    return render(
+      <MemoryRouter initialEntries={[`/cycle/${cycleId}`]}>
+        <Routes>
+          <Route path="/cycle/:cycleId" element={<CycleChartView />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+  }
+
+  afterEach(() => cleanup())
+
+  it('initializes overlays from saved settings (no toggle needed)', async () => {
+    const { a } = await seedCycles()
+    await useAppStore
+      .getState()
+      .updateSettings({ overlayMucus: true, overlayBbt: true, overlayIntercourse: true })
+    renderAt(a)
+    expect(daysOf('overlay-mucus-point')).toEqual([14])
+    expect(daysOf('overlay-bbt-point')).toHaveLength(7)
+    expect(daysOf('overlay-intercourse-point')).toEqual([18])
+  })
+
+  it('overlay toggles persist back to settings', async () => {
+    const user = userEvent.setup()
+    const { a } = await seedCycles()
+    renderAt(a)
+    expect(screen.queryByTestId('overlay-mucus-point')).toBeNull()
+    await user.click(screen.getAllByRole('switch')[0])
+    expect((await screen.findAllByTestId('overlay-mucus-point'))[0]).toBeInTheDocument()
+    expect(useAppStore.getState().settings.overlayMucus).toBe(true)
   })
 })

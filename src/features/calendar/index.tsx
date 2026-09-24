@@ -15,19 +15,21 @@ import type { EngineOutput } from '@/core/engine/engineSdk'
 import { cycleForDate, cycleResultsByCycleId } from '@/core/store/selectors'
 import { useAppStore } from '@/core/store/useAppStore'
 import { DayCell } from './day-cell'
-import { WEEKDAY_LABELS, monthGrid, monthTitle, resolveCell, shiftMonth } from './grid'
+import { monthGrid, monthTitle, resolveCell, shiftMonth, weekdayLabels } from './grid'
 import { QuickEntry } from '@/features/today/quick-entry'
 
 export function CalendarView() {
   const cycles = useAppStore((s) => s.cycles)
   const dayRecords = useAppStore((s) => s.dayRecords)
   const output = useAppStore((s) => s.output)
+  const interpreted = useAppStore((s) => s.settings.algorithmEnabled)
+  const weekStart = useAppStore((s) => s.settings.weekStart)
 
   const now = new Date()
   const [cursor, setCursor] = useState({ year: now.getFullYear(), month: now.getMonth() })
   const [selected, setSelected] = useState<string | null>(null)
   const today = todayKey()
-  const grid = monthGrid(cursor.year, cursor.month)
+  const grid = monthGrid(cursor.year, cursor.month, weekStart)
   const results = cycleResultsByCycleId(output)
   const forecast = output?.forecast?.nextFertileWindow
   const predictedOvulationDay = predictedOvulationOf(output)
@@ -56,7 +58,7 @@ export function CalendarView() {
       </div>
 
       <div className="grid grid-cols-7 gap-1">
-        {WEEKDAY_LABELS.map((label) => (
+        {weekdayLabels(weekStart).map((label) => (
           <div key={label} className="pb-1 text-center text-[11px] font-medium text-stone-400">
             {label}
           </div>
@@ -72,12 +74,12 @@ export function CalendarView() {
                 key={dateKey}
                 dateKey={dateKey}
                 dayNumber={Number(dateKey.slice(8))}
-                info={cell.info}
-                forecast={cell.forecast}
+                info={interpreted ? cell.info : null}
+                forecast={interpreted ? cell.forecast : false}
                 menses={cell.menses}
                 monitor={cell.monitor}
                 intercourse={cell.intercourse}
-                ovulation={cell.ovulation}
+                ovulation={interpreted ? cell.ovulation : false}
                 isToday={dateKey === today}
                 onSelect={(d) => setSelected(d)}
               />

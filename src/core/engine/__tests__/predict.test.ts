@@ -6,7 +6,7 @@ import { computePredictions } from '../predict'
 import type { CycleHistory, CycleInput, CycleResult, DayRecordInput, EngineSettings } from '../types'
 
 function settings(): EngineSettings {
-  return { postPeakDays: 3, historyWindow: 6 }
+  return { postPeakDays: 3, historyWindow: 6, cycleMinLength: 21, cycleMaxLength: 42 }
 }
 
 function emptyHistory(): CycleHistory {

@@ -1,5 +1,4 @@
 import { addDays } from './dateUtils'
-import { CYCLE_LENGTH_MAX, CYCLE_LENGTH_MIN } from './marquette'
 import type { CycleResult, EngineSettings, Forecast } from './types'
 
 function median(values: number[]): number {
@@ -32,7 +31,9 @@ export function computePredictions(cycles: CycleResult[], settings: EngineSettin
   const peaks = closed.map((c) => c.peakDay).filter((p): p is number => p !== null)
   const newest = cycles[cycles.length - 1]
 
-  const inBand = lengths.filter((l) => l >= CYCLE_LENGTH_MIN && l <= CYCLE_LENGTH_MAX)
+  const inBand = lengths.filter(
+    (l) => l >= settings.cycleMinLength && l <= settings.cycleMaxLength,
+  )
   const outOfBandCount = lengths.length - inBand.length
 
   const meanLength = mean(lengths)

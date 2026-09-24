@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -14,12 +14,9 @@ export function CycleChartView() {
   const dayRecords = useAppStore((s) => s.dayRecords)
   const settings = useAppStore((s) => s.settings)
   const output = useAppStore((s) => s.output)
+  const updateSettings = useAppStore((s) => s.updateSettings)
   const { cycleId } = useParams()
   const navigate = useNavigate()
-
-  const [showMucus, setShowMucus] = useState(false)
-  const [showBbt, setShowBbt] = useState(false)
-  const [showIntercourse, setShowIntercourse] = useState(false)
 
   const selected = useMemo(() => resolveSelectedCycle(cycles, cycleId), [cycles, cycleId])
   const results = useMemo(() => cycleResultsByCycleId(output), [output])
@@ -65,17 +62,22 @@ export function CycleChartView() {
           </SelectContent>
         </Select>
         <OverlayToggles
-          showMucus={showMucus}
-          onMucusChange={setShowMucus}
-          showBbt={showBbt}
-          onBbtChange={setShowBbt}
-          showIntercourse={showIntercourse}
-          onIntercourseChange={setShowIntercourse}
+          showMucus={settings.overlayMucus}
+          onMucusChange={(next) => updateSettings({ overlayMucus: next })}
+          showBbt={settings.overlayBbt}
+          onBbtChange={(next) => updateSettings({ overlayBbt: next })}
+          showIntercourse={settings.overlayIntercourse}
+          onIntercourseChange={(next) => updateSettings({ overlayIntercourse: next })}
         />
       </div>
       <Legend />
       <div aria-label="Cycle chart">
-        <StripChart model={model} showMucus={showMucus} showBbt={showBbt} showIntercourse={showIntercourse} />
+        <StripChart
+          model={model}
+          showMucus={settings.overlayMucus}
+          showBbt={settings.overlayBbt}
+          showIntercourse={settings.overlayIntercourse}
+        />
       </div>
     </div>
   )

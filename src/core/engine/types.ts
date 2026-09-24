@@ -14,6 +14,10 @@ export interface EngineSettings {
   postPeakDays: number
   /** Number of previous cycles used for the calendar rules. Marquette default: 6. */
   historyWindow: number
+  /** Protocol band floor in days. Marquette default: 21. */
+  cycleMinLength: number
+  /** Protocol band ceiling in days. Marquette default: 42. */
+  cycleMaxLength: number
 }
 
 export interface CycleInput {

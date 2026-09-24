@@ -1,5 +1,5 @@
 import { diffDays } from './dateUtils'
-import { CYCLE_LENGTH_MAX, CYCLE_LENGTH_MIN, computeCycle } from './marquette'
+import { computeCycle } from './marquette'
 import { computePredictions } from './predict'
 import type { CycleHistory, CycleInput, CycleResult, DayRecordInput, EngineSettings, EngineWarning } from './types'
 
@@ -45,19 +45,21 @@ export function computeAll(
     history.cycleNos.push(cycleNo)
   }
 
-  const warnings = collectWarnings(results)
+  const warnings = collectWarnings(results, settings)
   const forecast = computePredictions(results, settings)
 
   return { cycles: results, forecast, warnings }
 }
 
-function collectWarnings(results: CycleResult[]): EngineWarning[] {
+function collectWarnings(results: CycleResult[], settings: EngineSettings): EngineWarning[] {
   const warnings: EngineWarning[] = []
   for (const result of results) {
     warnings.push(...result.warnings)
   }
   const outOfBand = results.filter(
-    (r) => r.length !== null && (r.length < CYCLE_LENGTH_MIN || r.length > CYCLE_LENGTH_MAX),
+    (r) =>
+      r.length !== null &&
+      (r.length < settings.cycleMinLength || r.length > settings.cycleMaxLength),
   )
   if (outOfBand.length >= 2) {
     for (const result of outOfBand) {

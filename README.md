@@ -38,7 +38,9 @@ Milestone 4 (Today view) complete: start-cycle flow, status/forecast card with c
 Milestone 5 (Calendar view) complete: Monday-first month grid with per-day status shading (predicted vs confirmed vs forecast ring), menses + monitor dots, month nav/legend; shared `core/dateKeys` + `cycleStatus` extracted and reused by Today (58 tests total).
 Milestone 6 (Cycle strip chart) complete: Recharts CBPM-style strip per cycle with monitor band colors, fertile-window shading (confirmed vs predicted, hidden when the algorithm is off), overlay toggles for BBT/mucus/intercourse, and a cycle selector with `/cycle/:id` routing — plus view/lib/selector tests (104 tests total, all green).
 Milestone 7 (History/Stats) complete: forecast panel (predicted tags on every projection), cycle stats (length/peak/fertile-day averages), and a per-cycle table — plus view tests (104 tests total, all green).
-Milestone 8 (Settings) is next.
+Milestone 8 (Settings) complete: goal, algorithm on/off (log-only when off, app-wide), post-Peak days, history window, theme (system/light/dark), calendar week-start (Monday/Sunday), configurable cycle-length protocol band (default 21–42), persisted chart overlay toggles (BBT/mucus/intercourse), and a confirmed clear-all-data danger zone (123 tests total, all green).
+
+**Remaining before first release**: place the medical disclaimer on a visible screen (Today or footer — currently README-only), remove the demo-seed block and `src/core/store/seedDemo.ts` (`TODO(remove-after-dev)`).
 
 ## Medical disclaimer
 

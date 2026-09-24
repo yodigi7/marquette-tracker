@@ -24,7 +24,12 @@ export interface AppState {
 }
 
 function engineSettingsOf(settings: SettingsEntity) {
-  return { postPeakDays: settings.postPeakDays, historyWindow: settings.historyWindow }
+  return {
+    postPeakDays: settings.postPeakDays,
+    historyWindow: settings.historyWindow,
+    cycleMinLength: settings.cycleMinLength,
+    cycleMaxLength: settings.cycleMaxLength,
+  }
 }
 
 export function createAppStore(db: AppDb) {
@@ -93,6 +98,7 @@ export function createAppStore(db: AppDb) {
 
       async clearAllData() {
         await repos.clearAll()
+        await repos.settings.update({ demoSeeded: true })
         await refresh({ hydrated: true })
       },
     }

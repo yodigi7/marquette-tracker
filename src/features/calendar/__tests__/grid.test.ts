@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { monthGrid, monthTitle, resolveCell, shiftMonth } from '../grid'
+import { monthGrid, monthTitle, resolveCell, shiftMonth, weekdayLabels } from '../grid'
 import type { CycleEntity, DayRecordEntity } from '@/core/store/entities'
 import type { CycleResult } from '@/core/engine/types'
 
@@ -54,6 +54,27 @@ describe('monthGrid', () => {
 
   it('labels the month title', () => {
     expect(monthTitle(2026, 7)).toBe('August 2026')
+  })
+
+  describe('week-start variants', () => {
+    it('defaults to Monday-first and labels Mo…Su', () => {
+      expect(weekdayLabels()).toEqual(['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'])
+      const grid = monthGrid(2026, 7)
+      expect(grid.weeks[0][0]).toBe('')
+      expect(grid.weeks[0][5]).toBe('2026-08-01')
+    })
+
+    it('sunday-first: the 1st sits in the trailing slot of week 0, Sep 1 blanked after Aug 31', () => {
+      expect(weekdayLabels('sunday')).toEqual(['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'])
+      const grid = monthGrid(2026, 7, 'sunday')
+      // Aug 1 2026 is a Saturday → Sunday grid opens 6 days earlier (Jul 26, blanked).
+      expect(grid.weeks[0][0]).toBe('')
+      expect(grid.weeks[0][6]).toBe('2026-08-01')
+      expect(grid.weeks[1][0]).toBe('2026-08-02')
+      expect(grid.weeks[5][0]).toBe('2026-08-30')
+      expect(grid.weeks[5][1]).toBe('2026-08-31')
+      expect(grid.weeks[5][2]).toBe('')
+    })
   })
 })
 

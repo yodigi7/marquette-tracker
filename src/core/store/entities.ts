@@ -32,6 +32,8 @@ export interface DayRecordEntity extends SyncMeta {
   notes?: string
 }
 
+export type WeekStart = 'monday' | 'sunday'
+
 export interface SettingsEntity extends SyncMeta {
   key: 'main'
   goal: Goal
@@ -39,6 +41,12 @@ export interface SettingsEntity extends SyncMeta {
   postPeakDays: number
   historyWindow: number
   theme: Theme
+  weekStart: WeekStart
+  cycleMinLength: number
+  cycleMaxLength: number
+  overlayMucus: boolean
+  overlayBbt: boolean
+  overlayIntercourse: boolean
   /** TEMPORARY: one-shot marker so demo data is loaded only on first startup. */
   demoSeeded: boolean
 }
@@ -52,5 +60,11 @@ export const DEFAULT_SETTINGS: Omit<SettingsEntity, keyof SyncMeta> = {
   postPeakDays: 3,
   historyWindow: 6,
   theme: 'system',
+  weekStart: 'monday',
+  cycleMinLength: 21,
+  cycleMaxLength: 42,
+  overlayMucus: false,
+  overlayBbt: false,
+  overlayIntercourse: false,
   demoSeeded: false,
 }
