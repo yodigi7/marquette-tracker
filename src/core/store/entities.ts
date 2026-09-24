@@ -39,6 +39,8 @@ export interface SettingsEntity extends SyncMeta {
   postPeakDays: number
   historyWindow: number
   theme: Theme
+  /** TEMPORARY: one-shot marker so demo data is loaded only on first startup. */
+  demoSeeded: boolean
 }
 
 export const SETTINGS_KEY = 'main' as const
@@ -50,4 +52,5 @@ export const DEFAULT_SETTINGS: Omit<SettingsEntity, keyof SyncMeta> = {
   postPeakDays: 3,
   historyWindow: 6,
   theme: 'system',
+  demoSeeded: false,
 }

@@ -52,6 +52,7 @@ export function createAppStore(db: AppDb) {
         createdAt: '',
         updatedAt: '',
       },
+
       output: null,
 
       async hydrate() {
