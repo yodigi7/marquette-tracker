@@ -20,6 +20,8 @@ Vite 8 · React 19 · TypeScript 6 (strict) · Tailwind CSS v4 · shadcn/ui (Rad
 | `pnpm preview` | Preview the production build (verify offline behavior) |
 | `pnpm lint` | Oxlint |
 
+Manual light/dark and mobile verification checklist: [`docs/VISUAL_QA.md`](./docs/VISUAL_QA.md).
+
 ## Deployment
 
 The production PWA is published to GitHub Pages at:

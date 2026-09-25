@@ -1,24 +1,28 @@
 import { Bar, ComposedChart, Line, ReferenceArea, ResponsiveContainer, Scatter, XAxis, YAxis } from 'recharts'
 import type { ReactElement } from 'react'
 import type { MucusLevel } from '@/core/engine/types'
+import {
+  FERTILITY_FORECAST_VISUAL,
+  FERTILITY_MONITOR_VISUALS,
+} from '@/lib/fertility-visuals'
 import { bbtSeries, intercourseSeries, mucusSeries } from './lib'
 import type { StripDay, StripModel, StripWindow } from './lib'
 
 const BAND_FILL: Record<string, string> = {
-  none: 'fill-stone-200 dark:fill-stone-800',
-  low: 'fill-sky-400',
-  high: 'fill-amber-500',
-  peak: 'fill-violet-600',
+  none: FERTILITY_MONITOR_VISUALS.none.fill,
+  low: FERTILITY_MONITOR_VISUALS.low.fill,
+  high: FERTILITY_MONITOR_VISUALS.high.fill,
+  peak: FERTILITY_MONITOR_VISUALS.peak.fill,
 }
 
 const MUCUS_FILL: Record<MucusLevel, string> = {
-  none: 'fill-fuchsia-200',
-  low: 'fill-fuchsia-400',
-  high: 'fill-fuchsia-500',
-  peak: 'fill-fuchsia-700',
+  none: 'fill-fertility-overlay-mucus-none',
+  low: 'fill-fertility-overlay-mucus-low',
+  high: 'fill-fertility-overlay-mucus-high',
+  peak: 'fill-fertility-overlay-mucus-peak',
 }
 
-const BBT_STROKE = '#64748b'
+const BBT_STROKE = 'var(--fertility-overlay-bbt)'
 
 /** Half-band pad keeps the first/last segments fully inside the plot area. */
 const X_PAD = 0.5
@@ -76,7 +80,7 @@ function BbtPoint({ cx, cy, payload }: OverlayShapeProps): ReactElement {
       cx={cx}
       cy={cy}
       r={3}
-      className="fill-stone-500"
+      className="fill-fertility-overlay-bbt"
       data-testid="overlay-bbt-point"
       data-day={datum?.day}
       data-bbt={datum?.bbt}
@@ -105,7 +109,7 @@ function MucusPoint({ cx, cy, payload }: OverlayShapeProps): ReactElement {
 function IntercoursePoint({ cx, cy, payload }: OverlayShapeProps): ReactElement {
   const datum = payload as { day?: number } | null
   return (
-    <circle cx={cx} cy={cy} r={3} className="fill-teal-600" data-testid="overlay-intercourse-point" data-day={datum?.day} />
+    <circle cx={cx} cy={cy} r={3} className="fill-fertility-overlay-intercourse" data-testid="overlay-intercourse-point" data-day={datum?.day} />
   )
 }
 
@@ -152,8 +156,8 @@ export function StripChart({ model, showMucus = false, showBbt = false, showInte
                 x2={(window.end ?? span) + X_PAD}
                 y1={0}
                 y2={2}
-                fill="rgba(225, 29, 72, 0.12)"
-                stroke="#e11d48"
+                fill={FERTILITY_FORECAST_VISUAL.windowFill}
+                stroke={FERTILITY_FORECAST_VISUAL.windowBorder}
                 strokeWidth={1}
                 strokeDasharray={window.source === 'predicted' ? '4 3' : undefined}
                 ifOverflow="extendDomain"

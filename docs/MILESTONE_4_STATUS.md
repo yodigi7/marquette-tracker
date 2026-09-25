@@ -27,3 +27,9 @@ src/features/status/
 - Shows the no-cycle state on an empty store.
 - Shows the logging-only explanation when the algorithm is disabled.
 - `pnpm test`, `pnpm lint`, and `pnpm build` remain green.
+
+## 4. Theme-aware presentation
+
+Status badges use the shared fertility visual tokens for the four derived statuses. The source badge uses the shared confirmed/predicted border and text treatment, and the next-period estimate is explicitly styled as predictive. Explanatory and empty-state text uses theme-aware fertility text tokens so the view remains readable in both light and dark themes without changing status labels or read-only behavior.
+
+Contrast and mobile rendering are covered by the manual matrix in [`VISUAL_QA.md`](./VISUAL_QA.md); automated tests cover the token mapping and algorithm-off branch.

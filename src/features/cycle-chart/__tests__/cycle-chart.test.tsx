@@ -30,6 +30,8 @@ describe('CycleChartView', () => {
     const band = screen.getByTestId('fertile-window-band')
     expect(band.getAttribute('data-begin')).not.toBeNull()
     expect(band.getAttribute('data-source')).toBe('predicted')
+    expect(document.querySelector('.recharts-reference-area-rect')?.getAttribute('fill')).toBe('var(--fertility-window-fill)')
+    expect(document.querySelector('[data-legend-label="Low"] span')?.getAttribute('class')).toContain('bg-fertility-monitor-low')
   })
 
   it('shows day bands but no window band when the algorithm is disabled (FR-004)', async () => {
@@ -39,6 +41,9 @@ describe('CycleChartView', () => {
     expect(screen.getAllByTestId('day-band')).toHaveLength(28)
     expect(screen.queryByTestId('fertile-window-band')).toBeNull()
     expect(document.querySelector('.recharts-reference-area')).toBeNull()
+    expect(screen.getByText('Low')).toBeInTheDocument()
+    expect(screen.queryByText('Predicted window')).toBeNull()
+    expect(screen.queryByText('Confirmed window')).toBeNull()
   })
 
   it('hides inferred Low rows while the algorithm is off but keeps user records', async () => {

@@ -47,6 +47,9 @@ describe('Algorithm off = logging only (US2)', () => {
 
     const monitorDot = screen.getAllByTitle(/Monitor: high/i)
     expect(monitorDot.length).toBeGreaterThan(0)
+    expect(screen.queryByText('Fertile')).toBeNull()
+    expect(screen.queryByText('Predicted window')).toBeNull()
+    expect(screen.queryByText('Assumed data')).toBeNull()
   })
 
   it('restores interpretation when the algorithm is re-enabled', async () => {

@@ -59,3 +59,9 @@ Status consumes `core/cycleStatus.dayInfo` and the shared date helpers; Calendar
 - [x] confirmed vs predicted visually distinct (incl. forecast ring)
 - [x] `pnpm test` (incl. new), `pnpm lint`, `pnpm build` green
 - [x] README status → M6 next
+
+## 7. Theme-aware presentation
+
+Calendar day cells and the legend consume the shared fertility visual tokens. The four derived statuses keep their existing meanings, but each now has light/dark-aware fills; confirmed/predicted source cues use distinct border styles, and the future fertile-window forecast remains a separate dashed predictive treatment. Unlogged cells remain base cells.
+
+The legend also explains `post-calendar`, confirmed/predicted source cues, and every raw marker shown in a day cell. The assumed-data marker remains additive to the stored Low marker, and algorithm-off mode hides inferred rows and all computed interpretation styling while retaining user-authored markers. Contrast targets and the narrow-mobile scanability check are documented in [`VISUAL_QA.md`](./VISUAL_QA.md).

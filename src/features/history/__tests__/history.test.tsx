@@ -53,7 +53,33 @@ describe('HistoryView', () => {
     expect(openRow!.textContent).toContain(`day ${lastDay}`)
   })
 
-  it('uses user-only derived output while logging-only mode is active', async () => {
+  it('uses shared text and predictive tokens in the forecast and stats panels', async () => {
+    render(<HistoryView />)
+
+    expect(screen.getByText('predicted')).toHaveClass('text-fertility-forecast-fg')
+    expect(screen.getByText('Avg length')).toHaveClass('text-fertility-muted')
+    expect(screen.getByText('Next fertile window')).toHaveClass('text-fertility-muted')
+  })
+
+  it('renders the protocol-band warning with the shared warning token', () => {
+    const output = store().output
+    if (!output?.forecast) {
+      throw new Error('Expected seeded forecast output')
+    }
+
+    useAppStore.setState({
+      output: {
+        ...output,
+        forecast: { ...output.forecast, outOfBandCount: 2 },
+      },
+    })
+
+    render(<HistoryView />)
+
+    expect(screen.getByText(/2 cycles fell outside the 21–42 day band/i)).toHaveClass('text-fertility-warning')
+  })
+
+  it('hides computed summaries in logging-only mode and restores them when re-enabled', async () => {
     await store().clearAllData()
     const start = addDays(todayKey(), -20)
     const cycle = await store().setNewCycle(start)
@@ -62,9 +88,20 @@ describe('HistoryView', () => {
     const generatedDate = addDays(start, 18)
     await store().updateSettings({ algorithmEnabled: false })
 
-    render(<HistoryView />)
+    const { rerender } = render(<HistoryView />)
 
+    expect(screen.getByTestId('history-logging-only')).toBeInTheDocument()
+    expect(screen.queryByText('Avg length')).toBeNull()
+    expect(screen.queryByText('Fertile days')).toBeNull()
+    expect(screen.getByRole('table')).toBeInTheDocument()
+    expect(screen.getAllByRole('row')).toHaveLength(2)
     expect(store().output?.cycles[0].days.some((day) => day.date === generatedDate)).toBe(false)
-    expect(screen.getByText(/Avg length/i)).toBeInTheDocument()
+
+    await store().updateSettings({ algorithmEnabled: true })
+    rerender(<HistoryView />)
+
+    expect(screen.getByText('Avg length')).toBeInTheDocument()
+    expect(screen.getAllByText('Fertile days').length).toBeGreaterThan(0)
+    expect(screen.queryByTestId('history-logging-only')).toBeNull()
   })
 })

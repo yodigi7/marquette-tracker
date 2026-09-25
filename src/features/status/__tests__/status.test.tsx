@@ -47,6 +47,7 @@ describe('StatusView', () => {
     render(<StatusView />)
 
     expect(screen.getByText('predicted')).toBeInTheDocument()
+    expect(screen.getByText('Fertile window')).toHaveClass('bg-fertility-status-fertile-predicted')
   })
 
   it('shows source, window explanation, and a next-period estimate when available', async () => {
@@ -116,6 +117,33 @@ describe('StatusView', () => {
     await store().updateSettings({ postPeakDays: 2 })
     render(<StatusView />)
     expect(await screen.findByText(/until day 16 \(current Peak \+ 2 days\)/)).toBeInTheDocument()
+  })
+
+  it('uses the shared status and source visual tokens', async () => {
+    await bootWithCycle()
+    render(<StatusView />)
+
+    const statusBadge = screen.getByText('Fertile window')
+    expect(statusBadge.className).toContain('bg-fertility-status-fertile')
+    expect(statusBadge.className).toContain('text-fertility-status-fertile-fg')
+
+    const sourceBadge = screen.getByText('confirmed')
+    expect(sourceBadge.className).toContain('border-fertility-source-confirmed')
+    expect(sourceBadge.className).toContain('text-fertility-source-confirmed')
+  })
+
+  it('marks the estimated next period as predictive and uses readable body text', async () => {
+    const previousStart = addDays(todayKey(), -60)
+    const previous = await store().setNewCycle(previousStart)
+    await store().addDayRecord(previous.id, previousStart, 1, { bloodFlow: 'medium' })
+    const currentStart = addDays(todayKey(), -30)
+    const current = await store().setNewCycle(currentStart)
+    await store().addDayRecord(current.id, addDays(currentStart, 2), 3, { monitor: 'high' })
+
+    render(<StatusView />)
+
+    expect(screen.getByTestId('status-forecast')).toHaveClass('text-fertility-forecast-fg')
+    expect(screen.getByText(/Fertile from cycle day/i)).toHaveClass('text-fertility-body')
   })
 
   it('shows a no-cycle state on an empty store', () => {

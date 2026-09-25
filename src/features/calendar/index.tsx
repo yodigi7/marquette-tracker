@@ -2,6 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Heart } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import {
+  FERTILITY_FORECAST_VISUAL,
+  FERTILITY_MARKER_VISUALS,
+  FERTILITY_MONITOR_VISUALS,
+  FERTILITY_SOURCE_VISUALS,
+  FERTILITY_STATUS_VISUALS,
+  FERTILITY_TEXT_VISUALS,
+} from '@/lib/fertility-visuals'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -85,7 +93,7 @@ export function CalendarView() {
 
       <div className="grid grid-cols-7 gap-1">
         {weekdayLabels(weekStart).map((label) => (
-          <div key={label} className="pb-1 text-center text-[11px] font-medium text-stone-400">
+          <div key={label} className={cn('pb-1 text-center text-[11px] font-medium', FERTILITY_TEXT_VISUALS.muted)}>
             {label}
           </div>
         ))}
@@ -115,7 +123,7 @@ export function CalendarView() {
         )}
       </div>
 
-      <Legend />
+      <Legend interpreted={interpreted} />
 
       <Dialog open={selected !== null} onOpenChange={(open) => !open && setSelected(null)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
@@ -171,23 +179,30 @@ function pendingPlacement(
   return null
 }
 
-function Legend() {
+function Legend({ interpreted }: { interpreted: boolean }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-stone-500">
-      <LegendItem className="rounded bg-rose-200" label="Fertile" />
-      <LegendItem className="rounded bg-amber-100" label="Pre-fertile" />
-      <LegendItem className="rounded bg-emerald-100" label="Post-peak" />
-      <LegendItem className="rounded border border-dashed border-violet-300" label="Predicted window" />
-      <LegendDot className="bg-red-500" label="Menses" />
-      <LegendDot className="border border-dashed border-amber-500" label="Assumed data" />
-      <LegendDot className="bg-sky-400" label="Low" />
-      <LegendDot className="bg-amber-500" label="High" />
-      <LegendDot className="bg-violet-600" label="Peak" />
+    <div className={cn('flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]', FERTILITY_TEXT_VISUALS.muted)}>
+      {interpreted && (
+        <>
+          <LegendItem className={cn('rounded', FERTILITY_STATUS_VISUALS.fertile.fill)} label="Fertile" />
+          <LegendItem className={cn('rounded', FERTILITY_STATUS_VISUALS['pre-fertile'].fill)} label="Pre-fertile" />
+          <LegendItem className={cn('rounded', FERTILITY_STATUS_VISUALS['post-peak'].fill)} label="Post-peak" />
+          <LegendItem className={cn('rounded', FERTILITY_STATUS_VISUALS['post-calendar'].fill)} label="Post-calendar" />
+          <LegendItem className={cn('rounded border', FERTILITY_SOURCE_VISUALS.confirmed.cellBorder)} label="Confirmed source" />
+          <LegendItem className={cn('rounded border', FERTILITY_SOURCE_VISUALS.predicted.cellBorder)} label="Predicted status" />
+          <LegendItem className={cn('rounded border', FERTILITY_FORECAST_VISUAL.cellBorder, FERTILITY_FORECAST_VISUAL.fill)} label="Predicted window" />
+        </>
+      )}
+      <LegendDot className={FERTILITY_MARKER_VISUALS.menses.dot} label="Menses" />
+      {interpreted && <LegendDot className={FERTILITY_MARKER_VISUALS.assumed.dot} label="Assumed data" />}
+      <LegendDot className={FERTILITY_MONITOR_VISUALS.low.dot} label="Low" />
+      <LegendDot className={FERTILITY_MONITOR_VISUALS.high.dot} label="High" />
+      <LegendDot className={FERTILITY_MONITOR_VISUALS.peak.dot} label="Peak" />
       <span className="flex items-center gap-1">
-        <Heart aria-hidden="true" className="size-2 fill-red-500 text-red-500" />
+        <Heart aria-hidden="true" className={cn('size-2', FERTILITY_MARKER_VISUALS.intercourse.icon)} />
         Intercourse
       </span>
-      <LegendDot className="border-2 border-violet-600 bg-white" label="Predicted ovulation" />
+      {interpreted && <LegendDot className={FERTILITY_MARKER_VISUALS.ovulation.dot} label="Predicted ovulation" />}
     </div>
   )
 }
@@ -203,7 +218,7 @@ function predictedOvulationOf(output: EngineOutput | null): number | undefined {
 
 function LegendItem({ className, label }: { className: string; label: string }) {
   return (
-    <span className="flex items-center gap-1">
+    <span className="flex items-center gap-1" data-legend-label={label}>
       <span className={cn('h-2.5 w-2.5', className)} />
       {label}
     </span>

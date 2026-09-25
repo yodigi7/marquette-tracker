@@ -55,12 +55,26 @@ describe('StripChart', () => {
     expect(empty?.getAttribute('data-monitor')).toBe('')
   })
 
-it('colors bands per the calendar vocabulary (sky/amber/violet)', () => {
+it('colors bands with the shared monitor tokens', () => {
     render(<StripChart model={makeModel()} />)
-    expect(bandByDay(5)?.getAttribute('class')).toContain('fill-sky-400')
-    expect(bandByDay(7)?.getAttribute('class')).toContain('fill-amber-500')
-    expect(bandByDay(9)?.getAttribute('class')).toContain('fill-violet-600')
-    expect(bandByDay(3)?.getAttribute('class')).toContain('fill-stone-200')
+    expect(bandByDay(5)?.getAttribute('class')).toContain('fill-fertility-monitor-low')
+    expect(bandByDay(7)?.getAttribute('class')).toContain('fill-fertility-monitor-high')
+    expect(bandByDay(9)?.getAttribute('class')).toContain('fill-fertility-monitor-peak')
+    expect(bandByDay(3)?.getAttribute('class')).toContain('fill-fertility-monitor-none')
+  })
+
+  it('uses theme variables for the fertile-window reference area', () => {
+    render(
+      <StripChart
+        model={makeModel({
+          window: { begin: 6, end: 17, source: 'predicted', beginRule: 'calendar-day-6', endRule: 'current-peak-plus-n' },
+        })}
+      />,
+    )
+
+    const area = document.querySelector('.recharts-reference-area-rect')
+    expect(area?.getAttribute('fill')).toBe('var(--fertility-window-fill)')
+    expect(area?.getAttribute('stroke')).toBe('var(--fertility-window-border)')
   })
 
   it('renders a solid window band (no dashes) when confirmed (SR element data-source)', () => {

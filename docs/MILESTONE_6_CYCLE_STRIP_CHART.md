@@ -23,14 +23,14 @@ src/test/setup.ts              # jsdom polyfills (scrollIntoView, pointer captur
 
 ## 2. Behavior spec
 
-**Strip** — fixed-width day-band columns (28px each) in a horizontally scrollable region; a day with no monitor reading renders a faint neutral track. Colors: Low sky-400 · High amber-500 · Peak violet-600 (matching the calendar dots).
+**Strip** — fixed-width day-band columns (28px each) in a horizontally scrollable region; a day with no monitor reading renders a faint neutral track. Monitor fills use the shared fertility tokens: `fill-fertility-monitor-none`, `fill-fertility-monitor-low`, `fill-fertility-monitor-high`, and `fill-fertility-monitor-peak` (matching the Calendar dots and legend).
 
-**Fertile window** — a single band across days `begin…end` filled with the day-bands' natural monitor colors, plus a rose border (solid for confirmed, dashed for predicted). Begin = first-High/Peak day → confirmed; else calendar rule → predicted. No window when the cycle has no Peak/boundary, or when Settings "Algorithm" is off. Conveyed to screen readers via an sr-only element carrying `data-begin`/`data-end`/`data-source`.
+**Fertile window** — a single band across days `begin…end` filled with the day-bands' natural monitor colors, using the theme-aware `--fertility-window-fill` and `--fertility-window-border` values (solid for confirmed, dashed for predicted). Begin = first-High/Peak day → confirmed; else calendar rule → predicted. No window when the cycle has no Peak/boundary, or when Settings "Algorithm" is off. Conveyed to screen readers via an sr-only element carrying `data-begin`/`data-end`/`data-source`.
 
 **Overlays** (toggle off by default, ephemeral state only):
-- BBT: stone line + markers on a right-side temperature axis; missing days create a gap (no interpolation).
-- Mucus: fuchsia markers (none→200 / low→400 / high→500 / peak→700), including explicit "none" recordings.
-- Intercourse: teal markers.
+- BBT: the shared `--fertility-overlay-bbt` line and `fill-fertility-overlay-bbt` markers on a right-side temperature axis; missing days create a gap (no interpolation).
+- Mucus: shared `fill-fertility-overlay-mucus-none` / `low` / `high` / `peak` tokens, including explicit "none" recordings.
+- Intercourse: shared `fill-fertility-overlay-intercourse` markers.
 
 **Selector** — shadcn Select, items newest-first, label `Cycle N · starts Jan 29, 2026 · 6 days (open)` (span = engine length when closed, else latest recorded day). Changing selection navigates to `/cycle/:id`; unknown/absent ids fall back to the newest cycle.
 
@@ -52,3 +52,9 @@ Totals: 101 tests for the Milestone 6 snapshot (58 at the end of Milestone 5); t
 - [x] Cycle selector navigates; invalid ids fall back to newest cycle
 - [x] `pnpm test` (Milestone 6 snapshot: 101; current full suite: 232), `pnpm lint`, `pnpm build` green
 - [x] README status → M7 (History/Stats) next
+
+## 7. Theme-aware presentation
+
+The chart keeps its existing structure: one monitor band per cycle day, one fertile-window reference area, and the optional BBT/mucus/intercourse overlays. Monitor bands, the empty track, overlay markers, and the fertile-window fill/stroke now use the shared fertility tokens so they remain readable in both themes. The window keeps its solid-confirmed versus dashed-predicted source cue, and the legend uses matching samples.
+
+No per-day pre-fertile, post-peak, or post-calendar band layer is introduced. When the algorithm is off, the computed window area is hidden while raw monitor bands remain. Automated tests cover the token values and source/algorithm-off behavior; rendered contrast and mobile checks are in [`VISUAL_QA.md`](./VISUAL_QA.md).

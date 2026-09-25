@@ -74,6 +74,8 @@ describe('StripChart overlays (US2)', () => {
     expect(daysOf('overlay-bbt-point')).toEqual([8, 9, 10, 11, 13, 14, 15])
     const day14 = screen.getAllByTestId('overlay-bbt-point').find((el) => Number(el.getAttribute('data-day')) === 14)
     expect(day14?.getAttribute('data-bbt')).toBe('37')
+    expect(day14?.getAttribute('class')).toContain('fill-fertility-overlay-bbt')
+    expect(document.querySelector('.recharts-line-curve')?.getAttribute('stroke')).toBe('var(--fertility-overlay-bbt)')
     expect(screen.getAllByTestId('day-band')).toHaveLength(20)
   })
 
@@ -83,11 +85,18 @@ describe('StripChart overlays (US2)', () => {
     expect(points).toHaveLength(4)
     const levels = Object.fromEntries(points.map((el) => [Number(el.getAttribute('data-day')), el.getAttribute('data-level')]))
     expect(levels).toEqual({ 8: 'low', 12: 'high', 14: 'peak', 15: 'none' })
+    expect(points.map((el) => el.getAttribute('class'))).toEqual([
+      expect.stringContaining('fill-fertility-overlay-mucus-low'),
+      expect.stringContaining('fill-fertility-overlay-mucus-high'),
+      expect.stringContaining('fill-fertility-overlay-mucus-peak'),
+      expect.stringContaining('fill-fertility-overlay-mucus-none'),
+    ])
   })
 
   it('intercourse overlay: one teal marker per act day', () => {
     renderStrip(makeModel(), { showIntercourse: true })
     expect(daysOf('overlay-intercourse-point')).toEqual([18])
+    expect(screen.getByTestId('overlay-intercourse-point').getAttribute('class')).toContain('fill-fertility-overlay-intercourse')
   })
 
   it('mucus and intercourse markers sit inside the plot area, not clipped at the top', () => {

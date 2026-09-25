@@ -1,4 +1,5 @@
 import type { DayStatus, FertileWindow } from '@/core/engine/types'
+import { FERTILITY_STATUS_VISUALS } from '@/lib/fertility-visuals'
 import { dayInCycle, dateKeyLocal, parseDateKey, todayKey } from '@/core/dateKeys'
 
 export { dayInCycle, dateKeyLocal, parseDateKey, todayKey }
@@ -11,10 +12,10 @@ export const STATUS_LABELS: Record<DayStatus, string> = {
 }
 
 export const STATUS_TONES: Record<DayStatus, string> = {
-  'pre-fertile': 'bg-amber-100 text-amber-900',
-  fertile: 'bg-rose-100 text-rose-900',
-  'post-peak': 'bg-emerald-100 text-emerald-900',
-  'post-calendar': 'bg-stone-100 text-stone-900',
+  'pre-fertile': FERTILITY_STATUS_VISUALS['pre-fertile'].badge,
+  fertile: FERTILITY_STATUS_VISUALS.fertile.badge,
+  'post-peak': FERTILITY_STATUS_VISUALS['post-peak'].badge,
+  'post-calendar': FERTILITY_STATUS_VISUALS['post-calendar'].badge,
 }
 
 export const BEGIN_RULE_LABELS: Record<FertileWindow['beginRule'], string> = {

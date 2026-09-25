@@ -1,6 +1,11 @@
 import { useMemo } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { cn } from '@/lib/utils'
+import {
+  FERTILITY_FORECAST_VISUAL,
+  FERTILITY_MONITOR_VISUALS,
+  FERTILITY_TEXT_VISUALS,
+} from '@/lib/fertility-visuals'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
@@ -71,7 +76,7 @@ export function CycleChartView() {
           onIntercourseChange={(next) => updateSettings({ overlayIntercourse: next })}
         />
       </div>
-      <Legend />
+      <Legend algorithmEnabled={settings.algorithmEnabled} />
       <div aria-label="Cycle chart">
         <StripChart
           model={model}
@@ -117,24 +122,24 @@ function SwitchControl({ label, checked, onCheckedChange }: { label: string; che
   )
 }
 
-function Legend() {
+function Legend({ algorithmEnabled }: { algorithmEnabled: boolean }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-stone-500">
-      <LegendItem className="rounded bg-sky-400" label="Low" />
-      <LegendItem className="rounded bg-amber-500" label="High" />
-      <LegendItem className="rounded bg-violet-600" label="Peak" />
-      <LegendItem className="rounded border border-dashed border-rose-600" label="Predicted window" />
-      <LegendItem className="rounded border border-solid border-rose-600" label="Confirmed window" />
-      <LegendDot className="bg-fuchsia-500" label="Mucus" />
-      <LegendDot className="bg-stone-500" label="BBT" />
-      <LegendDot className="bg-teal-600" label="Intercourse" />
+    <div className={cn('flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]', FERTILITY_TEXT_VISUALS.muted)}>
+      <LegendItem className={cn('rounded', FERTILITY_MONITOR_VISUALS.low.dot)} label="Low" />
+      <LegendItem className={cn('rounded', FERTILITY_MONITOR_VISUALS.high.dot)} label="High" />
+      <LegendItem className={cn('rounded', FERTILITY_MONITOR_VISUALS.peak.dot)} label="Peak" />
+      {algorithmEnabled && <LegendItem className={cn('rounded border', FERTILITY_FORECAST_VISUAL.cellBorder)} label="Predicted window" />}
+      {algorithmEnabled && <LegendItem className={cn('rounded border border-fertility-forecast-border')} label="Confirmed window" />}
+      <LegendDot className="bg-fertility-overlay-mucus-high" label="Mucus" />
+      <LegendDot className="bg-fertility-overlay-bbt" label="BBT" />
+      <LegendDot className="bg-fertility-overlay-intercourse" label="Intercourse" />
     </div>
   )
 }
 
 function LegendItem({ className, label }: { className: string; label: string }) {
   return (
-    <span className="flex items-center gap-1">
+    <span className="flex items-center gap-1" data-legend-label={label}>
       <span className={cn('h-2.5 w-2.5', className)} />
       {label}
     </span>

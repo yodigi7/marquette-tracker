@@ -1,5 +1,12 @@
 import { Heart } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import {
+  FERTILITY_FORECAST_VISUAL,
+  FERTILITY_MARKER_VISUALS,
+  FERTILITY_MONITOR_VISUALS,
+  FERTILITY_SOURCE_VISUALS,
+  FERTILITY_STATUS_VISUALS,
+} from '@/lib/fertility-visuals'
 import type { DayInfo } from '@/core/cycleStatus'
 import type { DayRecordEntity } from '@/core/store/entities'
 import type { CellOrigin } from './grid'
@@ -18,24 +25,22 @@ export interface DayCellProps {
   onSelect(dateKey: string): void
 }
 
-const STATUS_CELL_TONES: Record<DayInfo['status'], { base: string; predicted: string }> = {
-  'pre-fertile': { base: 'bg-amber-100', predicted: 'bg-amber-50' },
-  fertile: { base: 'bg-rose-200', predicted: 'bg-rose-100' },
-  'post-peak': { base: 'bg-emerald-100', predicted: 'bg-emerald-50' },
-  'post-calendar': { base: 'bg-stone-100', predicted: 'bg-stone-50' },
-}
-
-const MONITOR_DOTS: Record<NonNullable<DayRecordEntity['monitor']>, string> = {
-  none: '',
-  low: 'bg-sky-400',
-  high: 'bg-amber-500',
-  peak: 'bg-violet-600',
-}
-
 export function DayCell({ dateKey, dayNumber, info, forecast, menses, monitor, intercourse, origin, ovulation, isToday, onSelect }: DayCellProps) {
-  const tone = info ? STATUS_CELL_TONES[info.status] : null
-  const predicted = info?.source === 'predicted'
+  const statusVisual = info ? FERTILITY_STATUS_VISUALS[info.status] : null
+  const sourceVisual = info ? FERTILITY_SOURCE_VISUALS[info.source] : null
   const assumed = origin === 'inferred'
+  const statusFill = forecast
+    ? FERTILITY_FORECAST_VISUAL.fill
+    : statusVisual
+      ? info?.source === 'predicted'
+        ? statusVisual.predictedFill
+        : statusVisual.fill
+      : undefined
+  const statusCue = forecast
+    ? cn('border', FERTILITY_FORECAST_VISUAL.cellBorder)
+    : sourceVisual
+      ? cn('border', sourceVisual.cellBorder)
+      : undefined
 
   return (
     <button
@@ -50,9 +55,8 @@ export function DayCell({ dateKey, dayNumber, info, forecast, menses, monitor, i
       onClick={() => onSelect(dateKey)}
       className={cn(
         'relative flex h-12 flex-col items-center justify-center rounded-md text-xs transition-colors focus-visible:ring-2 focus-visible:ring-foreground/70 focus-visible:outline-none',
-        tone?.base,
-        tone && predicted && tone.predicted,
-        forecast && 'border border-dashed border-violet-300 bg-violet-50/60',
+        statusFill,
+        statusCue,
         isToday && 'ring-2 ring-foreground/70',
         'hover:brightness-105 cursor-pointer',
       )}
@@ -60,16 +64,16 @@ export function DayCell({ dateKey, dayNumber, info, forecast, menses, monitor, i
       <span className={cn('text-[11px] leading-none', isToday && 'font-bold')}>{dayNumber}</span>
       <span className="mt-1 flex h-2 items-center gap-0.5">
         {monitor && monitor !== 'none' && (
-          <span title={`Monitor: ${monitor}`} className={cn('h-1.5 w-1.5 rounded-full', MONITOR_DOTS[monitor])} />
+          <span title={`Monitor: ${monitor}`} className={cn('h-1.5 w-1.5 rounded-full', FERTILITY_MONITOR_VISUALS[monitor].dot)} />
         )}
         {intercourse && (
           <span title="Intercourse" className="inline-flex">
-            <Heart aria-hidden="true" className="size-2 fill-red-500 text-red-500" />
+            <Heart aria-hidden="true" className={cn('size-2', FERTILITY_MARKER_VISUALS.intercourse.icon)} />
           </span>
         )}
-        {assumed && <span title="Assumed data" aria-label="Assumed data" className="h-1.5 w-1.5 rounded-full border border-dashed border-amber-500" />}
-        {menses && <span title="Menses" className="h-1.5 w-1.5 rounded-full bg-red-500" />}
-        {ovulation && <span title="Predicted ovulation" className="h-1.5 w-1.5 rounded-full border-2 border-violet-600 bg-white" />}
+        {assumed && <span title="Assumed data" aria-label="Assumed data" className={cn('h-1.5 w-1.5 rounded-full', FERTILITY_MARKER_VISUALS.assumed.dot)} />}
+        {menses && <span title="Menses" className={cn('h-1.5 w-1.5 rounded-full', FERTILITY_MARKER_VISUALS.menses.dot)} />}
+        {ovulation && <span title="Predicted ovulation" className={cn('h-1.5 w-1.5 rounded-full', FERTILITY_MARKER_VISUALS.ovulation.dot)} />}
       </span>
     </button>
   )
