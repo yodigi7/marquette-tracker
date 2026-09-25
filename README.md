@@ -48,6 +48,16 @@ The workflow installs the locked pnpm dependencies, runs tests, lint, and the pr
 
 Cycle records and settings remain in the browser's IndexedDB; the Pages deployment does not upload or synchronize user data.
 
+## Data portability
+
+Settings includes a **Data & backup** section for local JSON backup and restore:
+
+- Export writes a readable, versioned JSON file containing supported persisted cycles, day records, settings, sync metadata, and post-Peak provenance. Derived fertile windows, statuses, and forecasts are recomputed rather than stored in the file.
+- Import validates and migrates the complete file before any write. Newer or unsupported formats, malformed data, duplicate identities, invalid settings, and future-dated records are rejected without changing local data.
+- Restore is replace-only for the first version and requires explicit confirmation. It replaces records and settings, then re-derives cycle structure and computed interpretation. Untouched inferred post-Peak rows retain provenance; user-edited inferred rows remain user-authored.
+- Files are read and downloaded locally; the app does not upload backup contents. An optional current-data download is available from the restore confirmation dialog.
+- Human-readable CSV export is tracked separately in GitHub issue #5, and merge-import behavior is tracked in #6.
+
 ### Rollback
 
 If a release is unhealthy, revert the deployment commit on `main` and let the workflow publish the reverted revision, or manually rerun the workflow for the last known-good `main` commit. Verify the Pages URL and offline shell after recovery.
@@ -59,6 +69,7 @@ src/
   app/           # App shell: router, layout, providers
   components/    # Shared UI (shadcn/ui in components/ui, lib/utils)
   core/engine/   # Pure, framework-agnostic Marquette algorithm (M2)
+  core/backup/   # Versioned JSON backup contract, validation, and migrations
   core/store/    # Zustand stores + Dexie repositories (M3)
   features/      # calendar / status / cycle-chart / history / settings
 ```

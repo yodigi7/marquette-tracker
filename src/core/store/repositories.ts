@@ -1,3 +1,4 @@
+import type { BackupSnapshot } from '@/core/backup/types'
 import type { DateKey } from '@/core/engine/types'
 import type { CycleEntity, DayRecordEntity, SettingsEntity, SyncMeta } from './entities'
 import { DEFAULT_SETTINGS, SETTINGS_KEY } from './entities'
@@ -15,6 +16,10 @@ export function newUuid(): string {
 function freshMeta(): SyncMeta {
   const stamp = nowIso()
   return { version: 1, synced: false, createdAt: stamp, updatedAt: stamp }
+}
+
+function defaultSettings(): SettingsEntity {
+  return { ...DEFAULT_SETTINGS, ...freshMeta() }
 }
 
 /** Increment version + clear sync flag (sync-ready bookkeeping on every write). */
@@ -56,6 +61,10 @@ export interface Repositories {
   cycles: CycleRepository
   days: DayRecordRepository
   settings: SettingsRepository
+  /** Read a consistent source snapshot for backup export. */
+  snapshot(): Promise<BackupSnapshot>
+  /** Replace all tables inside the caller's transaction. */
+  replaceAll(snapshot: BackupSnapshot): Promise<void>
   clearAll(): Promise<void>
 }
 
@@ -142,7 +151,7 @@ export function createRepositories(db: AppDb): Repositories {
         // are available without requiring a destructive schema migration.
         return { ...DEFAULT_SETTINGS, ...row }
       }
-      const defaults: SettingsEntity = { ...DEFAULT_SETTINGS, ...freshMeta() }
+      const defaults = defaultSettings()
       await db.settings.add(defaults)
       return defaults
     },
@@ -157,6 +166,32 @@ export function createRepositories(db: AppDb): Repositories {
     cycles,
     days,
     settings,
+    async snapshot() {
+      return db.transaction('r', db.cycles, db.dayRecords, db.settings, async () => {
+        const [cycles, dayRecords, storedSettings] = await Promise.all([
+          db.cycles.orderBy('day1').toArray(),
+          db.dayRecords.orderBy('date').toArray(),
+          db.settings.get(SETTINGS_KEY),
+        ])
+        return {
+          cycles,
+          dayRecords,
+          settings: storedSettings ?? defaultSettings(),
+        }
+      })
+    },
+    async replaceAll(snapshot) {
+      await db.cycles.clear()
+      await db.dayRecords.clear()
+      await db.settings.clear()
+      if (snapshot.cycles.length > 0) {
+        await db.cycles.bulkPut(snapshot.cycles)
+      }
+      if (snapshot.dayRecords.length > 0) {
+        await db.dayRecords.bulkPut(snapshot.dayRecords)
+      }
+      await db.settings.put({ ...snapshot.settings, key: SETTINGS_KEY, synced: false })
+    },
     async clearAll() {
       await db.transaction('rw', db.cycles, db.dayRecords, db.settings, async () => {
         await db.cycles.clear()

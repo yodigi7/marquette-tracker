@@ -1,5 +1,6 @@
 import { CoreSection } from './core-section'
 import { DangerSection } from './danger-section'
+import { DataBackupSection } from './data-backup-section'
 import { DisplaySection } from './display-section'
 import { ThemeSection } from './theme-section'
 
@@ -29,6 +30,15 @@ export function SettingsView() {
         </h2>
         <div className="space-y-5 rounded-lg border p-4" data-testid="display-settings">
           <DisplaySection />
+        </div>
+      </section>
+
+      <section aria-labelledby="data-backup-settings-heading">
+        <h2 id="data-backup-settings-heading" className="text-lg font-medium">
+          Data &amp; backup
+        </h2>
+        <div className="space-y-5 rounded-lg border p-4">
+          <DataBackupSection />
         </div>
       </section>
 

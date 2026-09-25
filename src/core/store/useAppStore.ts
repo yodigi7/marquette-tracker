@@ -1,4 +1,6 @@
 import { create } from 'zustand'
+import { createBackup as createBackupDocument, prepareBackupDocument } from '@/core/backup'
+import type { BackupDocument, BackupRestoreResult, PreparedBackup } from '@/core/backup'
 import { addDays } from '@/core/engine/dateUtils'
 import { computeAll } from '@/core/engine/engineSdk'
 import type { EngineOutput } from '@/core/engine/engineSdk'
@@ -32,6 +34,8 @@ export interface AppState {
   setNewCycle(day1: DateKey): Promise<CycleEntity>
   updateSettings(patch: Omit<Partial<SettingsEntity>, 'key'>): Promise<void>
   clearAllData(): Promise<void>
+  createBackup(): Promise<BackupDocument>
+  restoreBackup(prepared: PreparedBackup): Promise<BackupRestoreResult>
 }
 
 function engineSettingsOf(settings: SettingsEntity) {
@@ -72,7 +76,11 @@ export function createAppStore(db: AppDb) {
       set({ cycles, dayRecords, settings, output, ...next })
     }
 
-    async function reconcileCycleRows(placementRecords: DayRecordEntity[], allRecords: DayRecordEntity[]) {
+    async function reconcileCycleRows(
+      placementRecords: DayRecordEntity[],
+      allRecords: DayRecordEntity[],
+      options: { preserveMeta?: boolean } = {},
+    ) {
       const existing = await db.cycles.toArray()
       const plans = planCycles(
         placementRecords.map(toPlacedDay),
@@ -117,10 +125,18 @@ export function createAppStore(db: AppDb) {
         const closedAt = next ? addDays(next.day1, -1) : null
         const current = await db.cycles.get(byDay1[index].id)
         if (current && current.closedAt !== closedAt) {
-          await repos.cycles.updateClosedAt(byDay1[index].id, closedAt)
+          if (options.preserveMeta) {
+            await db.cycles.update(byDay1[index].id, { closedAt })
+          } else {
+            await repos.cycles.updateClosedAt(byDay1[index].id, closedAt)
+          }
         }
         if (current && current.cycleNo !== index + 1) {
-          await repos.cycles.update(byDay1[index].id, { cycleNo: index + 1 })
+          if (options.preserveMeta) {
+            await db.cycles.update(byDay1[index].id, { cycleNo: index + 1 })
+          } else {
+            await repos.cycles.update(byDay1[index].id, { cycleNo: index + 1 })
+          }
         }
       }
 
@@ -132,7 +148,11 @@ export function createAppStore(db: AppDb) {
         }
         const cycleId = idFor.get(owner.plan.day1) ?? ''
         if (cycleId && (record.cycleId !== cycleId || record.dayInCycle !== owner.day)) {
-          await repos.days.update(record.id, { cycleId, dayInCycle: owner.day })
+          if (options.preserveMeta) {
+            await db.dayRecords.update(record.id, { cycleId, dayInCycle: owner.day })
+          } else {
+            await repos.days.update(record.id, { cycleId, dayInCycle: owner.day })
+          }
         }
       }
 
@@ -177,7 +197,7 @@ export function createAppStore(db: AppDb) {
       })
     }
 
-    async function reconcileGeneratedRecordsInTransaction() {
+    async function reconcileGeneratedRecordsInTransaction(options: { preserveMeta?: boolean } = {}) {
       const allRecords = await db.dayRecords.toArray()
       const settings = await repos.settings.get()
       const userPlacementRecords = recordsForMode(allRecords, false)
@@ -186,7 +206,7 @@ export function createAppStore(db: AppDb) {
       // User evidence determines boundaries first. Generated rows are assigned
       // only after placement when interpretation is enabled; while it is off,
       // they remain stored and untouched.
-      await reconcileCycleRows(userPlacementRecords, assignmentRecords)
+      await reconcileCycleRows(userPlacementRecords, assignmentRecords, options)
 
       if (!settings.algorithmEnabled) {
         return
@@ -227,13 +247,18 @@ export function createAppStore(db: AppDb) {
       }
       for (const item of plan.generated) {
         if (item.existingId) {
-          await repos.days.update(item.existingId, {
+          const patch = {
             cycleId: item.cycleId,
             dayInCycle: item.dayInCycle,
             monitor: item.monitor,
             dataOrigin: item.dataOrigin,
             inference: item.inference,
-          })
+          }
+          if (options.preserveMeta) {
+            await db.dayRecords.update(item.existingId, patch)
+          } else {
+            await repos.days.update(item.existingId, patch)
+          }
         } else {
           await repos.days.upsert(item.cycleId, item.date, item.dayInCycle, {
             monitor: item.monitor,
@@ -246,7 +271,7 @@ export function createAppStore(db: AppDb) {
       // Re-assignment after generation still derives boundaries from user-only
       // evidence; generated rows are updated in place, never re-placed.
       const finalRecords = await db.dayRecords.toArray()
-      await reconcileCycleRows(userPlacementRecords, finalRecords)
+      await reconcileCycleRows(userPlacementRecords, finalRecords, options)
     }
 
     async function reconcileGeneratedRecords() {
@@ -338,6 +363,26 @@ export function createAppStore(db: AppDb) {
 
       async updateSettings(patch) {
         await runMutationWithReconciliation(() => repos.settings.update(patch))
+      },
+
+      async createBackup() {
+        return createBackupDocument(await repos.snapshot())
+      },
+
+      async restoreBackup(prepared) {
+        const validated = prepareBackupDocument(prepared.document)
+        await db.transaction('rw', db.cycles, db.dayRecords, db.settings, async () => {
+          await repos.replaceAll({
+            ...validated.document.data,
+            settings: { ...validated.document.data.settings, demoSeeded: true },
+          })
+          await reconcileGeneratedRecordsInTransaction({ preserveMeta: true })
+        })
+        await refresh({ hydrated: true })
+        return {
+          cycleCount: validated.summary.cycleCount,
+          dayRecordCount: validated.summary.dayRecordCount,
+        }
       },
 
       async clearAllData() {
