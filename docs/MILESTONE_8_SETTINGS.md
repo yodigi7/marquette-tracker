@@ -1,13 +1,13 @@
 # Milestone 8 — Settings & Preferences
 
-Single routed Settings screen persisted to the local settings store: fertility goal, algorithm on/off, post-Peak days, history window, theme, calendar week-start, cycle-length protocol band, persisted chart overlays, and a confirmed clear-all-data danger zone.
+Single routed Settings screen persisted to the local settings store: fertility goal, algorithm on/off, post-Peak days, inferred post-Peak fill mode, history window, theme, calendar week-start, cycle-length protocol band, persisted chart overlays, and a confirmed clear-all-data danger zone.
 
 ## 1. Files
 
 ```
 src/features/settings/
   index.tsx                  # SettingsView shell: Core / Display & protocol / Danger zone sections
-  core-section.tsx           # goal, algorithm toggle, post-Peak days, history window
+  core-section.tsx           # goal, algorithm toggle, post-Peak days, fill mode, history window
   theme-section.tsx          # theme (system/light/dark) via next-themes
   display-section.tsx        # week-start select + cycle band min/max (US4)
   danger-section.tsx         # clear-all-data, ack-gated destructive dialog (US3)
@@ -30,7 +30,7 @@ src/core/store/seedDemo.ts   # TEMP demo seeding — remove before release (TODO
 
 ## 2. Behavior spec
 
-- **Core settings**: goal select (track-only / avoid / achieve), algorithm switch (on by default; off ⇒ no fertile-window status, shading, or window band in Status/Calendar/Cycle chart while raw readings stay logged), post-Peak days (integer 0–10), history window (integer 1–12). Numeric inputs commit on blur/Enter and reject out-of-range values with an inline error without writing.
+- **Core settings**: goal select (track-only / avoid / achieve), algorithm switch (on by default; off ⇒ no fertile-window status, shading, or window band in Status/Calendar/Cycle chart while raw readings stay logged), post-Peak days (integer 0–10, default 4), inferred post-Peak fill mode (`Automatically after fertile window` by default or `After first user Low`), history window (integer 1–12). Numeric inputs commit on blur/Enter and reject out-of-range values with an inline error without writing. The fill mode is reconciled immediately; automatic mode stores assumed Low rows after the post-Peak window, while user-anchor mode leaves earlier gaps blank. Explicitly deleting an assumed row records a persistent suppression for that date and inference basis; entering user data on the date clears it.
 - **Theme**: system/light/dark, applied live via `next-themes <ThemeProvider attribute="class">` (previously installed but unwired), persisted to settings.
 - **Display & protocol**: week-start select (Monday default / Sunday), cycle band min/max (integer 15–60, min < max enforced in the UI; defaults 21–42). The band feeds the engine: cycles outside it trigger the existing "consult a teacher" style warning and are excluded from the forecast band filter.
 - **Chart overlays**: the Cycle chart's BBT/mucus/intercourse toggles seed from and persist to `settings.overlayMucus/overlayBbt/overlayIntercourse` instead of ephemeral local state.
@@ -43,13 +43,14 @@ The user-facing requirement "no engine changes" was interpreted one way and the 
 ## 4. Test matrix
 
 - `settings.test.tsx` (7): goal select, algorithm toggle, numeric validation (out-of-range rejected, not written), theme select persists.
-- `algorithm-off.test.tsx` (3): Status, Calendar, and Cycle strip show no interpretation when off; recordings still displayed.
-- `clear-data.test.tsx` (2): execute disabled until ack; wipe + defaults restore + dialog closes + no re-seed.
+- `postPeakFill.test.tsx` (3): default/persisted fill mode, algorithm-off preservation, post-Peak-day tail shift.
+- `algorithm-off.test.tsx` (4): Status, Calendar, and Cycle strip show no interpretation when off; recordings still displayed.
+- `clear-data.test.tsx` (3): execute disabled until ack; wipe + defaults restore + dialog closes + no re-seed.
 - `grid.test.ts` (+2): Monday (default) preserved; Sunday-first slicing + labels.
 - `overlays.test.tsx` (+2): strip mounts overlays seeded from settings; a toggle call persists via `updateSettings`.
 - `band-shift` in `marquette.test.ts` (3): default preservation; boundary (==min/==max in, min−1/max+1 out); shifted [24,39].
 
-Totals: 123 tests across the suite (was 104 at the end of Milestone 7), all green with `pnpm test && pnpm lint && pnpm build`.
+Totals: 123 tests for the Milestone 8 snapshot (104 at the end of Milestone 7); the current full suite is 265 tests, all green with `pnpm test && pnpm lint && pnpm build`.
 
 ## 5. Verification
 
@@ -58,11 +59,12 @@ Quickstart scenarios S1–S7 (`specs/002-app-settings/quickstart.md`): core pers
 ## 6. Definition of Done
 
 - [x] Core preferences persist and take effect immediately; numeric inputs validate without writing bad values
+- [x] Post-Peak fill mode persists and reconciles stored assumed readings; at most 30 inferred rows per post-Peak window
 - [x] Algorithm off ⇒ no fertile-window interpretation in any view; raw logging intact
 - [x] Theme applied live and persisted
 - [x] Week-start (Monday/Sunday) re-slices the calendar grid
 - [x] Cycle band (15–60, min<max) drives the engine warning + forecast filter, defaults 21–42 unchanged
 - [x] Chart overlay toggles persist across navigation/reload
 - [x] Clear-all-data ack-gated; wipes everything; demo data does not re-seed
-- [x] `pnpm test` (123), `pnpm lint`, `pnpm build` green
+- [x] `pnpm test` (Milestone 8 snapshot: 123; current full suite: 232), `pnpm lint`, `pnpm build` green
 - [x] README status → M8 complete; documented remaining items (disclaimer placement, demo-seed removal)

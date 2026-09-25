@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { addDays } from '@/core/engine/dateUtils'
 import { createDb } from '../db'
+import type { SettingsEntity } from '../entities'
 import { createAppStore, FutureDateError } from '../useAppStore'
 
 function setup() {
@@ -26,7 +27,7 @@ describe('store hydration', () => {
     expect(s.hydrated).toBe(true)
     expect(s.cycles).toEqual([])
     expect(s.dayRecords).toEqual([])
-    expect(s.settings.postPeakDays).toBe(3)
+    expect(s.settings.postPeakDays).toBe(4)
     expect(s.settings.algorithmEnabled).toBe(true)
     expect(s.settings.goal).toBe('track-only')
   })
@@ -36,6 +37,7 @@ describe('day records', () => {
   it('upserts by cycle+date without creating duplicates', async () => {
     const { store } = setup()
     const { id: cycleId } = await store.getState().setNewCycle('2026-01-01')
+    await store.getState().updateSettings({ algorithmEnabled: false })
     const put = store.getState().addDayRecord
     await put(cycleId, '2026-01-10', 10, { monitor: 'high' })
     await put(cycleId, '2026-01-10', 10, { monitor: 'peak' })
@@ -45,13 +47,13 @@ describe('day records', () => {
     expect(state(store).dayRecords[0].synced).toBe(false)
   })
 
-  it('engine output recomputes when a peak is logged (end = peak + 3)', async () => {
+  it('engine output recomputes when a peak is logged (end = peak + 4)', async () => {
     const { store } = setup()
     const { id: cycleId } = await store.getState().setNewCycle('2026-01-01')
     await store.getState().addDayRecord(cycleId, '2026-01-14', 14, { monitor: 'peak' })
     const cycle = state(store).output?.cycles[0]
     expect(cycle?.fertileWindow.begin).toBe(6)
-    expect(cycle?.fertileWindow.end).toBe(17)
+    expect(cycle?.fertileWindow.end).toBe(18)
     expect(cycle?.peakDay).toBe(14)
   })
 
@@ -91,6 +93,7 @@ describe('cycles', () => {
     const { store } = setup()
     const first = await store.getState().setNewCycle('2026-01-01')
     const second = await store.getState().setNewCycle('2026-02-01')
+    await store.getState().updateSettings({ algorithmEnabled: false })
     await store.getState().addDayRecord(first.id, '2026-01-14', 14, { monitor: 'peak' })
     await store.getState().addDayRecord(second.id, '2026-02-12', 12, { monitor: 'high' })
     const cycles = state(store).output!.cycles
@@ -107,7 +110,7 @@ describe('settings & data lifecycle', () => {
     const { store } = setup()
     const { id: cycleId } = await store.getState().setNewCycle('2026-01-01')
     await store.getState().addDayRecord(cycleId, '2026-01-14', 14, { monitor: 'peak' })
-    expect(state(store).output!.cycles[0].fertileWindow.end).toBe(17)
+    expect(state(store).output!.cycles[0].fertileWindow.end).toBe(18)
     await store.getState().updateSettings({ postPeakDays: 6 })
     expect(state(store).settings.postPeakDays).toBe(6)
     expect(state(store).output!.cycles[0].fertileWindow.end).toBe(20)
@@ -126,7 +129,37 @@ describe('settings & data lifecycle', () => {
     expect(s.cycles).toHaveLength(1)
     expect(s.cycles[0].day1).toBe('2026-01-01')
     expect(s.dayRecords[0].monitor).toBe('peak')
-    expect(s.settings.postPeakDays).toBe(3)
+    expect(s.settings.postPeakDays).toBe(4)
+  })
+
+  it('keeps an explicitly persisted post-Peak value across a restart', async () => {
+    const db = createDb()
+    const first = createAppStore(db)
+    await first.getState().hydrate()
+    await first.getState().updateSettings({ postPeakDays: 3 })
+
+    const second = createAppStore(db)
+    await second.getState().hydrate()
+    expect(state(second).settings.postPeakDays).toBe(3)
+  })
+
+  it('upgrades a legacy settings row without a persisted post-Peak value to the default', async () => {
+    const db = createDb()
+    const first = createAppStore(db)
+    await first.getState().hydrate()
+    // Simulate a row written before the setting existed: the repository must
+    // fill the missing field from defaults instead of leaving it undefined.
+    const row = (await db.settings.get('main'))! as Partial<SettingsEntity>
+    const { postPeakDays: _dropped, ...legacy } = row
+    await db.settings.put({ ...legacy, postPeakDays: 3 } as SettingsEntity)
+    const withLegacyValue = createAppStore(db)
+    await withLegacyValue.getState().hydrate()
+    expect(state(withLegacyValue).settings.postPeakDays).toBe(3)
+
+    await db.settings.put({ ...legacy } as SettingsEntity)
+    const withoutValue = createAppStore(db)
+    await withoutValue.getState().hydrate()
+    expect(state(withoutValue).settings.postPeakDays).toBe(4)
   })
 
   it('clearAllData wipes everything and resets defaults', async () => {

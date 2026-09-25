@@ -57,8 +57,9 @@ describe('Algorithm off = logging only (US2)', () => {
     await store().updateSettings({ algorithmEnabled: true })
     rerender(<StatusView />)
 
-    expect(screen.getByText('confirmed')).toBeInTheDocument()
+    expect(screen.getByText('Fertile window')).toBeInTheDocument()
     expect(screen.getByText(/Fertile from cycle day/i)).toBeInTheDocument()
+    expect(screen.getByText(/current Peak \+ 4 days/)).toBeInTheDocument()
   })
 
   it('Status shows the logging-only card when the algorithm is off', async () => {

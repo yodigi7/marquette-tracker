@@ -4,6 +4,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { seedDemoData } from '@/core/store/seedDemo'
 import { useAppStore } from '@/core/store/useAppStore'
 import { addDays } from '@/core/engine/dateUtils'
+import { todayKey } from '@/core/dateKeys'
 import { HistoryView } from '../index'
 
 const store = () => useAppStore.getState()
@@ -50,5 +51,20 @@ describe('HistoryView', () => {
     const openRow = screen.getAllByRole('row').find((r) => r.textContent?.includes('Open'))
     expect(openRow).toBeTruthy()
     expect(openRow!.textContent).toContain(`day ${lastDay}`)
+  })
+
+  it('uses user-only derived output while logging-only mode is active', async () => {
+    await store().clearAllData()
+    const start = addDays(todayKey(), -20)
+    const cycle = await store().setNewCycle(start)
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: 'medium' })
+    await store().addDayRecord(cycle.id, addDays(start, 13), 14, { monitor: 'peak' })
+    const generatedDate = addDays(start, 18)
+    await store().updateSettings({ algorithmEnabled: false })
+
+    render(<HistoryView />)
+
+    expect(store().output?.cycles[0].days.some((day) => day.date === generatedDate)).toBe(false)
+    expect(screen.getByText(/Avg length/i)).toBeInTheDocument()
   })
 })

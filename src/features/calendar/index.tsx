@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Heart } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -10,11 +10,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { dayInfo } from '@/core/cycleStatus'
 import { dayInCycle, todayKey } from '@/core/dateKeys'
 import type { EngineOutput } from '@/core/engine/engineSdk'
 import { isMensesFlow, planCycles } from '@/core/engine/placement'
-import { cycleForDate, cycleResultsByCycleId } from '@/core/store/selectors'
+import { cycleForDate, cycleResultsByCycleId, recordsForMode } from '@/core/store/selectors'
 import { useAppStore } from '@/core/store/useAppStore'
 import type { CycleEntity, DayRecordEntity } from '@/core/store/entities'
 import { DayCell } from './day-cell'
@@ -24,9 +23,10 @@ import { QuickEntry } from './quick-entry'
 
 export function CalendarView() {
   const cycles = useAppStore((s) => s.cycles)
-  const dayRecords = useAppStore((s) => s.dayRecords)
+  const allDayRecords = useAppStore((s) => s.dayRecords)
   const output = useAppStore((s) => s.output)
   const interpreted = useAppStore((s) => s.settings.algorithmEnabled)
+  const dayRecords = useMemo(() => recordsForMode(allDayRecords, interpreted), [allDayRecords, interpreted])
   const weekStart = useAppStore((s) => s.settings.weekStart)
 
   const now = new Date()
@@ -65,8 +65,6 @@ export function CalendarView() {
   const selectedRecord = selected ? dayRecords.find((r) => r.date === selected) : undefined
   const pending = selected && !selectedCycle ? pendingPlacement(cycles, dayRecords, selected) : null
   const selectedDay = selectedCycle && selected ? dayInCycle(selectedCycle.day1, selected) : (pending?.day ?? 1)
-  const selectedResult = selectedCycle ? results.get(selectedCycle.id) : undefined
-  const selectedInfo = selectedResult && selected ? dayInfo(selectedResult.fertileWindow, selectedResult.peakDay !== null, selectedDay) : null
 
   return (
     <div className="mx-auto w-full max-w-lg space-y-3">
@@ -107,6 +105,7 @@ export function CalendarView() {
                 menses={cell.menses}
                 monitor={cell.monitor}
                 intercourse={cell.intercourse}
+                origin={cell.origin}
                 ovulation={interpreted ? cell.ovulation : false}
                 isToday={dateKey === today}
                 onSelect={onSelectDate}
@@ -126,12 +125,7 @@ export function CalendarView() {
                 <DialogTitle>{selected === today ? 'Day details' : selected}</DialogTitle>
                 {selectedCycle ? (
                   <DialogDescription>
-                    Status:{' '}
-                    <span className="font-medium text-foreground">
-                      {selectedInfo
-                        ? `${selectedInfo.status}${selectedInfo.source === 'confirmed' ? ' (confirmed)' : ' (predicted)'}`
-                        : 'no status'}
-                    </span>
+                    Cycle day {selectedDay} of the cycle starting {selectedCycle.day1}.
                   </DialogDescription>
                 ) : (
                   <DialogDescription>
@@ -185,6 +179,7 @@ function Legend() {
       <LegendItem className="rounded bg-emerald-100" label="Post-peak" />
       <LegendItem className="rounded border border-dashed border-violet-300" label="Predicted window" />
       <LegendDot className="bg-red-500" label="Menses" />
+      <LegendDot className="border border-dashed border-amber-500" label="Assumed data" />
       <LegendDot className="bg-sky-400" label="Low" />
       <LegendDot className="bg-amber-500" label="High" />
       <LegendDot className="bg-violet-600" label="Peak" />

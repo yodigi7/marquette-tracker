@@ -5,12 +5,38 @@ export type Goal = 'avoid-pregnancy' | 'achieve-pregnancy' | 'track-only'
 export type Theme = 'light' | 'dark' | 'system'
 export type PregnancyResult = 'negative' | 'positive'
 
+/** Whether a stored observation came from the user or an app inference. */
+export type DataOrigin = 'user' | 'inferred'
+
+/** Controls when the persisted post-Peak Low tail begins. */
+export type PostPeakFillMode = 'auto-after-window' | 'after-user-low'
+
+/** Lineage for an inferred post-Peak Low reading. */
+export interface PostPeakInference {
+  rule: 'post-peak-low-tail'
+  /** Latest user-entered monitor Peak day that anchors the tail. */
+  peakDay: number
+  postPeakDays: number
+  anchorDate?: DateKey
+  mode: PostPeakFillMode
+}
+
+/** A user deletion that prevents the same inference basis from recreating a date. */
+export interface PostPeakSuppression {
+  date: DateKey
+  cycleId: string
+  cycleDay1: DateKey
+  peakDay: number
+  postPeakDays: number
+  mode: PostPeakFillMode
+}
+
 /** Calendar day key, format 'YYYY-MM-DD' (UTC). */
 export type DateKey = string
 
 /** The settings the engine needs. The store's Settings row may carry more (theme, algorithmEnabled). */
 export interface EngineSettings {
-  /** Days from last Peak day the fertile window extends. Official Marquette default: 3. */
+  /** Days from last Peak day the fertile window extends. Monitor-only default: 4. */
   postPeakDays: number
   /** Number of previous cycles used for the calendar rules. Marquette default: 6. */
   historyWindow: number
@@ -34,6 +60,7 @@ export interface DayRecordInput {
   date: DateKey
   dayInCycle: number
   monitor?: MonitorReading
+  /** Logged and displayed only; never engine evidence under the monitor-only contract. */
   mucus?: MucusLevel
   bloodFlow?: BloodFlow
   intercourse?: boolean
@@ -42,6 +69,8 @@ export interface DayRecordInput {
   symptoms?: string[]
   pregnancyTest?: PregnancyResult
   notes?: string
+  /** Absent on legacy rows; an absent value is treated as user-authored. */
+  dataOrigin?: DataOrigin
 }
 
 export type DayStatus = 'pre-fertile' | 'fertile' | 'post-peak' | 'post-calendar'
@@ -61,11 +90,12 @@ export interface DayResult {
   day: number
   date: DateKey
   status: DayStatus
-  /** Calendar-derived vs. monitor/mucus-confirmed. */
+  /** Calendar-derived vs. monitor-confirmed. */
   source: 'confirmed' | 'predicted'
 }
 
-export type PeakSource = 'monitor' | 'mucus' | 'both' | 'none'
+/** Monitor-only contract: Peak evidence comes from a user-entered monitor Peak. */
+export type PeakSource = 'monitor' | 'none'
 
 export interface CycleResult {
   cycleId: string

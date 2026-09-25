@@ -64,34 +64,40 @@ interface Case {
 
 const CASES: Case[] = [
   {
-    name: 'first cycle, peak on day 14: begin day 6, end 14+3',
+    name: 'first cycle, peak on day 14: begin day 6, end 14+4',
     cycleNo: 1,
     records: [record('c1', 6, { monitor: 'high' }), record('c1', 7, { monitor: 'high' }), record('c1', 14, { monitor: 'peak' })],
-    expect: { begin: 6, end: 17, beginRule: 'calendar-day-6', endRule: 'current-peak-plus-n', peakDay: 14, peakSource: 'monitor' },
+    expect: { begin: 6, end: 18, beginRule: 'calendar-day-6', endRule: 'current-peak-plus-n', peakDay: 14, peakSource: 'monitor' },
   },
   {
     name: 'first cycle, high on day 3: window opens at first high (day 3)',
     cycleNo: 1,
     records: [record(1, 3, { monitor: 'high' }), record(1, 14, { monitor: 'peak' })],
-    expect: { begin: 3, end: 17, beginRule: 'first-high-or-peak', endRule: 'current-peak-plus-n' },
+    expect: { begin: 3, end: 18, beginRule: 'first-high-or-peak', endRule: 'current-peak-plus-n' },
   },
   {
     name: 'first cycle, peak on day 6: begin stays day 6',
     cycleNo: 1,
     records: [record(1, 6, { monitor: 'peak' })],
-    expect: { begin: 6, end: 9, beginRule: 'calendar-day-6', endRule: 'current-peak-plus-n' },
+    expect: { begin: 6, end: 10, beginRule: 'calendar-day-6', endRule: 'current-peak-plus-n' },
   },
   {
-    name: 'monitor peak day 12, mucus peak day 14: peak day is the latest (14), both sources',
+    name: 'monitor peak day 12, mucus peak day 14: the monitor Peak is the only evidence',
     cycleNo: 2,
     records: [record(2, 12, { monitor: 'peak' }), record(2, 14, { mucus: 'peak' })],
-    expect: { begin: 6, end: 17, beginRule: 'calendar-day-6', endRule: 'current-peak-plus-n', peakDay: 14, peakSource: 'both' },
+    expect: { begin: 6, end: 16, beginRule: 'calendar-day-6', endRule: 'current-peak-plus-n', peakDay: 12, peakSource: 'monitor' },
   },
   {
-    name: 'mucus-only peak counts as peak',
+    name: 'mucus-only peak is not Peak evidence and creates no window end',
     cycleNo: 2,
     records: [record(2, 16, { mucus: 'peak' })],
-    expect: { begin: 6, end: 19, beginRule: 'calendar-day-6', endRule: 'current-peak-plus-n', peakDay: 16, peakSource: 'mucus' },
+    expect: { begin: 6, end: null, beginRule: 'calendar-day-6', endRule: 'none', peakDay: null, peakSource: 'none' },
+  },
+  {
+    name: 'mucus observations do not move the window begin either',
+    cycleNo: 1,
+    records: [record(1, 2, { mucus: 'peak' }), record(1, 14, { monitor: 'peak' })],
+    expect: { begin: 6, end: 18, beginRule: 'calendar-day-6', endRule: 'current-peak-plus-n', peakDay: 14, peakSource: 'monitor' },
   },
   {
     name: 'no peak in first six cycles: no end, no-peak-end warning',
@@ -104,41 +110,41 @@ const CASES: Case[] = [
     cycleNo: 9,
     history: historyWithPeaks([12, 16, 14, 15, 13, 14]),
     records: [record(9, 14, { monitor: 'peak' })],
-    expect: { begin: 6, end: 17, beginRule: 'calendar-earliest-peak-minus-6', endRule: 'current-peak-plus-n' },
+    expect: { begin: 6, end: 18, beginRule: 'calendar-earliest-peak-minus-6', endRule: 'current-peak-plus-n' },
   },
   {
     name: 'cycle 9: first high on day 4 beats calendar begin 6',
     cycleNo: 9,
     history: historyWithPeaks([12, 16, 14, 15, 13, 14]),
     records: [record(9, 4, { monitor: 'high' }), record(9, 14, { monitor: 'peak' })],
-    expect: { begin: 4, end: 17, beginRule: 'first-high-or-peak', endRule: 'current-peak-plus-n' },
+    expect: { begin: 4, end: 18, beginRule: 'first-high-or-peak', endRule: 'current-peak-plus-n' },
   },
   {
-    name: 'cycle 9: historic latest peak 16+3=19 ends before current 20+3=23 → earliest-end',
+    name: 'cycle 9: historic latest peak 16+4=20 ends before current 20+4=24 → earliest-end',
     cycleNo: 9,
     history: historyWithPeaks([12, 16, 14, 15, 13, 14]),
     records: [record(9, 20, { monitor: 'peak' })],
-    expect: { begin: 6, end: 19, beginRule: 'calendar-earliest-peak-minus-6', endRule: 'earliest-end' },
+    expect: { begin: 6, end: 20, beginRule: 'calendar-earliest-peak-minus-6', endRule: 'earliest-end' },
   },
   {
-    name: 'cycle 9: current peak end 13 beats historic end 19',
+    name: 'cycle 9: current peak end 14 beats historic end 20',
     cycleNo: 9,
     history: historyWithPeaks([12, 16, 14, 15, 13, 14]),
     records: [record(9, 10, { monitor: 'peak' })],
-    expect: { begin: 6, end: 13, beginRule: 'calendar-earliest-peak-minus-6', endRule: 'current-peak-plus-n' },
+    expect: { begin: 6, end: 14, beginRule: 'calendar-earliest-peak-minus-6', endRule: 'current-peak-plus-n' },
   },
   {
-    name: 'cycle 9 without peak falls back to historic latest peak + 3',
+    name: 'cycle 9 without peak falls back to historic latest peak + 4',
     cycleNo: 9,
     history: historyWithPeaks([12, 16, 14, 15, 13, 14]),
     records: [record(9, 10, { monitor: 'high' })],
-    expect: { begin: 6, end: 19, beginRule: 'calendar-earliest-peak-minus-6', endRule: 'historic-peak-plus-n' },
+    expect: { begin: 6, end: 20, beginRule: 'calendar-earliest-peak-minus-6', endRule: 'historic-peak-plus-n' },
   },
   {
     name: 'repeat highs do not move the begin after its set',
     cycleNo: 1,
     records: [record(1, 5, { monitor: 'high' }), record(1, 9, { monitor: 'high' }), record(1, 12, { monitor: 'peak' }), record(1, 15, { monitor: 'peak' })],
-    expect: { begin: 5, end: 18, beginRule: 'first-high-or-peak', endRule: 'current-peak-plus-n', peakDay: 15 },
+    expect: { begin: 5, end: 19, beginRule: 'first-high-or-peak', endRule: 'current-peak-plus-n', peakDay: 15 },
   },
   {
     name: 'postPeakDays 2 shortens the window',
@@ -151,13 +157,29 @@ const CASES: Case[] = [
     name: 'records in scrambled order produce the same window',
     cycleNo: 1,
     records: [record(1, 14, { monitor: 'peak' }), record(1, 3, { monitor: 'high' }), record(1, 7, { mucus: 'none' })],
-    expect: { begin: 3, end: 17, beginRule: 'first-high-or-peak', endRule: 'current-peak-plus-n' },
+    expect: { begin: 3, end: 18, beginRule: 'first-high-or-peak', endRule: 'current-peak-plus-n' },
   },
   {
-    name: 'cycle 9 without history at all: falls back to peak-12 minus 6 (day 6), ends peak+3',
+    name: 'cycle 9 without history at all: falls back to peak-12 minus 6 (day 6), ends peak+4',
     cycleNo: 9,
     records: [record(9, 15, { monitor: 'peak' })],
-    expect: { begin: 6, end: 18, beginRule: 'calendar-earliest-peak-minus-6', endRule: 'current-peak-plus-n' },
+    expect: { begin: 6, end: 19, beginRule: 'calendar-earliest-peak-minus-6', endRule: 'current-peak-plus-n' },
+  },
+  {
+    name: 'inferred monitor readings are not user evidence',
+    cycleNo: 1,
+    records: [
+      record(1, 14, { monitor: 'peak' }),
+      record(1, 19, { monitor: 'high', dataOrigin: 'inferred' }),
+      record(1, 20, { monitor: 'peak', dataOrigin: 'inferred' }),
+    ],
+    expect: { begin: 6, end: 18, beginRule: 'calendar-day-6', endRule: 'current-peak-plus-n', peakDay: 14, peakSource: 'monitor' },
+  },
+  {
+    name: 'records without provenance count as user evidence',
+    cycleNo: 1,
+    records: [record(1, 14, { monitor: 'peak' }), record(1, 21, { monitor: 'peak' })],
+    expect: { begin: 6, end: 25, beginRule: 'calendar-day-6', endRule: 'current-peak-plus-n', peakDay: 21, peakSource: 'monitor' },
   },
 ]
 
@@ -188,6 +210,25 @@ describe('marquette computeCycle', () => {
     })
   }
 
+  it('defaults to a four-day post-Peak interval', () => {
+    expect(DEFAULT_POST_PEAK_DAYS).toBe(4)
+  })
+
+  it('keeps the default window fertile through P+4 and safe from P+5', () => {
+    const result = computeCycle(
+      cycle(1),
+      [record(1, 14, { monitor: 'peak' })],
+      1,
+      28,
+      emptyHistory(),
+      settings(),
+    )
+
+    expect(result.fertileWindow.end).toBe(18)
+    expect(statusForCycleDay(result.fertileWindow, true, 18)).toBe('fertile')
+    expect(statusForCycleDay(result.fertileWindow, true, 19)).toBe('post-peak')
+  })
+
   it('assigns statuses across the whole window (first cycle, peak 14)', () => {
     const start = '2026-01-01'
     const records: DayRecordInput[] = Array.from({ length: 25 }, (_, i) => ({
@@ -201,8 +242,8 @@ describe('marquette computeCycle', () => {
     const byStatus = new Map(result.days.map((d) => [d.day, d.status]))
     expect(byStatus.get(5)).toBe('pre-fertile')
     expect(byStatus.get(6)).toBe('fertile')
-    expect(byStatus.get(17)).toBe('fertile')
-    expect(byStatus.get(18)).toBe('post-peak')
+    expect(byStatus.get(18)).toBe('fertile')
+    expect(byStatus.get(19)).toBe('post-peak')
     expect(byStatus.get(25)).toBe('post-peak')
   })
 
@@ -215,13 +256,50 @@ describe('marquette computeCycle', () => {
     expect(day20?.source).toBe('confirmed')
   })
 
+  it('does not treat Low-only records as Peak evidence or a fertile-window end', () => {
+    const result = computeCycle(
+      cycle(1),
+      [record(1, 18, { monitor: 'low' })],
+      1,
+      28,
+      emptyHistory(),
+      settings(),
+    )
+
+    expect(result.peakDay).toBeNull()
+    expect(result.peakSource).toBe('none')
+    expect(result.fertileWindow.end).toBeNull()
+    expect(result.fertileWindow.endRule).toBe('none')
+    expect(result.days[0]?.status).toBe('fertile')
+  })
+
+  it('returns day results for inferred records without using them as evidence', () => {
+    const result = computeCycle(
+      cycle(1),
+      [
+        record(1, 14, { monitor: 'peak' }),
+        record(1, 19, { monitor: 'low', dataOrigin: 'inferred' }),
+        record(1, 20, { monitor: 'low', dataOrigin: 'inferred' }),
+      ],
+      1,
+      28,
+      emptyHistory(),
+      settings(),
+    )
+
+    expect(result.peakDay).toBe(14)
+    expect(result.fertileWindow.end).toBe(18)
+    expect(result.days.map((day) => day.day)).toEqual([14, 19, 20])
+    expect(result.days.find((d) => d.day === 19)?.status).toBe('post-peak')
+  })
+
   it('statusForCycleDay extrapolates beyond recorded days', () => {
-    const window = { begin: 6, end: 17, beginRule: 'calendar-day-6' as const, endRule: 'current-peak-plus-n' as const }
+    const window = { begin: 6, end: 18, beginRule: 'calendar-day-6' as const, endRule: 'current-peak-plus-n' as const }
     expect(statusForCycleDay(window, true, 5)).toBe('pre-fertile')
     expect(statusForCycleDay(window, true, 6)).toBe('fertile')
-    expect(statusForCycleDay(window, true, 17)).toBe('fertile')
-    expect(statusForCycleDay(window, true, 18)).toBe('post-peak')
-    expect(statusForCycleDay(window, false, 18)).toBe('post-calendar')
+    expect(statusForCycleDay(window, true, 18)).toBe('fertile')
+    expect(statusForCycleDay(window, true, 19)).toBe('post-peak')
+    expect(statusForCycleDay(window, false, 19)).toBe('post-calendar')
     expect(statusForCycleDay({ ...window, end: null }, true, 40)).toBe('fertile')
   })
 })

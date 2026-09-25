@@ -21,7 +21,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
         await useAppStore.getState().updateSettings({ demoSeeded: true })
       }
     }
-    void boot()
+    void boot().catch((error: unknown) => {
+      // hydrate() intentionally leaves the store non-hydrated on failure, so
+      // the loading gate remains closed instead of rendering a partial snapshot.
+      console.error('App hydration failed', error)
+    })
   }, [])
 
   if (!hydrated) {

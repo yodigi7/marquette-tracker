@@ -86,7 +86,7 @@ describe('CalendarView', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('does not auto-open when the current cycle has mucus Peak or multiple Peaks', async () => {
+  it('does not auto-open when the current cycle has a monitor Peak after a mucus Peak', async () => {
     const cycleStart = addDays(todayKey(), -6)
     const cycle = await store().setNewCycle(cycleStart)
     await store().addDayRecord(cycle.id, addDays(cycleStart, 2), 3, { monitor: 'peak' })
@@ -97,6 +97,17 @@ describe('CalendarView', () => {
     await screen.findAllByTestId('day-cell')
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('auto-opens when the current cycle has a mucus Peak but no monitor Peak', async () => {
+    const cycleStart = addDays(todayKey(), -6)
+    const cycle = await store().setNewCycle(cycleStart)
+    await store().addDayRecord(cycle.id, addDays(cycleStart, 2), 3, { mucus: 'peak' })
+    allowAutoOpen()
+
+    render(<CalendarView />)
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
   })
 
   it('does not auto-open with consecutive monitor Peaks', async () => {
@@ -197,6 +208,40 @@ describe('CalendarView', () => {
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
     expect(screen.getByTestId('delete-record')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Peak' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('opens the day dialog without computed status, source, or forecast text', async () => {
+    const user = userEvent.setup()
+    const day1Key = dateKeyLocal(new Date(nowYear(), nowMonth(), 1))
+    const { id } = await store().setNewCycle(day1Key)
+    await store().addDayRecord(id, day1Key, 1, { monitor: 'peak' })
+    await store().addDayRecord(id, addDays(day1Key, 13), 14, { monitor: 'high' })
+
+    render(<CalendarView />)
+    await user.click(cellByDate(addDays(day1Key, 13))!)
+
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toBeInTheDocument()
+    expect(dialog).not.toHaveTextContent('Status:')
+    expect(dialog).not.toHaveTextContent('(confirmed)')
+    expect(dialog).not.toHaveTextContent('(predicted)')
+    expect(dialog).not.toHaveTextContent('post-peak')
+  })
+
+  it('keeps the day dialog free of derived status while the algorithm is off', async () => {
+    const user = userEvent.setup()
+    const day1Key = dateKeyLocal(new Date(nowYear(), nowMonth(), 1))
+    const { id } = await store().setNewCycle(day1Key)
+    await store().addDayRecord(id, day1Key, 1, { monitor: 'peak' })
+    await store().updateSettings({ algorithmEnabled: false })
+
+    render(<CalendarView />)
+    await user.click(cellByDate(day1Key)!)
+
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).not.toHaveTextContent('Status:')
+    expect(dialog).not.toHaveTextContent('(confirmed)')
+    expect(screen.getByTestId('delete-record')).toBeInTheDocument()
   })
 
   it('keeps existing values when a pre-populated form is saved', async () => {

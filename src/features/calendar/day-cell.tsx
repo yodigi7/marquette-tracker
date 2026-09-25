@@ -2,6 +2,7 @@ import { Heart } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { DayInfo } from '@/core/cycleStatus'
 import type { DayRecordEntity } from '@/core/store/entities'
+import type { CellOrigin } from './grid'
 
 export interface DayCellProps {
   dateKey: string
@@ -11,6 +12,7 @@ export interface DayCellProps {
   menses: boolean
   monitor: DayRecordEntity['monitor']
   intercourse: boolean
+  origin: CellOrigin
   ovulation: boolean
   isToday: boolean
   onSelect(dateKey: string): void
@@ -30,9 +32,10 @@ const MONITOR_DOTS: Record<NonNullable<DayRecordEntity['monitor']>, string> = {
   peak: 'bg-violet-600',
 }
 
-export function DayCell({ dateKey, dayNumber, info, forecast, menses, monitor, intercourse, ovulation, isToday, onSelect }: DayCellProps) {
+export function DayCell({ dateKey, dayNumber, info, forecast, menses, monitor, intercourse, origin, ovulation, isToday, onSelect }: DayCellProps) {
   const tone = info ? STATUS_CELL_TONES[info.status] : null
   const predicted = info?.source === 'predicted'
+  const assumed = origin === 'inferred'
 
   return (
     <button
@@ -41,8 +44,9 @@ export function DayCell({ dateKey, dayNumber, info, forecast, menses, monitor, i
       data-date={dateKey}
       data-status={info?.status ?? ''}
       data-source={info?.source ?? ''}
+      data-origin={origin === 'none' ? undefined : origin}
       data-forecast={forecast || undefined}
-      aria-label={`${dateKey}:${info?.status ?? 'no status'}`}
+      aria-label={`${dateKey}:${info?.status ?? 'no status'}${assumed ? ', assumed data' : ''}`}
       onClick={() => onSelect(dateKey)}
       className={cn(
         'relative flex h-12 flex-col items-center justify-center rounded-md text-xs transition-colors focus-visible:ring-2 focus-visible:ring-foreground/70 focus-visible:outline-none',
@@ -63,6 +67,7 @@ export function DayCell({ dateKey, dayNumber, info, forecast, menses, monitor, i
             <Heart aria-hidden="true" className="size-2 fill-red-500 text-red-500" />
           </span>
         )}
+        {assumed && <span title="Assumed data" aria-label="Assumed data" className="h-1.5 w-1.5 rounded-full border border-dashed border-amber-500" />}
         {menses && <span title="Menses" className="h-1.5 w-1.5 rounded-full bg-red-500" />}
         {ovulation && <span title="Predicted ovulation" className="h-1.5 w-1.5 rounded-full border-2 border-violet-600 bg-white" />}
       </span>

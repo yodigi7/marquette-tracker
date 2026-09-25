@@ -65,7 +65,7 @@ describe('Clear all data (US3)', () => {
     expect(store().dayRecords).toHaveLength(0)
     expect(store().settings.algorithmEnabled).toBe(true)
     expect(store().settings.goal).toBe('track-only')
-    expect(store().settings.postPeakDays).toBe(3)
+    expect(store().settings.postPeakDays).toBe(4)
     expect(store().settings.weekStart).toBe('monday')
     expect(store().settings.cycleMinLength).toBe(21)
 

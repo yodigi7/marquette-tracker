@@ -49,7 +49,7 @@ describe('Settings core preferences (US1)', () => {
 
     expect(screen.getByTestId('settings-goal')).toHaveTextContent('Track only')
     expect(screen.getByTestId('settings-algorithm')).toBeChecked()
-    expect(screen.getByTestId('settings-post-peak-days')).toHaveValue(3)
+    expect(screen.getByTestId('settings-post-peak-days')).toHaveValue(4)
     expect(screen.getByTestId('settings-history-window')).toHaveValue(6)
     expect(screen.getByTestId('settings-theme')).toHaveTextContent('System')
   })
@@ -98,12 +98,12 @@ describe('Settings core preferences (US1)', () => {
     await user.clear(postPeak)
     await user.type(postPeak, '-1')
     expect(await screen.findByText(/must be between 0 and 10/i)).toBeInTheDocument()
-    expect(store().settings.postPeakDays).toBe(3)
+    expect(store().settings.postPeakDays).toBe(4)
 
     await user.clear(postPeak)
     await user.type(postPeak, '11')
     expect(screen.getByText(/must be between 0 and 10/i)).toBeInTheDocument()
-    expect(store().settings.postPeakDays).toBe(3)
+    expect(store().settings.postPeakDays).toBe(4)
   })
 
   it('rejects history-window values outside integer 1-12 with inline error, not writing', async () => {

@@ -18,7 +18,7 @@ This is a **solo hobby project**. MVP is small and lean, but data model + algori
 - **Day 1 = first day of menses**.
 - **Manual entry only** for monitor readings — no device integration/import.
 - **No reminders/notifications** for now.
-- **No export** for now (JSON backup may come later; storage schema must keep that future-proofed).
+- **Versioned JSON backup/restore is in scope** for local data protection; the storage schema must remain migration-ready. CSV is a separate, low-priority human-readable export; no cloud sync or backend is in scope.
 - **Offline-first, local storage only** — IndexedDB. No cloud sync in MVP, no encryption required. Schema must be sync-ready later (UUIDs, version flags).
 - **No Python backend in MVP** — deferred entirely. The algorithm module must be framework-agnostic pure TS so it can be ported to Python/FastAPI later for logic parity.
 
@@ -52,10 +52,12 @@ Fertile-window **end**:
 
 | | Rule |
 |---|---|
-| Cycles 1–6 | 3 full (24-h) days after the last Peak day (Peak = monitor Peak or "Peak" mucus, whichever is **latest**) |
-| After 6 cycles | "Latest Peak of last 6 cycles + 3 days" OR "current cycle's last Peak + 3 days" — whichever **ends first** |
+| Cycles 1–6 | 4 full (24-h) days after the last user-entered **monitor** Peak day |
+| After 6 cycles | "Latest monitor Peak of last 6 cycles + postPeakDays" OR "current cycle's last monitor Peak + postPeakDays" — whichever **ends first** |
 
-- Practical interpretation: safe to resume intimacy on the **evening of the 4th day past Peak**. The `postPeakDays` setting defaults to **3** (official wording) and is configurable.
+- Monitor-only evidence: Peak, fertile-window begin/end, and confirmation come from user-entered monitor readings. Mucus stays loggable and visible (calendar/chart overlays) but is never engine evidence.
+- Practical interpretation: the first assumed (inferred) Low begins at **P+5** with the default. The `postPeakDays` setting defaults to **4** and is configurable.
+- A user-entered monitor **High** on or after the active tail start stops the inferred Low tail; a later monitor **Peak** starts a fresh tail with its own 30-row budget.
 - If a cycle has **no Peak** (8–10% of cycles), fall back to the calendar rule for the end.
 - Cycles outside 21–42 days: warn if 2+ cycles fall outside the band (protocol says consult a teacher).
 - All computed statuses are **derived at read time** from raw records — never stored — recomputed on every data change.
@@ -78,7 +80,7 @@ src/
 
 - `Cycle`: id (UUID), cycleNo, day1 (date, = first day of menses), closedAt, notes.
 - `DayRecord`: id (UUID), cycleId, date, dayInCycle, monitor (none/low/high/peak), mucus, blood flow, intercourse (bool + optional time), bbt, symptoms (array), medications, pregnancy test (neg/pos), notes — **all optional**.
-- `Settings`: goal (TTA / TTC / track-only), algorithmEnabled (bool), postPeakDays (default 3), historyWindow (default 6; used for calendar-rule peaks), theme (system/light/dark), weekStart (monday default / sunday), cycleMinLength/cycleMaxLength (band, default 21–42), overlayMucus/overlayBbt/overlayIntercourse (cycle-chart overlay persistence, default off).
+- `Settings`: goal (TTA / TTC / track-only), algorithmEnabled (bool), postPeakDays (default 4), historyWindow (default 6; used for calendar-rule peaks), theme (system/light/dark), weekStart (monday default / sunday), cycleMinLength/cycleMaxLength (band, default 21–42), overlayMucus/overlayBbt/overlayIntercourse (cycle-chart overlay persistence, default off).
 - Records carry sync-friendly metadata (UUID keys, `version`/`synced` flags) so a cloud sync layer can be added later.
 
 ## Views
@@ -92,7 +94,7 @@ src/
 ## Predictions / forecasting
 
 - Next period start: mean/median of last N cycles (6–12).
-- Estimated next fertile window: "earliest/latest Peak of last 6 cycles − 6 / + 3" calendar rule.
+- Estimated next fertile window: "earliest/latest monitor Peak of last 6 cycles − 6 / + postPeakDays" calendar rule.
 - Predictions are **always labeled as predictions** until confirmed by readings.
 
 ## Commands

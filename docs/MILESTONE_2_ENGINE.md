@@ -37,7 +37,7 @@ export type DateKey       = string        // 'YYYY-MM-DD', UTC
 export type PregnancyResult = 'negative' | 'positive'
 ```
 
-- `Settings { goal; postPeakDays: number /* default 3 */; historyWindow: number /* default 6 */ }` (only fields the engine needs; UI/theme handled by store).
+- `Settings { goal; postPeakDays: number /* default 4 */; historyWindow: number /* default 6 */ }` (only fields the engine needs; UI/theme handled by store).
 - Inputs (structural — the store's Dexie records contain extra fields like `id`, `synced`; they satisfy these shapes directly):
   - `CycleInput { id; day1: DateKey; closedAt?: DateKey | null; notes? }` — cycleNo is NOT an input: the engine assigns numbers by sorting `day1` (idempotent, order-proof).
   - `DayRecordInput { id; cycleId; date: DateKey; dayInCycle: number; monitor?; mucus?; bloodFlow?; intercourse?: boolean; intercourseTime?; bbt?: number | null; symptoms?: string[]; pregnancyTest?: PregnancyResult; notes? }` — all optional except identifiers/dayInCycle.
@@ -52,7 +52,7 @@ export interface DayResult { day: number; date: DateKey; status: DayStatus; sour
 export interface CycleResult {
   cycleId, cycleNo, day1,
   length: number | null,                    // null while open
-  peakDay: number | null,                   // latest peak (monitor or mucus)
+  peakDay: number | null,                   // latest user-entered monitor peak
   peakSource: 'monitor' | 'mucus' | 'both' | 'none'
   fertileWindow: FertileWindow
   days: DayResult[]                         // one per recorded/day present
@@ -68,14 +68,14 @@ export type EngineWarning = {kind: 'cycle-out-of-band'; cycleNo; length} | {kind
    - Any first monitor `high` or `peak` on day d → begin = min(begin, d), `beginRule: 'first-high-or-peak'` when it wins.
    - cycleNo ≥ 7 → calendar begin = (earliest peakDay of the previous `historyWindow` cycles) − 6, defaulting earliest = 12 when history lacks peaks (yields day 6). Combined with the first-high rule via min.
 3. **End** (inclusive last day):
-   - Peak known, cycles 1–6: end = peakDay + `postPeakDays` (`current-peak-plus-n`).
+   - Peak known, cycles 1–6: end = peakDay + `postPeakDays` (`current-peak-plus-n`); default 4 ⇒ fertile through P+4, first assumed Low at P+5.
    - Peak known, cycleNo ≥ 7: end = min(current end, historic end) — "whichever ends first"; `endRule` records the winner (`earliest-end` when historic is earlier, `current-peak-plus-n` when current wins).
    - No peak, cycleNo ≥ 7: fallback end = latest historic peak + `postPeakDays` (`historic-peak-plus-n`).
    - No peak, cyclesNo 1–6: `end: null`, `endRule: 'none'` (+ warning `no-peak-end`).
 4. **Statuses per day** (only for recorded days): day < begin → `pre-fertile`; begin..end → `fertile`; end < day → `post-peak` if peak known else `post-calendar`.
 5. **Warnings**: cycle length outside 21–42 and ≥2 such cycles totally → `cycle-out-of-band` (per protocol: consult teacher).
 
-- `postPeakDays` is configurable; ramp formula day-inCLUSIVE: fertile = begin … peak+postDays; the evening of `peak+postDays+1` is the "evening of 4th day past peak" textual savings for the UI.
+- `postPeakDays` is configurable (default 4); ramp formula day-INCLUSIVE: fertile = begin … peak+postDays. Evidence is monitor-only: mucus is stored/displayed but never Peak, begin, or end evidence, and records with `dataOrigin: 'inferred'` are excluded from all evidence rules.
 
 ---
 

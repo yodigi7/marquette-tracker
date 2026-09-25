@@ -3,13 +3,15 @@ import { addDays } from '@/core/engine/dateUtils'
 import { computeAll } from '@/core/engine/engineSdk'
 import type { EngineOutput } from '@/core/engine/engineSdk'
 import { planCycles, isMensesFlow, type PlacedDay } from '@/core/engine/placement'
-import type { DateKey } from '@/core/engine/types'
+import { planPostPeakFill, type PostPeakFillCycle, type PostPeakFillDay } from '@/core/engine/postPeakFill'
+import type { DateKey, PostPeakSuppression } from '@/core/engine/types'
 import { dayInCycle, todayKey } from '@/core/dateKeys'
 import type { AppDb } from './db'
 import { db } from './db'
 import { DEFAULT_SETTINGS } from './entities'
 import type { CycleEntity, DayRecordEntity, SettingsEntity } from './entities'
 import { createRepositories } from './repositories'
+import { recordsForMode } from './selectors'
 
 export class FutureDateError extends Error {
   constructor() {
@@ -66,91 +68,200 @@ export function createAppStore(db: AppDb) {
         repos.settings.get(),
       ])
       const dayRecords = [...records].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
-      const output = computeAll(cycles, dayRecords, engineSettingsOf(settings))
+      const output = computeAll(cycles, recordsForMode(dayRecords, settings.algorithmEnabled), engineSettingsOf(settings))
       set({ cycles, dayRecords, settings, output, ...next })
     }
 
-    /**
-     * Re-derives the whole cycle structure from the raw records, in one pass, inside a
-     * single transaction. No cycle is protected: a write may move a Day 1, merge two
-     * cycles, or split one. Declared cycle starts (pinned) always open a cycle and are
-     * kept even while empty.
-     */
-    async function replan() {
-      await db.transaction('rw', db.cycles, db.dayRecords, async () => {
-        const records = await db.dayRecords.toArray()
-        const existing = await db.cycles.toArray()
-        const plans = planCycles(
-          records.map(toPlacedDay),
-          existing.filter((cycle) => cycle.pinned).map((cycle) => cycle.day1),
-        )
+    async function reconcileCycleRows(placementRecords: DayRecordEntity[], allRecords: DayRecordEntity[]) {
+      const existing = await db.cycles.toArray()
+      const plans = planCycles(
+        placementRecords.map(toPlacedDay),
+        existing.filter((cycle) => cycle.pinned).map((cycle) => cycle.day1),
+      )
 
-        // A declared start owns a cycle even with no records: add any plan the walk missed.
-        for (const cycle of existing) {
-          if (cycle.pinned && !plans.some((plan) => plan.day1 === cycle.day1)) {
-            plans.push({ day1: cycle.day1, dates: [] })
-          }
+      // A declared start owns a cycle even with no records: add any plan the walk missed.
+      for (const cycle of existing) {
+        if (cycle.pinned && !plans.some((plan) => plan.day1 === cycle.day1)) {
+          plans.push({ day1: cycle.day1, dates: [] })
         }
-        plans.sort((a, b) => (a.day1 < b.day1 ? -1 : 1))
+      }
+      plans.sort((a, b) => (a.day1 < b.day1 ? -1 : 1))
 
-        const pinned = existing.filter((cycle) => cycle.pinned)
-        const taken = new Set<string>()
-        // Reuse the existing row that already owns a day1, preferring a declared
-        // start, so cycle ids stay stable while the structure is re-derived.
-        const matchFor = (day1: DateKey) =>
-          pinned.find((cycle) => cycle.day1 === day1 && !taken.has(cycle.id)) ??
-          existing.find((cycle) => cycle.day1 === day1 && !taken.has(cycle.id))
+      const pinned = existing.filter((cycle) => cycle.pinned)
+      const taken = new Set<string>()
+      // Reuse the existing row that already owns a day1, preferring a declared
+      // start, so cycle ids stay stable while the structure is re-derived.
+      const matchFor = (day1: DateKey) =>
+        pinned.find((cycle) => cycle.day1 === day1 && !taken.has(cycle.id)) ??
+        existing.find((cycle) => cycle.day1 === day1 && !taken.has(cycle.id))
 
-        const byDay1: { day1: DateKey; id: string }[] = []
-        for (const plan of plans) {
-          const match = matchFor(plan.day1)
-          if (match) {
-            taken.add(match.id)
-          }
-          byDay1.push({ day1: plan.day1, id: match ? match.id : '' })
+      const byDay1: { day1: DateKey; id: string }[] = []
+      for (const plan of plans) {
+        const match = matchFor(plan.day1)
+        if (match) {
+          taken.add(match.id)
         }
-        for (const entry of byDay1) {
-          if (entry.id) {
-            continue
-          }
-          const created = await repos.cycles.create({ day1: entry.day1 })
-          entry.id = created.id
+        byDay1.push({ day1: plan.day1, id: match ? match.id : '' })
+      }
+      for (const entry of byDay1) {
+        if (entry.id) {
+          continue
         }
+        const created = await repos.cycles.create({ day1: entry.day1 })
+        entry.id = created.id
+      }
 
-        // Last cycle stays open; every earlier one closes the day before the next begins.
-        for (let index = 0; index < byDay1.length; index++) {
-          const next = byDay1[index + 1]
-          const closedAt = next ? addDays(next.day1, -1) : null
-          const current = await db.cycles.get(byDay1[index].id)
-          if (current && current.closedAt !== closedAt) {
-            await repos.cycles.updateClosedAt(byDay1[index].id, closedAt)
-          }
-          if (current && current.cycleNo !== index + 1) {
-            await repos.cycles.update(byDay1[index].id, { cycleNo: index + 1 })
-          }
+      // Last cycle stays open; every earlier one closes the day before the next begins.
+      for (let index = 0; index < byDay1.length; index++) {
+        const next = byDay1[index + 1]
+        const closedAt = next ? addDays(next.day1, -1) : null
+        const current = await db.cycles.get(byDay1[index].id)
+        if (current && current.closedAt !== closedAt) {
+          await repos.cycles.updateClosedAt(byDay1[index].id, closedAt)
         }
+        if (current && current.cycleNo !== index + 1) {
+          await repos.cycles.update(byDay1[index].id, { cycleNo: index + 1 })
+        }
+      }
 
-        const idFor = new Map(byDay1.map((entry) => [entry.day1, entry.id]))
-        for (const record of records) {
-          const owner = ownerOf(plans, record.date)
-          if (!owner) {
-            continue
-          }
-          const cycleId = idFor.get(owner.plan.day1) ?? ''
-          if (record.cycleId !== cycleId || record.dayInCycle !== owner.day) {
-            await repos.days.update(record.id, { cycleId, dayInCycle: owner.day })
-          }
+      const idFor = new Map(byDay1.map((entry) => [entry.day1, entry.id]))
+      for (const record of allRecords) {
+        const owner = ownerOf(plans, record.date)
+        if (!owner) {
+          continue
         }
+        const cycleId = idFor.get(owner.plan.day1) ?? ''
+        if (cycleId && (record.cycleId !== cycleId || record.dayInCycle !== owner.day)) {
+          await repos.days.update(record.id, { cycleId, dayInCycle: owner.day })
+        }
+      }
 
-        const live = new Set(byDay1.map((entry) => entry.id))
-        for (const cycle of existing) {
-          if (!live.has(cycle.id)) {
-            await db.cycles.delete(cycle.id)
-          }
+      const live = new Set(byDay1.map((entry) => entry.id))
+      for (const cycle of existing) {
+        if (!live.has(cycle.id)) {
+          await db.cycles.delete(cycle.id)
         }
+      }
+    }
+
+    async function suppressionFor(record: DayRecordEntity): Promise<PostPeakSuppression | null> {
+      if (record.dataOrigin !== 'inferred' || !record.inference) {
+        return null
+      }
+      const cycle =
+        (await db.cycles.get(record.cycleId)) ??
+        (await db.cycles.toArray())
+          .filter((item) => item.day1 <= record.date)
+          .sort((a, b) => (a.day1 < b.day1 ? -1 : 1))
+          .at(-1)
+      if (!cycle) {
+        return null
+      }
+      return {
+        date: record.date,
+        cycleId: cycle.id,
+        cycleDay1: cycle.day1,
+        peakDay: record.inference.peakDay,
+        postPeakDays: record.inference.postPeakDays,
+        mode: record.inference.mode,
+      }
+    }
+
+    async function clearSuppressionsForDate(date: DateKey) {
+      const settings = await repos.settings.get()
+      if (!settings.postPeakSuppressions.some((suppression) => suppression.date === date)) {
+        return
+      }
+      await repos.settings.update({
+        postPeakSuppressions: settings.postPeakSuppressions.filter((suppression) => suppression.date !== date),
+      })
+    }
+
+    async function reconcileGeneratedRecordsInTransaction() {
+      const allRecords = await db.dayRecords.toArray()
+      const settings = await repos.settings.get()
+      const userPlacementRecords = recordsForMode(allRecords, false)
+      const assignmentRecords = settings.algorithmEnabled ? allRecords : userPlacementRecords
+
+      // User evidence determines boundaries first. Generated rows are assigned
+      // only after placement when interpretation is enabled; while it is off,
+      // they remain stored and untouched.
+      await reconcileCycleRows(userPlacementRecords, assignmentRecords)
+
+      if (!settings.algorithmEnabled) {
+        return
+      }
+
+      const cycles = await db.cycles.toArray()
+      const records = await db.dayRecords.toArray()
+      const output = computeAll(cycles, records, engineSettingsOf(settings))
+      const results = new Map(output.cycles.map((result) => [result.cycleId, result]))
+      const sortedCycles = [...cycles].sort((a, b) => (a.day1 < b.day1 ? -1 : 1))
+      const fillCycles: PostPeakFillCycle[] = sortedCycles.map((cycle, index) => ({
+        id: cycle.id,
+        day1: cycle.day1,
+        nextDay1: sortedCycles[index + 1]?.day1 ?? null,
+        monitorPeakDay: results.get(cycle.id)?.peakDay ?? null,
+      }))
+      const fillRecords: PostPeakFillDay[] = records.map((record) => ({
+        id: record.id,
+        cycleId: record.cycleId,
+        date: record.date,
+        dayInCycle: record.dayInCycle,
+        monitor: record.monitor,
+        mucus: record.mucus,
+        dataOrigin: record.dataOrigin,
+        inference: record.inference,
+      }))
+      const plan = planPostPeakFill({
+        cycles: fillCycles,
+        records: fillRecords,
+        mode: settings.postPeakFillMode,
+        postPeakDays: settings.postPeakDays,
+        today: todayKey(),
+        suppressions: settings.postPeakSuppressions,
       })
 
+      for (const id of plan.staleIds) {
+        await repos.days.remove(id)
+      }
+      for (const item of plan.generated) {
+        if (item.existingId) {
+          await repos.days.update(item.existingId, {
+            cycleId: item.cycleId,
+            dayInCycle: item.dayInCycle,
+            monitor: item.monitor,
+            dataOrigin: item.dataOrigin,
+            inference: item.inference,
+          })
+        } else {
+          await repos.days.upsert(item.cycleId, item.date, item.dayInCycle, {
+            monitor: item.monitor,
+            dataOrigin: item.dataOrigin,
+            inference: item.inference,
+          })
+        }
+      }
+
+      // Re-assignment after generation still derives boundaries from user-only
+      // evidence; generated rows are updated in place, never re-placed.
+      const finalRecords = await db.dayRecords.toArray()
+      await reconcileCycleRows(userPlacementRecords, finalRecords)
+    }
+
+    async function reconcileGeneratedRecords() {
+      await db.transaction('rw', db.cycles, db.dayRecords, db.settings, () => reconcileGeneratedRecordsInTransaction())
       await refresh()
+    }
+
+    async function runMutationWithReconciliation<T>(mutate: () => Promise<T>): Promise<T> {
+      let result!: T
+      await db.transaction('rw', db.cycles, db.dayRecords, db.settings, async () => {
+        result = await mutate()
+        await reconcileGeneratedRecordsInTransaction()
+      })
+      await refresh()
+      return result
     }
 
     return {
@@ -171,45 +282,62 @@ export function createAppStore(db: AppDb) {
         if (get().hydrated) {
           return
         }
-        await refresh({ hydrated: true })
+        await refresh()
+        await reconcileGeneratedRecords()
+        set({ hydrated: true })
       },
 
       async addDayRecord(cycleId, date, dayInCycle, patch) {
         if (date > todayKey()) {
           throw new FutureDateError()
         }
-        const records = await db.dayRecords.toArray()
-        const existing = records.find((record) => record.date === date)
-        if (existing) {
-          await repos.days.update(existing.id, patch)
-        } else {
-          await repos.days.upsert(cycleId, date, dayInCycle, patch)
-        }
-        await replan()
+        await runMutationWithReconciliation(async () => {
+          const records = await db.dayRecords.toArray()
+          const existing = records.find((record) => record.date === date)
+          if (existing) {
+            await repos.days.update(existing.id, { ...patch, dataOrigin: 'user' })
+          } else {
+            await repos.days.upsert(cycleId, date, dayInCycle, { ...patch, dataOrigin: 'user' })
+          }
+          await clearSuppressionsForDate(date)
+        })
       },
 
       async removeDayRecord(id) {
-        await repos.days.remove(id)
-        await replan()
+        await runMutationWithReconciliation(async () => {
+          const record = await db.dayRecords.get(id)
+          if (record) {
+            const suppression = await suppressionFor(record)
+            if (suppression) {
+              const settings = await repos.settings.get()
+              await repos.settings.update({
+                postPeakSuppressions: [
+                  ...settings.postPeakSuppressions.filter((item) => item.date !== suppression.date),
+                  suppression,
+                ],
+              })
+            }
+          }
+          await repos.days.remove(id)
+        })
       },
 
       async setNewCycle(day1) {
-        const cycles = await repos.cycles.list()
-        const latest = cycles[cycles.length - 1]
-        if (latest && latest.closedAt === null) {
-          if (day1 <= latest.day1) {
-            return latest
+        return runMutationWithReconciliation(async () => {
+          const cycles = await repos.cycles.list()
+          const latest = cycles[cycles.length - 1]
+          if (latest && latest.closedAt === null) {
+            if (day1 <= latest.day1) {
+              return latest
+            }
+            await repos.cycles.updateClosedAt(latest.id, addDays(day1, -1))
           }
-          await repos.cycles.updateClosedAt(latest.id, addDays(day1, -1))
-        }
-        const created = await repos.cycles.create({ day1, pinned: true })
-        await refresh()
-        return created
+          return repos.cycles.create({ day1, pinned: true })
+        })
       },
 
       async updateSettings(patch) {
-        await repos.settings.update(patch)
-        await refresh()
+        await runMutationWithReconciliation(() => repos.settings.update(patch))
       },
 
       async clearAllData() {

@@ -53,12 +53,15 @@ export function weekdayLabels(weekStart: WeekStart = 'monday'): string[] {
   return weekStart === 'sunday' ? WEEKDAY_LABELS_SUNDAY : WEEKDAY_LABELS
 }
 
+export type CellOrigin = 'user' | 'inferred' | 'none'
+
 export interface CellInfo {
   info: DayInfo | null
   forecast: boolean
   menses: boolean
   monitor: DayRecordEntity['monitor']
   intercourse: boolean
+  origin: CellOrigin
   /** True on the predicted ovulation day of the current open cycle (see `predictedOvulationDay`). */
   ovulation: boolean
 }
@@ -99,6 +102,7 @@ export function resolveCell(
     menses: !isFuture && mensesFor(record, cycle ? dayInCycle(cycle.day1, dateKey) : 0),
     monitor: record?.monitor && record.monitor !== 'none' ? record.monitor : undefined,
     intercourse: !!record?.intercourse,
+    origin: record ? (record.dataOrigin ?? 'user') : 'none',
     ovulation,
   }
 }

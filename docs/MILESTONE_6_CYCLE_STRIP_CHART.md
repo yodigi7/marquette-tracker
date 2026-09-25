@@ -42,7 +42,7 @@ src/test/setup.ts              # jsdom polyfills (scrollIntoView, pointer captur
 - `overlays.test.tsx`: marker counts, days, and data attrs per overlay; toggling one overlay doesn't touch bands/window.
 - `selector.test.tsx`: newest-first ordering + `(open)` suffix; selecting Cycle A navigates and swaps the strip to 28 bands; `/cycle/bogus` and `/cycle` fall back to Cycle B's 6-band strip.
 
-Totals: 101 tests across the suite (was 58 at the end of Milestone 5), all green with `pnpm test && pnpm lint && pnpm build`.
+Totals: 101 tests for the Milestone 6 snapshot (58 at the end of Milestone 5); the current full suite is 265 tests, all green with `pnpm test && pnpm lint && pnpm build`.
 
 ## 6. Definition of Done
 
@@ -50,5 +50,5 @@ Totals: 101 tests across the suite (was 58 at the end of Milestone 5), all green
 - [x] Fertile window band rendered with confirmed-vs-predicted distinction; hidden when algorithm is off
 - [x] BBT/mucus/intercourse overlays gated by ephemeral toggles
 - [x] Cycle selector navigates; invalid ids fall back to newest cycle
-- [x] `pnpm test` (101), `pnpm lint`, `pnpm build` green
+- [x] `pnpm test` (Milestone 6 snapshot: 101; current full suite: 232), `pnpm lint`, `pnpm build` green
 - [x] README status → M7 (History/Stats) next

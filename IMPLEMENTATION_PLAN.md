@@ -75,9 +75,9 @@ Input: ordered `DayRecord[]` of one cycle + `Settings` + reference to previous c
    - In ALL cases: if a monitor `high` or `peak` reading occurs on cycle day d, begin = min(begin, d) (any first High triggers fertility).
    - After 6 cycles: calendar begin = earliest peak day of the last `historyWindow` (default 6) cycles minus 6 days; combine with first-High rule (min).
 4. **End:**
-   - `end = noPeak ? calendarFallbackEnd : lastPeakDay + postPeakDays` (3 full 24-h days = `peak + 3`; fertile spans peak, +1, +2, +3 — evening of peak+4 safe per AGENTS.md).
-   - After 6 cycles: end = min(historic latest peak + `postPeakDays`, current end) — "whichever comes first".
-   - No peak + after 6 cycles: use calendar fallback (latest peak of last 6 cycles + 3). No peak + first 6 cycles: no reliable end → status `unknown` (and surface a notice).
+   - `end = noPeak ? calendarFallbackEnd : lastMonitorPeakDay + postPeakDays` (4 full 24-h days by default = `peak + 4`; fertile spans peak … peak+4, first assumed Low at peak+5). Monitor-only: mucus is never Peak evidence.
+   - After 6 cycles: end = min(historic latest monitor peak + `postPeakDays`, current end) — "whichever comes first".
+   - No peak + after 6 cycles: use calendar fallback (latest monitor peak of last 6 cycles + postPeakDays). No peak + first 6 cycles: no reliable end → status `unknown` (and surface a notice).
 5. **Statuses per day:** `pre-fertile` (before begin), `fertile` (begin..end), `post-peak-safe` (after end once peak confirmed), `post-fertile` (after end via calendar only — label shows if end was by calendar); predicted vs confirmed computed for days without data.
 6. Cycle validity: length 21–42 days; engine returns `outOfBandWarnings` when ≥2 consecutive cycles outside band.
 
@@ -157,7 +157,7 @@ Input: ordered `DayRecord[]` of one cycle + `Settings` + reference to previous c
 
 ### 6.5 Settings (`features/settings/`)
 - Goal: TTA / TTC / track-only (informational labels; drives copy like "avoid intimacy in fertile window" vs "best days for conception").
-- Algorithm toggle (ON default; when OFF the app logs data only, no windows/status computed; label clearly). postPeakDays stepper (default 3, allowed 2–6). historyWindow (default 6). Dark mode; clear-all-data danger zone (with confirm + IndexedDB clear).
+- Algorithm toggle (ON default; when OFF the app logs data only, no windows/status computed; label clearly). postPeakDays stepper (default 4, allowed 0–10). historyWindow (default 6). Dark mode; clear-all-data danger zone (with confirm + IndexedDB clear).
 
 **Acceptance:** toggle persists; with OFF, all fertile/time labels disappear app-wide.
 
@@ -183,9 +183,14 @@ Input: ordered `DayRecord[]` of one cycle + `Settings` + reference to previous c
 
 ---
 
+## Current data-portability scope
+
+- Versioned JSON backup/restore for all persisted local data, including schema migration and atomic restore.
+- CSV is a separate, low-priority human-readable export; it is not the canonical backup format.
+
 ## Out of scope (post-MVP backlog)
 
-- Python FastAPI backend / cloud sync / multi-user / auth; JSON backup/restore; reminders; device import; postpartum/non-cycling protocols; PDF/CSV export.
+- Python FastAPI backend / cloud sync / multi-user / auth; reminders; device import; postpartum/non-cycling protocols; PDF/CSV export.
 
 ---
 

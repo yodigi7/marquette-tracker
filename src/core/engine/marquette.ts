@@ -17,32 +17,31 @@ export const CYCLE_LENGTH_MIN = 21
 export const CYCLE_LENGTH_MAX = 42
 /** Calendar fallback: earliest possible peak day 12 minus 6 yields fertile day 6. */
 export const DEFAULT_EARLIEST_PEAK = 12
-export const DEFAULT_POST_PEAK_DAYS = 3
+export const DEFAULT_POST_PEAK_DAYS = 4
 export const DEFAULT_HISTORY_WINDOW = 6
 
 function isHighOrPeak(record: DayRecordInput): boolean {
   return record.monitor === 'high' || record.monitor === 'peak'
 }
 
+/**
+ * User-authored records only. An absent `dataOrigin` is legacy user data, so
+ * inferred rows never become Peak, begin, or end evidence.
+ */
+function isUserEvidence(record: DayRecordInput): boolean {
+  return record.dataOrigin !== 'inferred'
+}
+
+/** Monitor-only Peak evidence: a user-entered monitor Peak, never mucus. */
 function computePeak(records: DayRecordInput[]): { peakDay: number | null; source: PeakSource } {
   let monitorPeak: number | null = null
-  let mucusPeak: number | null = null
   for (const record of records) {
     if (record.monitor === 'peak') {
       monitorPeak = record.dayInCycle
     }
-    if (record.mucus === 'peak') {
-      mucusPeak = record.dayInCycle
-    }
-  }
-  if (monitorPeak !== null && mucusPeak !== null) {
-    return { peakDay: Math.max(monitorPeak, mucusPeak), source: 'both' }
   }
   if (monitorPeak !== null) {
     return { peakDay: monitorPeak, source: 'monitor' }
-  }
-  if (mucusPeak !== null) {
-    return { peakDay: mucusPeak, source: 'mucus' }
   }
   return { peakDay: null, source: 'none' }
 }
@@ -140,6 +139,8 @@ function sourceForDay(day: number, window: FertileWindow, peakKnown: boolean): D
  * Computes the fertile window and day statuses for a single cycle.
  *
  * Pure: no I/O, no framework imports. All derived from the provided records.
+ * Peak, begin, and end come from user-authored monitor evidence only; inferred
+ * records still receive a day result so coverage views can display them.
  *
  * @param cycleNo     cycle number (1-based), assigned by engineSdk via day1 ordering
  * @param length      cycle length in days; null while the cycle is open
@@ -154,9 +155,12 @@ export function computeCycle(
   settings: EngineSettings,
 ): CycleResult {
   const sorted = [...records].sort((a, b) => a.dayInCycle - b.dayInCycle)
-  const { peakDay, source } = computePeak(sorted)
+  // Day results cover every supplied record; only user-authored records are
+  // allowed to establish Peak, begin, and end evidence.
+  const evidence = sorted.filter(isUserEvidence)
+  const { peakDay, source } = computePeak(evidence)
 
-  const begin = computeBegin(cycleNo, sorted, history, settings)
+  const begin = computeBegin(cycleNo, evidence, history, settings)
   const end = computeEnd(cycleNo, peakDay, history, settings)
   const fertileWindow: FertileWindow = { begin: begin.begin, end: end.end, beginRule: begin.rule, endRule: end.rule }
 

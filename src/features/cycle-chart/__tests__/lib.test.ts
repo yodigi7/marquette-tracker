@@ -50,7 +50,7 @@ function result(over: Partial<CycleResult> = {}): CycleResult {
     day1: '2026-01-01',
     length: 28,
     peakDay: 14,
-    peakSource: 'both',
+    peakSource: 'monitor',
     fertileWindow: {
       begin: 6,
       end: 17,

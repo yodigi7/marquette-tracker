@@ -88,6 +88,36 @@ describe('StatusView', () => {
     expect(screen.queryByText('Fertile window')).toBeNull()
   })
 
+  it('omits inferred days from derived output while logging-only mode is active', async () => {
+    const start = addDays(todayKey(), -20)
+    const cycle = await store().setNewCycle(start)
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: 'medium' })
+    await store().addDayRecord(cycle.id, addDays(start, 13), 14, { monitor: 'peak' })
+    const generatedDate = addDays(start, 18)
+    await store().updateSettings({ algorithmEnabled: false })
+
+    render(<StatusView />)
+
+    expect(store().output?.cycles[0].days.some((day) => day.date === generatedDate)).toBe(false)
+    expect(screen.getByText(/algorithm is off/i)).toBeInTheDocument()
+    expect(screen.queryByText('Fertile window')).toBeNull()
+  })
+
+  it('describes the post-Peak rule with the configured day count', async () => {
+    const start = addDays(todayKey(), -20)
+    const cycle = await store().setNewCycle(start)
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: 'medium' })
+    await store().addDayRecord(cycle.id, addDays(start, 13), 14, { monitor: 'peak' })
+
+    const { unmount } = render(<StatusView />)
+    expect(await screen.findByText(/until day 18 \(current Peak \+ 4 days\)/)).toBeInTheDocument()
+    unmount()
+
+    await store().updateSettings({ postPeakDays: 2 })
+    render(<StatusView />)
+    expect(await screen.findByText(/until day 16 \(current Peak \+ 2 days\)/)).toBeInTheDocument()
+  })
+
   it('shows a no-cycle state on an empty store', () => {
     render(<StatusView />)
 

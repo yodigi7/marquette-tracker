@@ -1,4 +1,4 @@
-import type { DateKey, Goal, Theme } from '@/core/engine/types'
+import type { DataOrigin, DateKey, Goal, PostPeakFillMode, PostPeakInference, PostPeakSuppression, Theme } from '@/core/engine/types'
 
 /** Sync/version bookkeeping attached to every row (AGENTS.md sync-ready path). */
 export interface SyncMeta {
@@ -26,6 +26,9 @@ export interface DayRecordEntity extends SyncMeta {
   monitor?: 'none' | 'low' | 'high' | 'peak'
   mucus?: 'none' | 'low' | 'high' | 'peak'
   bloodFlow?: 'none' | 'light' | 'medium' | 'heavy'
+  /** Absent on legacy rows; legacy records are treated as user-authored. */
+  dataOrigin?: DataOrigin
+  inference?: PostPeakInference
   intercourse?: boolean
   intercourseTime?: string
   bbt?: number | null
@@ -46,6 +49,8 @@ export interface SettingsEntity extends SyncMeta {
   weekStart: WeekStart
   cycleMinLength: number
   cycleMaxLength: number
+  postPeakFillMode: PostPeakFillMode
+  postPeakSuppressions: PostPeakSuppression[]
   overlayMucus: boolean
   overlayBbt: boolean
   overlayIntercourse: boolean
@@ -59,12 +64,14 @@ export const DEFAULT_SETTINGS: Omit<SettingsEntity, keyof SyncMeta> = {
   key: SETTINGS_KEY,
   goal: 'track-only',
   algorithmEnabled: true,
-  postPeakDays: 3,
+  postPeakDays: 4,
   historyWindow: 6,
   theme: 'system',
   weekStart: 'monday',
   cycleMinLength: 21,
   cycleMaxLength: 42,
+  postPeakFillMode: 'auto-after-window',
+  postPeakSuppressions: [],
   overlayMucus: false,
   overlayBbt: false,
   overlayIntercourse: false,

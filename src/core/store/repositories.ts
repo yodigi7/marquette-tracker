@@ -138,7 +138,9 @@ export function createRepositories(db: AppDb): Repositories {
     async get() {
       const row = await db.settings.get(SETTINGS_KEY)
       if (row) {
-        return row
+        // Merge defaults so settings introduced after a database was created
+        // are available without requiring a destructive schema migration.
+        return { ...DEFAULT_SETTINGS, ...row }
       }
       const defaults: SettingsEntity = { ...DEFAULT_SETTINGS, ...freshMeta() }
       await db.settings.add(defaults)

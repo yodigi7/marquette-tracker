@@ -56,7 +56,7 @@ Index notes: `[cycleId+date]` compound unique index makes day-record upsert dete
 - day records: `getByCycle(cycleId)`, `getByDate(cycleId, date)`, `upsert(cycleId, date, patch)` (update existing or add — never two rows per `[cycleId+date]`), `remove(id)`.
 - settings: `getSettings(): SettingsEntity` (returns default row when missing), `updateSettings(patch)`.
 
-**Defaults**: `postPeakDays: 3`, `historyWindow: 6`, `algorithmEnabled: true`, `goal: 'track-only'`, `theme: 'system'`.
+**Defaults**: `postPeakDays: 4`, `historyWindow: 6`, `algorithmEnabled: true`, `goal: 'track-only'`, `theme: 'system'`.
 
 ---
 
@@ -107,7 +107,7 @@ Store ops order: persist → `refresh()` (re-read all tables → `computeAll(cyc
 |---|---|
 | 1 | hydrate on empty DB → default settings row + no cycles |
 | 2 | addDayRecord → row persisted; second call with same date updates (no duplicates) |
-| 3 | addDayRecord with monitor `peak` recomputes window end = peak + 3 |
+| 3 | addDayRecord with monitor `peak` recomputes window end = peak + postPeakDays (default 4) |
 | 4 | startNewCycle closes open cycle (closedAt = day1−1), bumps cycleNo |
 | 5 | startNewCycle with truncated start is a no-op for latest open cycle |
 | 6 | updateSettings persists; engine recomputes with new postPeakDays |

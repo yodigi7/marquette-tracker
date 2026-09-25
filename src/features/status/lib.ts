@@ -24,18 +24,27 @@ export const BEGIN_RULE_LABELS: Record<FertileWindow['beginRule'], string> = {
 }
 
 export const END_RULE_LABELS: Record<FertileWindow['endRule'], string> = {
-  'current-peak-plus-n': '3 days after Peak',
-  'historic-peak-plus-n': 'latest historical Peak + 3 days',
+  'current-peak-plus-n': 'current Peak + N days',
+  'historic-peak-plus-n': 'latest historical Peak + N days',
   'earliest-end': 'earliest of historical vs current Peak',
   none: 'no end (no Peak yet)',
 }
 
-export function windowDescription(window: FertileWindow, peakKnown: boolean): string {
+/** Rule text with the configured post-Peak interval substituted in. */
+export function endRuleLabel(rule: FertileWindow['endRule'], postPeakDays: number): string {
+  return END_RULE_LABELS[rule].replace('N days', `${postPeakDays} days`)
+}
+
+export function windowDescription(
+  window: FertileWindow,
+  peakKnown: boolean,
+  postPeakDays: number,
+): string {
   const begin = `Fertile from cycle day ${window.begin} (${BEGIN_RULE_LABELS[window.beginRule]})`
   if (window.end === null) {
     return peakKnown
       ? `${begin}; end pending new readings after Peak.`
       : `${begin}; end unknown until a Peak is read.`
   }
-  return `${begin}; until day ${window.end} (${END_RULE_LABELS[window.endRule]}).`
+  return `${begin}; until day ${window.end} (${endRuleLabel(window.endRule, postPeakDays)}).`
 }
