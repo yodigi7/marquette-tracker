@@ -12,6 +12,7 @@ import type { CycleResult, Forecast } from "@/core/engine/types";
 import { useAppStore } from "@/core/store/useAppStore";
 import { cn } from "@/lib/utils";
 import { FERTILITY_FORECAST_VISUAL, FERTILITY_TEXT_VISUALS } from "@/lib/fertility-visuals";
+import { Link, useNavigate } from "react-router";
 
 export function HistoryView() {
   const output = useAppStore((s) => s.output);
@@ -164,6 +165,8 @@ function CycleStats({ results, forecast }: { results: CycleResult[]; forecast: F
 }
 
 function CycleTable({ results, showDerived }: { results: CycleResult[]; showDerived: boolean }) {
+  const navigate = useNavigate();
+
   if (results.length === 0) {
     return (
       <Card>
@@ -196,8 +199,20 @@ function CycleTable({ results, showDerived }: { results: CycleResult[]; showDeri
           </TableHeader>
           <TableBody>
             {results.map((result) => (
-              <TableRow key={result.cycleId}>
-                <TableCell>{result.cycleNo}</TableCell>
+              <TableRow
+                key={result.cycleId}
+                onClick={() => navigate(`/cycle/${result.cycleId}`)}
+                className="cursor-pointer"
+              >
+                <TableCell>
+                  <Link
+                    to={`/cycle/${result.cycleId}`}
+                    aria-label={`Cycle ${result.cycleNo}, Day 1 ${result.day1}`}
+                    className="font-medium text-fertility-body underline underline-offset-4"
+                  >
+                    {result.cycleNo}
+                  </Link>
+                </TableCell>
                 <TableCell>{result.day1}</TableCell>
                 <TableCell>{result.length ?? "open"}</TableCell>
                 {showDerived && (

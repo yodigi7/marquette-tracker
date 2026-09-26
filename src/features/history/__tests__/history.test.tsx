@@ -1,6 +1,6 @@
 import "fake-indexeddb/auto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { seedDemoData } from "@/core/store/seedDemo";
 import { useAppStore } from "@/core/store/useAppStore";
 import { addDays } from "@/core/engine/dateUtils";
@@ -28,7 +28,11 @@ describe("HistoryView", () => {
   afterEach(() => cleanup());
 
   it("renders stats, forecast, and a cycle table from seeded data", async () => {
-    render(<HistoryView />);
+    render(
+      <MemoryRouter>
+        <HistoryView />
+      </MemoryRouter>,
+    );
     expect(await screen.findByText(/Forecast/i)).toBeInTheDocument();
     expect(screen.getByText(/Avg length/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Peak day/i).length).toBeGreaterThanOrEqual(1);
@@ -37,7 +41,11 @@ describe("HistoryView", () => {
   });
 
   it("updates the open cycle live when a day record is added", async () => {
-    render(<HistoryView />);
+    render(
+      <MemoryRouter>
+        <HistoryView />
+      </MemoryRouter>,
+    );
     expect(await screen.findByText(/Forecast/i)).toBeInTheDocument();
 
     const open = store().cycles.find((c) => c.closedAt === null)!;
@@ -66,7 +74,11 @@ describe("HistoryView", () => {
   });
 
   it("uses shared text and predictive tokens in the forecast and stats panels", async () => {
-    render(<HistoryView />);
+    render(
+      <MemoryRouter>
+        <HistoryView />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByText("predicted")).toHaveClass("text-fertility-forecast-fg");
     expect(screen.getByText("Avg length")).toHaveClass("text-fertility-muted");
@@ -86,7 +98,11 @@ describe("HistoryView", () => {
       },
     });
 
-    render(<HistoryView />);
+    render(
+      <MemoryRouter>
+        <HistoryView />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByText(/2 cycles fell outside the 21–42 day band/i)).toHaveClass(
       "text-fertility-warning",
@@ -113,7 +129,11 @@ describe("HistoryView", () => {
 
     useAppStore.setState({ output: { ...output, cycles } });
 
-    render(<HistoryView />);
+    render(
+      <MemoryRouter>
+        <HistoryView />
+      </MemoryRouter>,
+    );
 
     const notice = screen.getByTestId("history-reconciliation-warning");
     expect(notice).toHaveTextContent(/1 cycle has a monitor reading/i);
@@ -121,7 +141,11 @@ describe("HistoryView", () => {
   });
 
   it("shows no reconciliation notice when every cycle agrees with its window", () => {
-    render(<HistoryView />);
+    render(
+      <MemoryRouter>
+        <HistoryView />
+      </MemoryRouter>,
+    );
 
     expect(screen.queryByTestId("history-reconciliation-warning")).toBeNull();
   });
@@ -134,7 +158,11 @@ describe("HistoryView", () => {
     await store().addDayRecord(cycle.id, addDays(start, 13), 14, { monitor: "peak" });
     await store().updateSettings({ algorithmEnabled: false });
 
-    const { rerender } = render(<HistoryView />);
+    const { rerender } = render(
+      <MemoryRouter>
+        <HistoryView />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByTestId("history-logging-only")).toBeInTheDocument();
     expect(screen.queryByText("Avg length")).toBeNull();
@@ -145,11 +173,145 @@ describe("HistoryView", () => {
     expect(store().dayRecords).toHaveLength(2);
 
     await store().updateSettings({ algorithmEnabled: true });
-    rerender(<HistoryView />);
+    rerender(
+      <MemoryRouter>
+        <HistoryView />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByText("Avg length")).toBeInTheDocument();
     expect(screen.getAllByText("Fertile days").length).toBeGreaterThan(0);
     expect(screen.queryByTestId("history-logging-only")).toBeNull();
+  });
+
+  it("navigates to the cycle chart when a cycle row is clicked", async () => {
+    render(
+      <MemoryRouter initialEntries={["/history"]}>
+        <Routes>
+          <Route path="/history" element={<HistoryView />} />
+          <Route path="/cycle/:cycleId" element={<CycleChartView />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const rows = await screen.findAllByRole("row");
+    const dataRow = rows.find(
+      (r) => r.textContent?.includes("Open") || r.textContent?.includes("Closed"),
+    );
+    expect(dataRow).toBeTruthy();
+
+    fireEvent.click(dataRow!);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("cycle-chart-empty")).toBeNull();
+    });
+  });
+
+  it("navigates to the cycle chart when the cycle link is activated", async () => {
+    render(
+      <MemoryRouter initialEntries={["/history"]}>
+        <Routes>
+          <Route path="/history" element={<HistoryView />} />
+          <Route path="/cycle/:cycleId" element={<CycleChartView />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const links = await screen.findAllByRole("link", { name: /Cycle \d+, Day 1/ });
+    expect(links.length).toBeGreaterThan(0);
+    fireEvent.click(links[0]);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("cycle-chart-empty")).toBeNull();
+    });
+  });
+
+  it("navigates for both open and closed cycle rows", async () => {
+    const { unmount } = render(
+      <MemoryRouter initialEntries={["/history"]}>
+        <Routes>
+          <Route path="/history" element={<HistoryView />} />
+          <Route path="/cycle/:cycleId" element={<CycleChartView />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    let rows = await screen.findAllByRole("row");
+    const openRow = rows.find((r) => r.textContent?.includes("Open"));
+    expect(openRow).toBeTruthy();
+    fireEvent.click(openRow!);
+    await waitFor(() => expect(screen.queryByTestId("cycle-chart-empty")).toBeNull());
+    unmount();
+
+    render(
+      <MemoryRouter initialEntries={["/history"]}>
+        <Routes>
+          <Route path="/history" element={<HistoryView />} />
+          <Route path="/cycle/:cycleId" element={<CycleChartView />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    rows = await screen.findAllByRole("row");
+    const closedRow = rows.find((r) => r.textContent?.includes("Closed"));
+    expect(closedRow).toBeTruthy();
+    fireEvent.click(closedRow!);
+    await waitFor(() => expect(screen.queryByTestId("cycle-chart-empty")).toBeNull());
+  });
+
+  it("keeps cycle rows navigable when the algorithm is disabled", async () => {
+    await store().clearAllData();
+    const start = addDays(todayKey(), -20);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+    await store().addDayRecord(cycle.id, addDays(start, 13), 14, { monitor: "peak" });
+    await store().updateSettings({ algorithmEnabled: false });
+
+    render(
+      <MemoryRouter initialEntries={["/history"]}>
+        <Routes>
+          <Route path="/history" element={<HistoryView />} />
+          <Route path="/cycle/:cycleId" element={<CycleChartView />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const rows = await screen.findAllByRole("row");
+    const dataRow = rows.find((r) => r.textContent?.includes("Open"));
+    expect(dataRow).toBeTruthy();
+
+    fireEvent.click(dataRow!);
+    await waitFor(() => expect(screen.queryByTestId("cycle-chart-empty")).toBeNull());
+  });
+
+  it("falls back to the newest cycle for an unknown cycle id", async () => {
+    render(
+      <MemoryRouter initialEntries={["/cycle/nonexistent-id"]}>
+        <Routes>
+          <Route path="/cycle/:cycleId" element={<CycleChartView />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    // Unknown id falls back to the newest cycle, not the empty state.
+    expect(await screen.findByTestId("cycle-selector")).toBeInTheDocument();
+    expect(screen.queryByTestId("cycle-chart-empty")).toBeNull();
+  });
+
+  it("shows the empty state when there are no cycles", async () => {
+    await store().clearAllData();
+    useAppStore.setState({ hydrated: false });
+    await useAppStore.getState().hydrate();
+
+    render(
+      <MemoryRouter initialEntries={["/cycle/nonexistent-id"]}>
+        <Routes>
+          <Route path="/cycle/:cycleId" element={<CycleChartView />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId("cycle-chart-empty")).toBeInTheDocument();
   });
 });
 
@@ -158,7 +320,11 @@ describe("HistoryView peak-day statistics", () => {
   afterEach(() => cleanup());
 
   it("reports the Peak-day range and no average Peak day", async () => {
-    render(<HistoryView />);
+    render(
+      <MemoryRouter>
+        <HistoryView />
+      </MemoryRouter>,
+    );
 
     expect(await screen.findByText("Peak day range")).toBeInTheDocument();
     // the protocol yields a range, never a central day
@@ -169,7 +335,11 @@ describe("HistoryView peak-day statistics", () => {
   it("renders no single-day ovulation estimate on any surface", async () => {
     // the protocol's calendar rule yields a range, so no surface may mark one
     // ovulatory day: not the stats, not the Calendar, not the Cycle chart
-    const stats = render(<HistoryView />);
+    const stats = render(
+      <MemoryRouter>
+        <HistoryView />
+      </MemoryRouter>,
+    );
     expect(await screen.findByText("Peak day range")).toBeInTheDocument();
     expect(screen.queryByText(/Peak day \(avg\)/)).not.toBeInTheDocument();
     expect(document.querySelectorAll('[title="Predicted ovulation"]')).toHaveLength(0);
@@ -198,7 +368,11 @@ describe("HistoryView peak-day statistics", () => {
   });
 
   it("names the estimator behind the projected dates", async () => {
-    render(<HistoryView />);
+    render(
+      <MemoryRouter>
+        <HistoryView />
+      </MemoryRouter>,
+    );
 
     const disclosure = await screen.findByText(/Projected dates use the median/i);
     const forecast = store().output?.forecast;
@@ -218,7 +392,11 @@ describe("HistoryView peak-day statistics", () => {
     await store().clearAllData();
     useAppStore.setState({ hydrated: false });
     await useAppStore.getState().hydrate();
-    render(<HistoryView />);
+    render(
+      <MemoryRouter>
+        <HistoryView />
+      </MemoryRouter>,
+    );
 
     expect(await screen.findByText(/Not enough data yet/i)).toBeInTheDocument();
     expect(screen.queryByText(/Projected dates use the median/i)).not.toBeInTheDocument();
