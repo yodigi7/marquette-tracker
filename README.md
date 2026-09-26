@@ -10,17 +10,80 @@ Vite 8 · React 19 · TypeScript 6 (strict) · Tailwind CSS v4 · shadcn/ui (Rad
 
 ## Commands
 
-| Command           | Description                                                                |
-| ----------------- | -------------------------------------------------------------------------- |
-| `pnpm install`    | Install dependencies                                                       |
-| `pnpm dev`        | Local dev server (Vite)                                                    |
-| `pnpm test`       | Run Vitest test suite (engine tests required for any `core/engine` change) |
-| `pnpm test:watch` | Vitest watch mode                                                          |
-| `pnpm build`      | Type-check + production build (PWA: SW + manifest)                         |
-| `pnpm preview`    | Preview the production build (verify offline behavior)                     |
-| `pnpm lint`       | Oxlint                                                                     |
+| Command             | Description                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------ |
+| `pnpm install`      | Install dependencies (also enables the Git hooks — see below)                        |
+| `pnpm dev`          | Local dev server (Vite)                                                              |
+| **`pnpm check`**    | **The full quality gate** — format check, lint, test, build. This is the one to run. |
+| `pnpm test`         | Run Vitest test suite (engine tests required for any `core/engine` change)           |
+| `pnpm test:watch`   | Vitest watch mode                                                                    |
+| `pnpm build`        | Type-check + production build (PWA: SW + manifest)                                   |
+| `pnpm preview`      | Preview the production build (verify offline behavior)                               |
+| `pnpm lint`         | Oxlint                                                                               |
+| `pnpm format`       | Format the repository with oxfmt (rewrites files)                                    |
+| `pnpm format:check` | Report formatting differences without changing files                                 |
+| `pnpm typecheck`    | Run the strict TypeScript project check only (no bundle)                             |
+
+`pnpm check` is the single canonical gate. The local hooks and both CI workflows invoke exactly that
+command, so what passes locally is what CI runs. It runs `format:check`, `lint`, `test`, then `build` — and
+because `build` is `tsc -b && vite build`, the type check happens once, inside `build`.
 
 Manual light/dark and mobile verification checklist: [`docs/VISUAL_QA.md`](./docs/VISUAL_QA.md).
+
+## Git hooks
+
+Hook scripts live in [`.githooks/`](./.githooks) and are tracked in the repository, so they travel with a
+clone. They are enabled automatically by a `prepare` script during `pnpm install`, which points
+`core.hooksPath` at `.githooks`.
+
+| Hook         | What it runs                                                                           | Cost  |
+| ------------ | -------------------------------------------------------------------------------------- | ----- |
+| `pre-commit` | Formats staged files and re-stages them, then lints the project and validates OpenSpec | ~1.4s |
+| `pre-push`   | `pnpm check` — the full gate, including tests and the production build                 | ~21s  |
+
+Both are fast by design: the type check and test suite are deliberately kept out of `pre-commit` because
+`tsc -b` costs ~4s with no useful incrementality on this tree, so they run once at push time instead of on
+every commit.
+
+**Bypass deliberately** — for example, committing a WIP fix you will rebase later:
+
+```bash
+git commit --no-verify
+git push --no-verify
+```
+
+**Restore hooks.** If commits stop being validated, the hook path is probably unset. `pnpm install` only
+runs `prepare` when it does real work, so it will not repair a no-op install. Check and restore it:
+
+```bash
+git config --get core.hooksPath   # expect: .githooks
+git config core.hooksPath .githooks
+```
+
+A clone installed with `pnpm install --ignore-scripts` never enables hooks, and nothing warns you. CI still
+catches failures on a push, so that is the backstop.
+
+## Formatting
+
+[oxfmt](https://oxc.rs) is the only formatter, configured in [`.oxfmtrc.json`](./.oxfmtrc.json). It covers
+TypeScript/TSX, JavaScript, JSON, CSS, HTML, Markdown, and YAML, and skips `node_modules`, `dist`, and
+anything matched by `.gitignore`.
+
+Committed style: semicolons, double-quoted JavaScript strings, a 100-column wrap width, and two-space
+indentation. Three deliberate exceptions:
+
+| Exception                                                 | Reason                                                                                                                     |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `src/index.css` keeps 4-space indentation                 | It is shadcn-provided and regenerated by `shadcn add` at 4 spaces                                                          |
+| `package.json` key order is preserved                     | A formatter should not silently reorder a manifest for readability                                                         |
+| `.opencode/**`, `openspec/changes/archive/**` not touched | Vendored tooling and archived change records are not ours to restyle; an archived spec is the record of what was validated |
+
+Live capability specs under `openspec/specs/` **are** formatted, along with `docs/` and the root Markdown
+files.
+
+Note that shadcn's own output is semicolon-free, so `shadcn add` or a shadcn update introduces
+semicolon-free code that the pre-commit hook reformats for you on commit. If that churn becomes annoying,
+set `"semi": false` in `.oxfmtrc.json` and re-run `pnpm format`.
 
 ## Deployment
 
@@ -46,7 +109,9 @@ In **Settings -> Pages**, set **Build and deployment -> Source** to **GitHub Act
 
 After that setup, every push to `main` runs the deployment workflow automatically. The workflow can also be started manually from the repository's **Actions** tab for a recovery rebuild.
 
-The workflow installs the locked pnpm dependencies, runs tests, lint, and the production build, then publishes `dist/` to GitHub Pages. Use `pnpm build && pnpm preview` locally to verify the production PWA and offline shell before pushing.
+The workflow installs the locked pnpm dependencies, runs the same `pnpm check` gate used locally, then publishes `dist/` to GitHub Pages. Use `pnpm build && pnpm preview` locally to verify the production PWA and offline shell before pushing.
+
+Pull requests and pushes to `main` are validated by a separate read-only workflow ([`.github/workflows/ci.yml`](./.github/workflows/ci.yml)) that runs `pnpm check` and never deploys. Keeping validation separate from deployment is what guarantees a pull request cannot reach a publish step.
 
 Cycle records and settings remain in the browser's IndexedDB; the Pages deployment does not upload or synchronize user data.
 

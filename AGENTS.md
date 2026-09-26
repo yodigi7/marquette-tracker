@@ -99,11 +99,42 @@ src/
 
 ## Commands
 
-(Define these when scaffolding starts — keep me updated in the README)
+The project uses **pnpm**. `pnpm check` is the single canonical quality gate and the only command that needs
+to be green before a change is considered done.
 
-- `npm run dev` — local dev server
-- `npm run test` — Vitest (engine tests are required for any engine change)
-- `npm run build` — production build (PWA)
+- `pnpm dev` — local dev server
+- `pnpm check` — **the full gate**: `format:check`, `lint`, `test`, then `build` (the type check runs once,
+  inside `build`). This is what the hooks and CI invoke.
+- `pnpm test` — Vitest (engine tests are required for any engine change)
+- `pnpm build` — type check + production build (PWA)
+- `pnpm lint` — Oxlint
+- `pnpm format` / `pnpm format:check` — oxfmt write / verify
+- `pnpm typecheck` — strict TypeScript project check only
+
+**Before starting work:** `pnpm check`. **Before calling anything done:** `pnpm check` green, plus
+`openspec validate --all` if OpenSpec artifacts changed.
+
+## Quality gates
+
+- **Git hooks** live in `.githooks/` (tracked in the repo) and are enabled at install time by a `prepare`
+  script that sets `core.hooksPath`. `pre-commit` formats staged files and re-stages them, then runs
+  `oxlint` and `openspec validate --all` (~1.4s). `pre-push` runs `pnpm check` (~21s).
+- The type check and tests are intentionally **not** in `pre-commit`: `tsc -b` costs ~4s here with no
+  useful incrementality, so they run once at push time instead of on every commit.
+- `pnpm install` only runs `prepare` when it does real work. If hooks appear inactive, restore with
+  `git config core.hooksPath .githooks`. Bypass deliberately with `git commit --no-verify` /
+  `git push --no-verify`.
+- **Formatting** is oxfmt, configured in `.oxfmtrc.json`. Style is semicolons, double quotes, 100-column
+  width, two-space indent. Three exceptions: `src/index.css` stays 4-space (shadcn), `package.json` key
+  order is preserved, and `.opencode/**` plus `openspec/changes/archive/**` are skipped (vendored tooling
+  and historical records). Do not add a second formatter.
+- **Lint baseline is zero warnings.** The one exception, `react/only-export-components` in
+  `src/components/ui/`, is disabled by committed `overrides` in `.oxlintrc.json` because shadcn exports
+  `cva()` results alongside components. Keep it scoped to that directory, and do not silence it with inline
+  comments — `shadcn add` would wipe them.
+- **CI**: `.github/workflows/ci.yml` runs `pnpm check` on pull requests and pushes to `main` with
+  read-only permissions and no deploy step. `deploy.yml` publishes to Pages from `main` only and runs the
+  same `pnpm check` first. Never add a deploy step to `ci.yml`.
 
 ## Development workflow
 
@@ -120,12 +151,12 @@ Workflow commands (see `.opencode/commands/opsx-*.md`):
 - `openspec validate` — lint specs; `openspec status --change <name>` — change progress.
 
 - Before implementing, read `openspec/changes/<name>/specs/**/spec.md`, `design.md`, and `tasks.md` — those are the authoritative spec; implement what they say, no more (**YAGNI**).
-- `npm run test` is required for any change touching `core/engine` (table-driven tests written first).
+- `pnpm test` is required for any change touching `core/engine` (table-driven tests written first).
 
 ## Conventions
 
 - TypeScript strict mode. No `any` leaks into the engine.
 - Pure engine cannot import React, Dexie, or any browser API.
 - Keep feature code in `src/features/**`; shared UI in `src/data/**` (prefer shadcn/ui).
-- Tests first for any change touching `core/engine` (run `npm run test`).
+- Tests first for any change touching `core/engine` (run `pnpm test`).
 - Keep deps minimal: no new dependency without the user's awareness (hobby project discipline).
