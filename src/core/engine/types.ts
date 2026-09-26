@@ -48,7 +48,7 @@ export interface DayRecordInput {
 export type DayStatus = 'pre-fertile' | 'fertile' | 'post-peak' | 'post-calendar'
 
 export type BeginRule = 'calendar-day-6' | 'calendar-earliest-peak-minus-6' | 'first-high-or-peak'
-export type EndRule = 'current-peak-plus-n' | 'historic-peak-plus-n' | 'earliest-end' | 'none'
+export type EndRule = 'current-peak-plus-n' | 'historic-peak-plus-n' | 'earliest-end' | 'protocol-default-band' | 'none'
 
 export interface FertileWindow {
   begin: number
@@ -92,13 +92,19 @@ export interface CycleHistory {
 
 export interface Forecast {
   basedOnCycles: number
+  /**
+   * Number of recent closed cycle lengths the projected dates were derived
+   * from — the configured history window, capped by the cycles available.
+   */
+  lookbackWindow: number
+  /** The configured history window, whether or not that many cycles exist. */
+  configuredLookbackWindow: number
   /** Considered in the protocol band 21–42 days. */
   outOfBandCount: number
   meanLength: number
   medianLength: number
   earliestLength: number
   latestLength: number
-  peakDayMean: number
   peakDayEarliest: number
   peakDayLatest: number
   /** Date of the next expected period start (for the newest cycle's day1). Null without data. */

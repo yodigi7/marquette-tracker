@@ -1,6 +1,18 @@
+import { projectCycles } from '@/core/engine/projection'
 import type { DateKey, CycleResult } from '@/core/engine/types'
+import type { EngineSettings } from '@/core/engine/types'
 import type { EngineOutput } from '@/core/engine/engineSdk'
-import type { CycleEntity } from './entities'
+import type { CycleEntity, SettingsEntity } from './entities'
+
+/** Protocol parameters the engine needs, lifted from the persisted settings row. */
+export function engineSettingsOf(settings: SettingsEntity): EngineSettings {
+  return {
+    postPeakDays: settings.postPeakDays,
+    historyWindow: settings.historyWindow,
+    cycleMinLength: settings.cycleMinLength,
+    cycleMaxLength: settings.cycleMaxLength,
+  }
+}
 
 /** Latest cycle whose day1 is at or before the given date. */
 export function cycleForDate(cycles: CycleEntity[], date: DateKey): CycleEntity | undefined {
@@ -32,4 +44,24 @@ export function cycleResultsByCycleId(output: EngineOutput | null): Map<string, 
     map.set(cycle.cycleId, cycle)
   }
   return map
+}
+
+/**
+ * Projected cycles covering `untilDate`, or none when the setting is off.
+ *
+ * Derived here rather than in the store's single `computeAll` pass because the
+ * range belongs to the view: the Calendar asks for the month it is showing, so
+ * the chain can be followed as far as the user pages without a fixed horizon.
+ * A projected cycle is never stored and never added to the real cycle list.
+ */
+export function projectedCyclesThrough(
+  output: EngineOutput | null,
+  settings: SettingsEntity,
+  today: DateKey,
+  untilDate: DateKey,
+): CycleResult[] {
+  if (!output || !settings.projectFutureCycles) {
+    return []
+  }
+  return projectCycles(output.cycles, engineSettingsOf(settings), today, untilDate)
 }

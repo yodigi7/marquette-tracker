@@ -115,7 +115,6 @@ export const FERTILITY_MARKER_VISUALS = {
     stripe: 'bg-fertility-marker-menses',
   },
   intercourse: { icon: 'fill-fertility-marker-intercourse text-fertility-marker-intercourse' },
-  ovulation: { dot: 'border-2 border-fertility-forecast-border bg-fertility-ovulation' },
 } as const
 
 export const FERTILITY_FORECAST_VISUAL: FertilityForecastVisual = {

@@ -5,7 +5,13 @@ import { seedDemoData } from '@/core/store/seedDemo'
 import { useAppStore } from '@/core/store/useAppStore'
 import { addDays } from '@/core/engine/dateUtils'
 import { todayKey } from '@/core/dateKeys'
+import { MemoryRouter, Route, Routes } from 'react-router'
+import { CalendarView } from '@/features/calendar'
+import { CycleChartView } from '@/features/cycle-chart'
+import { installChartShim } from '@/features/cycle-chart/__tests__/helpers'
 import { HistoryView } from '../index'
+
+installChartShim()
 
 const store = () => useAppStore.getState()
 
@@ -105,5 +111,73 @@ describe('HistoryView', () => {
     expect(screen.getByText('Avg length')).toBeInTheDocument()
     expect(screen.getAllByText('Fertile days').length).toBeGreaterThan(0)
     expect(screen.queryByTestId('history-logging-only')).toBeNull()
+  })
+})
+
+describe('HistoryView peak-day statistics', () => {
+  beforeEach(boot)
+  afterEach(() => cleanup())
+
+  it('reports the Peak-day range and no average Peak day', async () => {
+    render(<HistoryView />)
+
+    expect(await screen.findByText('Peak day range')).toBeInTheDocument()
+    // the protocol yields a range, never a central day
+    expect(screen.queryByText('Peak day (avg)')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Peak day \(avg\)/)).not.toBeInTheDocument()
+  })
+
+  it('renders no single-day ovulation estimate on any surface', async () => {
+    // the protocol's calendar rule yields a range, so no surface may mark one
+    // ovulatory day: not the stats, not the Calendar, not the Cycle chart
+    const stats = render(<HistoryView />)
+    expect(await screen.findByText('Peak day range')).toBeInTheDocument()
+    expect(screen.queryByText(/Peak day \(avg\)/)).not.toBeInTheDocument()
+    expect(document.querySelectorAll('[title="Predicted ovulation"]')).toHaveLength(0)
+    stats.unmount()
+
+    const calendar = render(<CalendarView />)
+    await waitFor(() => expect(screen.getAllByTestId('day-cell').length).toBeGreaterThan(0))
+    expect(document.querySelectorAll('[title="Predicted ovulation"]')).toHaveLength(0)
+    expect(screen.queryByText('Predicted ovulation')).not.toBeInTheDocument()
+    calendar.unmount()
+
+    const cycleId = store().cycles[0]?.id
+    const chart = render(
+      <MemoryRouter initialEntries={cycleId ? [`/cycle/${cycleId}`] : ['/cycle']}>
+        <Routes>
+          <Route path="/cycle" element={<CycleChartView />} />
+          <Route path="/cycle/:cycleId" element={<CycleChartView />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await waitFor(() => expect(document.querySelector('[data-testid="cycle-chart-empty"]')).toBeNull())
+    expect(document.querySelectorAll('[title="Predicted ovulation"]')).toHaveLength(0)
+    chart.unmount()
+  })
+
+  it('names the estimator behind the projected dates', async () => {
+    render(<HistoryView />)
+
+    const disclosure = await screen.findByText(/Projected dates use the median/i)
+    const forecast = store().output?.forecast
+    expect(forecast).not.toBeNull()
+    // the fixture must actually exercise the "fewer cycles than configured"
+    // branch, otherwise this test would pass while covering nothing
+    expect(forecast!.lookbackWindow).toBeLessThan(forecast!.configuredLookbackWindow)
+    expect(disclosure.textContent).toContain(`last ${forecast!.lookbackWindow} completed cycle`)
+    expect(disclosure.textContent).toContain(`configured window of ${forecast!.configuredLookbackWindow}`)
+    // and it is explicit that the displayed averages are not the source
+    expect(disclosure.textContent).toMatch(/not what produces them/)
+  })
+
+  it('reports no projection and names no estimator without a closed cycle', async () => {
+    await store().clearAllData()
+    useAppStore.setState({ hydrated: false })
+    await useAppStore.getState().hydrate()
+    render(<HistoryView />)
+
+    expect(await screen.findByText(/Not enough data yet/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Projected dates use the median/i)).not.toBeInTheDocument()
   })
 })

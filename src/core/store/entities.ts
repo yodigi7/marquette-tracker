@@ -51,6 +51,8 @@ export interface SettingsEntity extends SyncMeta {
   overlayBbt: boolean
   overlayIntercourse: boolean
   calendarDetailMode: CalendarDetailMode
+  /** Project future cycles on the Calendar. Off by default; see cycle-projection. */
+  projectFutureCycles: boolean
   /** TEMPORARY: one-shot marker so demo data is loaded only on first startup. */
   demoSeeded: boolean
 }
@@ -71,5 +73,6 @@ export const DEFAULT_SETTINGS: Omit<SettingsEntity, keyof SyncMeta> = {
   overlayBbt: false,
   overlayIntercourse: false,
   calendarDetailMode: 'simple',
+  projectFutureCycles: false,
   demoSeeded: false,
 }

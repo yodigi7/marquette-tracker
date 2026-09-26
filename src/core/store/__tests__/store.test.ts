@@ -57,6 +57,35 @@ describe('store hydration', () => {
     await second.getState().hydrate()
     expect(state(second).settings.calendarDetailMode).toBe('simple')
   })
+
+  it('defaults cycle projection to off', async () => {
+    const { store } = setup()
+    expect(state(store).settings.projectFutureCycles).toBe(false)
+  })
+
+  it('persists a cycle projection change across a restart', async () => {
+    const db = createDb()
+    const first = createAppStore(db)
+    await first.getState().hydrate()
+    await first.getState().updateSettings({ projectFutureCycles: true })
+
+    const second = createAppStore(db)
+    await second.getState().hydrate()
+    expect(state(second).settings.projectFutureCycles).toBe(true)
+  })
+
+  it('fills a missing cycle projection value from defaults for legacy settings', async () => {
+    const db = createDb()
+    const first = createAppStore(db)
+    await first.getState().hydrate()
+    const row = (await db.settings.get('main'))! as Partial<SettingsEntity>
+    const { projectFutureCycles: _dropped, ...legacy } = row
+    await db.settings.put(legacy as SettingsEntity)
+
+    const second = createAppStore(db)
+    await second.getState().hydrate()
+    expect(state(second).settings.projectFutureCycles).toBe(false)
+  })
 })
 
 describe('day records', () => {

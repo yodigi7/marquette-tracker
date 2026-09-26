@@ -53,7 +53,6 @@
     --color-fertility-status-post-calendar-border: var(--fertility-status-post-calendar-border);
     --color-fertility-marker-menses: var(--fertility-marker-menses);
     --color-fertility-marker-intercourse: var(--fertility-marker-intercourse);
-    --color-fertility-ovulation: var(--fertility-ovulation);
     --color-fertility-monitor-none: var(--fertility-monitor-none);
     --color-fertility-monitor-low: var(--fertility-monitor-low);
     --color-fertility-monitor-high: var(--fertility-monitor-high);
@@ -127,7 +126,6 @@
     --fertility-status-post-calendar-border: #78716c;
     --fertility-marker-menses: #ef4444;
     --fertility-marker-intercourse: #be123c;
-    --fertility-ovulation: #f5f3ff;
     --fertility-monitor-none: #a8a29e;
     --fertility-monitor-low: #0284c7;
     --fertility-monitor-high: #b45309;
@@ -195,7 +193,6 @@
     --fertility-status-post-calendar-border: #a8a29e;
     --fertility-marker-menses: #f87171;
     --fertility-marker-intercourse: #fb7185;
-    --fertility-ovulation: #2e1065;
     --fertility-monitor-none: #44403c;
     --fertility-monitor-low: #38bdf8;
     --fertility-monitor-high: #fbbf24;

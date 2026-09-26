@@ -404,8 +404,7 @@ describe('CalendarView', () => {
           menses={false}
           monitor={undefined}
           intercourse={false}
-          ovulation={false}
-          isToday={false}
+            isToday={false}
           detailMode="full"
           onSelect={() => {}}
         />,
@@ -429,7 +428,6 @@ describe('CalendarView', () => {
         menses
         monitor="high"
         intercourse
-        ovulation
         isToday={false}
         detailMode="simple"
         onSelect={() => {}}
@@ -458,7 +456,6 @@ describe('CalendarView', () => {
         menses
         monitor="high"
         intercourse={false}
-        ovulation={false}
         isToday={false}
         detailMode="simple"
         onSelect={() => {}}
@@ -483,7 +480,6 @@ describe('CalendarView', () => {
         menses={false}
         monitor="peak"
         intercourse
-        ovulation
         isToday={false}
         detailMode="full"
         onSelect={() => {}}
@@ -493,7 +489,32 @@ describe('CalendarView', () => {
     const cell = screen.getByTestId('day-cell')
     expect(cell.className).toContain('bg-fertility-status-fertile')
     expect(cell.querySelector('[title="Intercourse"] svg')).not.toBeNull()
-    expect(cell.querySelector('[title="Predicted ovulation"]')).not.toBeNull()
+    // no single-day ovulation estimate is rendered in any presentation
+    expect(cell.querySelector('[title="Predicted ovulation"]')).toBeNull()
+  })
+
+  it('keeps the phase fill on a projected cell so the window status still reads', () => {
+    render(
+      <DayCell
+        dateKey="2026-01-09"
+        dayNumber={9}
+        info={'fertile'}
+        forecast
+        menses={false}
+        monitor={undefined}
+        intercourse={false}
+        isToday={false}
+        detailMode="simple"
+        onSelect={() => {}}
+      />,
+    )
+
+    const cell = screen.getByTestId('day-cell')
+    // the phase survives; the dashed border is what says "not yet"
+    expect(cell.className).toContain('bg-fertility-status-fertile')
+    expect(cell.className).toContain('border-dashed border-fertility-forecast-border')
+    expect(cell).toHaveAttribute('data-forecast', 'true')
+    expect(cell.getAttribute('aria-label')).toContain('projected')
   })
   it('renders predictive forecast cells and additive raw markers with tokenized cues', () => {
     render(
@@ -505,7 +526,6 @@ describe('CalendarView', () => {
         menses
         monitor="low"
         intercourse
-        ovulation
         isToday={false}
         detailMode="full"
         onSelect={() => {}}
@@ -519,7 +539,50 @@ describe('CalendarView', () => {
     expect(cell.querySelector('[title="Menses"]')?.className).toContain('bg-fertility-marker-menses')
     expect(cell.querySelector('[title="Intercourse"] svg')?.getAttribute('class')).toContain('fill-fertility-marker-intercourse')
     expect(cell.querySelector('[data-testid="calendar-assumed-marker"]')).toBeNull()
-    expect(cell.querySelector('[title="Predicted ovulation"]')?.className).toContain('border-fertility-forecast-border')
+    expect(cell.querySelector('[title="Predicted ovulation"]')).toBeNull()
+  })
+
+  it('gives projected days and window-forecast days the same predictive cue', () => {
+    const projected = render(
+      <DayCell
+        dateKey="2026-01-09"
+        dayNumber={9}
+        info={'fertile'}
+        forecast
+        menses={false}
+        monitor={undefined}
+        intercourse={false}
+        isToday={false}
+        detailMode="simple"
+        onSelect={() => {}}
+      />,
+    )
+    const projectedCell = screen.getByTestId('day-cell')
+    const projectedClasses = projectedCell.className
+    expect(projectedClasses).toContain('border-fertility-forecast-border')
+    // the phase survives, which is what distinguishes a projected day
+    expect(projectedClasses).toContain('bg-fertility-status-fertile')
+    projected.unmount()
+
+    render(
+      <DayCell
+        dateKey="2026-01-10"
+        dayNumber={10}
+        info={null}
+        forecast
+        menses={false}
+        monitor={undefined}
+        intercourse={false}
+        isToday={false}
+        detailMode="simple"
+        onSelect={() => {}}
+      />,
+    )
+    const forecastCell = screen.getByTestId('day-cell')
+    // a forecast day with no status yet falls back to the forecast fill, but
+    // the predictive border is the same cue in both cases
+    expect(forecastCell.className).toContain('border-fertility-forecast-border')
+    expect(forecastCell.className).toContain('bg-fertility-forecast-bg')
   })
 
   it('keeps raw markers but removes interpretation styling when the algorithm is off', async () => {
@@ -563,8 +626,11 @@ describe('CalendarView', () => {
     await user.click(screen.getByRole('button', { name: /show full detail/i }))
 
     expect(await screen.findByText('Intercourse')).toBeInTheDocument()
-    expect(screen.getByText('Predicted ovulation')).toBeInTheDocument()
     expect(screen.getByText('Predicted window')).toBeInTheDocument()
+    // the single-day ovulation estimate is gone from the vocabulary
+    expect(screen.queryByText('Predicted ovulation')).not.toBeInTheDocument()
+    // the projected entry appears only once projection is actually painting days
+    expect(screen.queryByText('Projected')).not.toBeInTheDocument()
     expect(screen.queryByText('Confirmed source')).not.toBeInTheDocument()
     expect(screen.queryByText('Predicted status')).not.toBeInTheDocument()
   })
@@ -609,3 +675,197 @@ function shiftedMonth(label: string, delta: number): string {
   const total = Number(year) * 12 + months.indexOf(month) + delta
   return `${months[((total % 12) + 12) % 12]} ${Math.floor(total / 12)}`
 }
+describe('CalendarView with cycle projection', () => {
+  /** Nine cycles of history so the calendar rule applies, then an open cycle. */
+  async function seedHistory() {
+    let day1 = addDays(todayKey(), -250)
+    for (let i = 0; i < 8; i++) {
+      const cycle = await store().setNewCycle(day1)
+      await store().addDayRecord(cycle.id, addDays(day1, 11), 12, { monitor: 'peak' })
+      day1 = addDays(day1, 28)
+    }
+    await store().setNewCycle(day1)
+  }
+
+  it('projects nothing while the setting is off, and touches no stored record', async () => {
+    await seedHistory()
+    await store().updateSettings({ projectFutureCycles: true })
+    // paint it once, so there is something that could be left behind
+    render(<CalendarView />)
+    cleanup()
+    const before = { cycles: store().cycles.length, records: store().dayRecords.length }
+    const beforeIds = store().dayRecords.map((r) => r.id).sort()
+
+    await store().updateSettings({ projectFutureCycles: false })
+    render(<CalendarView />)
+
+    const projected = screen
+      .getAllByTestId('day-cell')
+      .filter((el) => el.getAttribute('data-forecast') === 'true')
+    expect(projected).toHaveLength(0)
+    // disabling removes the drawing and nothing else
+    expect(store().cycles).toHaveLength(before.cycles)
+    expect(store().dayRecords).toHaveLength(before.records)
+    expect(store().dayRecords.map((r) => r.id).sort()).toEqual(beforeIds)
+  })
+
+  it('paints projected days when the setting is on', async () => {
+    await seedHistory()
+    await store().updateSettings({ projectFutureCycles: true })
+    render(<CalendarView />)
+
+    await waitFor(() => {
+      const projected = screen
+        .getAllByTestId('day-cell')
+        .filter((el) => el.getAttribute('data-forecast') === 'true')
+      expect(projected.length).toBeGreaterThan(0)
+    })
+  })
+
+  it('keeps a phase fill on projected days so the window status reads', async () => {
+    await seedHistory()
+    await store().updateSettings({ projectFutureCycles: true })
+    render(<CalendarView />)
+
+    await waitFor(() => {
+      const projected = screen
+        .getAllByTestId('day-cell')
+        .filter((el) => el.getAttribute('data-forecast') === 'true')
+      // every projected day with a status keeps a real phase fill, and the
+      // dashed border is what marks it as not yet happened
+      const phased = projected.filter((el) => el.getAttribute('data-phase'))
+      expect(phased.length).toBeGreaterThan(0)
+      for (const el of phased) {
+        expect(el.className).toContain('border-dashed')
+      }
+    })
+  })
+
+  it('leaves no date after today unpainted across paged months', async () => {
+    const user = userEvent.setup()
+    await seedHistory()
+    await store().updateSettings({ projectFutureCycles: true })
+    render(<CalendarView />)
+
+    // Page well past the current cycle: the chain has to follow, which means
+    // the range must cover the whole visible month and not just today. A month
+    // grid's final week often falls outside the month entirely.
+    for (let page = 0; page < 6; page++) {
+      await user.click(screen.getByRole('button', { name: /next month/i }))
+      const future = screen
+        .getAllByTestId('day-cell')
+        .filter((el) => (el.getAttribute('data-date') ?? '') > todayKey())
+      expect(future.length).toBeGreaterThan(0)
+      for (const el of future) {
+        expect(el.getAttribute('data-forecast'), `unpainted ${el.getAttribute('data-date')}`).toBe('true')
+      }
+    }
+  })
+
+  it('projects a whole month that lies beyond the first projected cycle', async () => {
+    const user = userEvent.setup()
+    await seedHistory()
+    await store().updateSettings({ projectFutureCycles: true })
+    render(<CalendarView />)
+
+    // three months out: the open cycle's own projected length cannot reach here
+    for (let page = 0; page < 3; page++) {
+      await user.click(screen.getByRole('button', { name: /next month/i }))
+    }
+    await waitFor(() => {
+      const future = screen
+        .getAllByTestId('day-cell')
+        .filter((el) => (el.getAttribute('data-date') ?? '') > todayKey())
+      expect(future.length).toBeGreaterThan(20)
+      for (const el of future) {
+        expect(el.getAttribute('data-forecast'), `unpainted ${el.getAttribute('data-date')}`).toBe('true')
+        // a projected day inside a covered cycle still carries a phase
+        expect(el.getAttribute('data-phase')).toBeTruthy()
+      }
+    })
+  })
+
+  it('marks a projected cycle day 1 with the menses stripe', async () => {
+    const user = userEvent.setup()
+    await seedHistory()
+    await store().updateSettings({ projectFutureCycles: true })
+    render(<CalendarView />)
+
+    for (let page = 0; page < 2; page++) {
+      await user.click(screen.getByRole('button', { name: /next month/i }))
+    }
+    // somewhere in this month a projected cycle begins
+    await waitFor(() => {
+      const withMenses = screen
+        .getAllByTestId('day-cell')
+        .filter((el) => el.getAttribute('data-forecast') === 'true')
+        .filter((el) => el.querySelector('[data-testid="calendar-menses-stripe"]'))
+      expect(withMenses.length).toBeGreaterThan(0)
+    })
+  })
+
+  it('still shows the existing next-window forecast while the projection is off', async () => {
+    // an open cycle recent enough that its forecast window reaches past today
+    await seedHistory()
+    await store().setNewCycle(addDays(todayKey(), -5))
+    await store().updateSettings({ projectFutureCycles: false })
+    render(<CalendarView />)
+
+    // the pre-existing overlay is untouched by the new setting
+    await waitFor(() => {
+      const forecast = screen
+        .getAllByTestId('day-cell')
+        .filter((el) => el.getAttribute('data-forecast') === 'true')
+      expect(forecast.length).toBeGreaterThan(0)
+    })
+  })
+
+  it('shows no projected output when interpretation is disabled', async () => {
+    await seedHistory()
+    await store().updateSettings({ projectFutureCycles: true, algorithmEnabled: false })
+    render(<CalendarView />)
+
+    const projected = screen
+      .getAllByTestId('day-cell')
+      .filter((el) => el.getAttribute('data-forecast') === 'true')
+    expect(projected).toHaveLength(0)
+    // the legend's projected entry goes with it
+    expect(screen.queryByText('Projected')).not.toBeInTheDocument()
+  })
+
+  it('lists a Projected legend entry only while projection is painting days', async () => {
+    await seedHistory()
+    await store().updateSettings({ projectFutureCycles: true })
+    render(<CalendarView />)
+
+    expect(await screen.findByText('Projected')).toBeInTheDocument()
+    // the sample matches the cells: a phase fill with the dashed forecast border
+    const swatch = document.querySelector('[data-legend-label="Projected"]')?.firstElementChild
+    expect(swatch?.className).toContain('border-dashed')
+    expect(swatch?.className).toContain('bg-fertility-status-fertile')
+  })
+
+  it('refuses to log a projected day', async () => {    const user = userEvent.setup()
+    stubMatchMedia()
+    await seedHistory()
+    await store().updateSettings({ projectFutureCycles: true })
+    render(
+      <>
+        <CalendarView />
+        <Toaster />
+      </>,
+    )
+
+    const future = addDays(todayKey(), 3)
+    const cell = cellByDate(future)
+    expect(cell).not.toBeNull()
+    // it is painted as a projected day, and still not loggable
+    expect(cell!).toHaveAttribute('data-forecast', 'true')
+    await user.click(cell!)
+    await waitFor(() => {
+      expect(screen.getByText(/future dates cannot be logged/i)).toBeInTheDocument()
+    })
+    // nothing was written
+    expect(store().dayRecords.every((r) => r.date <= todayKey())).toBe(true)
+  })
+})

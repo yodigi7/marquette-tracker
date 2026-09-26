@@ -4,7 +4,10 @@ import { addDays } from '../dateUtils'
 import { computeCycle } from '../marquette'
 import { CYCLE_LENGTH_MAX, CYCLE_LENGTH_MIN, DEFAULT_HISTORY_WINDOW, DEFAULT_POST_PEAK_DAYS } from '../marquette'
 import { computePredictions } from '../predict'
+import { PROTOCOL_DEFAULT_WINDOW_BEGIN, PROTOCOL_DEFAULT_WINDOW_END } from '../projection'
 import type { CycleHistory, CycleInput, CycleResult, DayRecordInput, EngineSettings } from '../types'
+
+const TODAY = '2026-06-01'
 
 function settings(): EngineSettings {
   return {
@@ -52,7 +55,7 @@ function result(
 
 describe('predict computePredictions', () => {
   it('returns null without any closed cycles', () => {
-    expect(computePredictions([], settings())).toBeNull()
+    expect(computePredictions([], settings(), TODAY)).toBeNull()
   })
 
   it('computes mean, median, min/max of cycle lengths (fixture 26,28,27,30,29)', () => {
@@ -63,7 +66,7 @@ describe('predict computePredictions', () => {
       result(4, '2026-03-23', 30, 16),
       result(5, '2026-04-22', 29, 14),
     ]
-    const forecast = computePredictions(cycles, settings())
+    const forecast = computePredictions(cycles, settings(), TODAY)
     expect(forecast).not.toBeNull()
     expect(forecast!.meanLength).toBe(28)
     expect(forecast!.medianLength).toBe(28)
@@ -74,12 +77,12 @@ describe('predict computePredictions', () => {
     expect(forecast!.peakDayLatest).toBe(16)
   })
 
-  it('projects expected period start from the newest cycle day1 plus mean', () => {
+  it('projects expected period start from the newest cycle day1 plus the shared median', () => {
     const cycles = [
       result(1, '2026-01-01', 28, 14),
       result(2, '2026-02-01', 28, 15),
     ]
-    const forecast = computePredictions(cycles, settings())
+    const forecast = computePredictions(cycles, settings(), TODAY)
     expect(forecast!.expectedPeriodStart).toBe('2026-03-01')
   })
 
@@ -90,7 +93,7 @@ describe('predict computePredictions', () => {
       result(3, '2026-02-26', 28, 12),
       result(4, '2026-03-26', 30, 16),
     ]
-    const forecast = computePredictions(cycles, settings())
+    const forecast = computePredictions(cycles, settings(), TODAY)
     // Newest day1 = 2026-03-26; earliest peak 12 → begin day 6 → date 2026-03-31
     // latest peak 16 + 4 = 20 → date 2026-04-14
     expect(forecast!.nextFertileWindow.begin).toBe('2026-03-31')
@@ -114,14 +117,13 @@ describe('predict computePredictions', () => {
     expect(mucusOnly.peakSource).toBe('none')
 
     const cycles = [mucusOnly, result(2, '2026-01-29', 28, 15)]
-    const forecast = computePredictions(cycles, settings())
+    const forecast = computePredictions(cycles, settings(), TODAY)
     expect(forecast!.peakDayEarliest).toBe(15)
     expect(forecast!.peakDayLatest).toBe(15)
-    expect(forecast!.peakDayMean).toBe(15)
   })
 
   it('excludes mucus-only cycles from historical peak statistics', () => {
-    const forecast = computePredictions([result(1, '2026-01-01', 28, 15)], settings())
+    const forecast = computePredictions([result(1, '2026-01-01', 28, 15)], settings(), TODAY)
     expect(forecast!.peakDayEarliest).toBe(15)
     expect(forecast!.peakDayLatest).toBe(15)
   })
@@ -132,15 +134,44 @@ describe('predict computePredictions', () => {
       result(2, '2026-01-21', 48, 20),
       result(3, '2026-03-10', 28, 14),
     ]
-    const forecast = computePredictions(cycles, settings())
+    const forecast = computePredictions(cycles, settings(), TODAY)
     expect(forecast!.outOfBandCount).toBe(2)
   })
 
   it('handles a single closed cycle', () => {
     const cycles = [result(1, '2026-01-01', 28, 14)]
-    const forecast = computePredictions(cycles, settings())
+    const forecast = computePredictions(cycles, settings(), TODAY)
     expect(forecast!.expectedPeriodStart).toBe('2026-01-29')
     expect(forecast!.nextFertileWindow.begin).toBe('2026-01-08')
     expect(forecast!.nextFertileWindow.end).toBe('2026-01-18')
+  })
+})
+describe('protocol default band is shared with the projection', () => {
+  it('uses the same constants in the no-peaks forecast fallback', () => {
+    // one protocol default, not two literals that happen to agree: if the
+    // shared constants move, both surfaces move together
+    const cycle = result(1, '2026-01-01', 28, null)
+    const forecast = computePredictions([cycle], settings(), TODAY)!
+
+    const day1 = cycle.day1
+    expect(forecast.nextFertileWindow.begin).toBe(
+      addDays(day1, PROTOCOL_DEFAULT_WINDOW_BEGIN - 1),
+    )
+    expect(forecast.nextFertileWindow.end).toBe(
+      addDays(day1, PROTOCOL_DEFAULT_WINDOW_END - 1),
+    )
+  })
+
+  it('keeps the calendar rule distinct from the default band', () => {
+    // the `- 6` in the calendar rule is a different protocol fact that
+    // coincidentally shares the value 6, so the two must not be conflated
+    const cycle = result(1, '2026-01-01', 28, 14)
+    const forecast = computePredictions([cycle], settings(), TODAY)!
+
+    // earliest peak 14 - 6 = day 8, not the default band's day 6
+    expect(forecast.nextFertileWindow.begin).toBe(addDays(cycle.day1, 7))
+    expect(forecast.nextFertileWindow.begin).not.toBe(
+      addDays(cycle.day1, PROTOCOL_DEFAULT_WINDOW_BEGIN - 1),
+    )
   })
 })

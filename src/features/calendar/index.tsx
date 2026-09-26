@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Heart } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -19,9 +19,8 @@ import {
 } from '@/components/ui/dialog'
 import { dayInCycle, todayKey } from '@/core/dateKeys'
 import { dayInfo } from '@/core/cycleStatus'
-import type { EngineOutput } from '@/core/engine/engineSdk'
 import { isMensesFlow, planCycles } from '@/core/engine/placement'
-import { cycleForDate, cycleResultsByCycleId } from '@/core/store/selectors'
+import { cycleForDate, cycleResultsByCycleId, projectedCyclesThrough } from '@/core/store/selectors'
 import { useAppStore } from '@/core/store/useAppStore'
 import type { CycleEntity, DayRecordEntity } from '@/core/store/entities'
 import { DayCell } from './day-cell'
@@ -35,6 +34,7 @@ export function CalendarView() {
   const dayRecords = useAppStore((s) => s.dayRecords)
   const output = useAppStore((s) => s.output)
   const interpreted = useAppStore((s) => s.settings.algorithmEnabled)
+  const settings = useAppStore((s) => s.settings)
   const detailMode = useAppStore((s) => s.settings.calendarDetailMode)
   const updateSettings = useAppStore((s) => s.updateSettings)
   const weekStart = useAppStore((s) => s.settings.weekStart)
@@ -47,7 +47,15 @@ export function CalendarView() {
   const grid = monthGrid(cursor.year, cursor.month, weekStart)
   const results = cycleResultsByCycleId(output)
   const forecast = output?.forecast?.nextFertileWindow
-  const predictedOvulationDay = predictedOvulationOf(output)
+  // The chain is derived for the month on screen, so paging forward keeps
+  // working with no fixed horizon. See projectedCyclesThrough.
+  // The last grid week can fall entirely outside the month, so take the last
+  // in-month date across every row rather than the final row's last entry.
+  const rangeEnd = grid.weeks.flat().filter(Boolean).pop() ?? today
+  const projected = useMemo(
+    () => projectedCyclesThrough(output, settings, today, rangeEnd),
+    [output, settings, today, rangeEnd],
+  )
   const currentCycle = cycleForDate(cycles, today)
   const currentCycleDay = currentCycle ? dayInCycle(currentCycle.day1, today) : null
   const currentResult = currentCycle ? results.get(currentCycle.id) : undefined
@@ -122,7 +130,7 @@ export function CalendarView() {
             if (!dateKey) {
               return <div key={`${w}-${d}`} />
             }
-            const cell = resolveCell(cycles, dayRecords, results, forecast, dateKey, today, predictedOvulationDay)
+            const cell = resolveCell(cycles, dayRecords, results, forecast, dateKey, today, projected)
             return (
               <DayCell
                 key={dateKey}
@@ -133,7 +141,6 @@ export function CalendarView() {
                 menses={cell.menses}
                 monitor={cell.monitor}
                 intercourse={cell.intercourse}
-                ovulation={interpreted ? cell.ovulation : false}
                 isToday={dateKey === today}
                 detailMode={detailMode}
                 onSelect={onSelectDate}
@@ -146,6 +153,7 @@ export function CalendarView() {
       <Legend
         interpreted={interpreted}
         detailMode={detailMode}
+        projecting={projected.length > 0}
         onToggleDetail={() => updateSettings({ calendarDetailMode: detailMode === 'simple' ? 'full' : 'simple' })}
       />
 
@@ -206,10 +214,12 @@ function pendingPlacement(
 function Legend({
   interpreted,
   detailMode,
+  projecting,
   onToggleDetail,
 }: {
   interpreted: boolean
   detailMode: 'simple' | 'full'
+  projecting: boolean
   onToggleDetail(): void
 }) {
   const fullDetail = detailMode === 'full'
@@ -236,6 +246,18 @@ function Legend({
               className={cn('rounded border', FERTILITY_FORECAST_VISUAL.cellBorder, FERTILITY_FORECAST_VISUAL.fill)}
               label="Predicted window"
             />
+            {projecting && (
+              // A projected day keeps its phase fill; the dashed border is the
+              // cue, so the sample shows a phase fill with that border.
+              <LegendItem
+                className={cn(
+                  'rounded border',
+                  FERTILITY_FORECAST_VISUAL.cellBorder,
+                  FERTILITY_CALENDAR_PHASE_VISUALS.fertile.fill,
+                )}
+                label="Projected"
+              />
+            )}
           </div>
         )}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -250,21 +272,11 @@ function Legend({
               <Heart aria-hidden="true" className={cn('size-2', FERTILITY_MARKER_VISUALS.intercourse.icon)} />
               Intercourse
             </span>
-            <LegendDot className={FERTILITY_MARKER_VISUALS.ovulation.dot} label="Predicted ovulation" />
           </div>
         )}
       </div>
     </div>
   )
-}
-
-function predictedOvulationOf(output: EngineOutput | null): number | undefined {
-  const forecast = output?.forecast
-  if (!forecast) {
-    return undefined
-  }
-  // Prefer the average historical Peak day; fall back to a typical mid-cycle day.
-  return forecast.peakDayEarliest > 0 ? Math.round(forecast.peakDayMean) : 14
 }
 
 function LegendItem({ className, label }: { className: string; label: string }) {

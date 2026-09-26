@@ -124,7 +124,9 @@ describe('Settings JSON backup and restore', () => {
 
     await waitFor(() => expect(store().cycles).toHaveLength(2))
     expect(store().settings.goal).toBe('achieve-pregnancy')
-    expect(screen.queryByTestId('settings-backup-dialog')).not.toBeInTheDocument()
+    // the dialog closes once the restore settles; under parallel load that is
+    // a tick after the store updates, so wait for it rather than sampling once
+    await waitFor(() => expect(screen.queryByTestId('settings-backup-dialog')).not.toBeInTheDocument())
   })
 
   it('offers an optional current-data download before replacement', async () => {

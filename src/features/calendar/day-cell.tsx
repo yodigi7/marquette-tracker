@@ -18,7 +18,6 @@ export interface DayCellProps {
   menses: boolean
   monitor: DayRecordEntity['monitor']
   intercourse: boolean
-  ovulation: boolean
   isToday: boolean
   detailMode?: CalendarDetailMode
   onSelect(dateKey: string): void
@@ -32,7 +31,6 @@ export function DayCell({
   menses,
   monitor,
   intercourse,
-  ovulation,
   isToday,
   detailMode = 'simple',
   onSelect,
@@ -46,13 +44,16 @@ export function DayCell({
     monitorText,
     menses ? 'menses' : null,
     detailMode === 'full' && intercourse ? 'intercourse' : null,
-    detailMode === 'full' && ovulation ? 'predicted ovulation' : null,
+    forecast ? 'projected' : null,
   ].filter((part): part is string => !!part)
 
-  const statusFill = forecast
-    ? FERTILITY_FORECAST_VISUAL.fill
-    : phaseVisual
-      ? phaseVisual.fill
+  // The phase fill is kept when one is known, so a projected fertile day still
+  // reads as fertile; the dashed border carries "this day has not happened yet".
+  // The forecast fill is only the fallback for a future day with no status yet.
+  const statusFill = phaseVisual
+    ? phaseVisual.fill
+    : forecast
+      ? FERTILITY_FORECAST_VISUAL.fill
       : undefined
   const statusCue = forecast ? cn('border', FERTILITY_FORECAST_VISUAL.cellBorder) : undefined
 
@@ -90,19 +91,11 @@ export function DayCell({
           className={cn('absolute inset-x-1 bottom-0 h-1 rounded-full', FERTILITY_MARKER_VISUALS.menses.stripe)}
         />
       )}
-      {detailMode === 'full' && (
+      {detailMode === 'full' && intercourse && (
         <span className="mt-1 flex h-2.5 items-center gap-0.5">
-          {intercourse && (
-            <span title="Intercourse" className="inline-flex">
-              <Heart aria-hidden="true" className={cn('size-2', FERTILITY_MARKER_VISUALS.intercourse.icon)} />
-            </span>
-          )}
-          {ovulation && (
-            <span
-              title="Predicted ovulation"
-              className={cn('size-2 rounded-full', FERTILITY_MARKER_VISUALS.ovulation.dot)}
-            />
-          )}
+          <span title="Intercourse" className="inline-flex">
+            <Heart aria-hidden="true" className={cn('size-2', FERTILITY_MARKER_VISUALS.intercourse.icon)} />
+          </span>
         </span>
       )}
     </button>

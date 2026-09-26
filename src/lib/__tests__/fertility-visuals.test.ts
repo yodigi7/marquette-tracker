@@ -87,7 +87,8 @@ describe('fertility visual mappings', () => {
     expect(FERTILITY_MARKER_VISUALS.menses.dot).toBe('bg-fertility-marker-menses')
     expect(FERTILITY_MARKER_VISUALS.menses.stripe).toBe('bg-fertility-marker-menses')
     expect(FERTILITY_MARKER_VISUALS.intercourse.icon).toContain('fertility-marker-intercourse')
-    expect(FERTILITY_MARKER_VISUALS.ovulation.dot).toContain('fertility-forecast-border')
+    // no single-day ovulation estimate treatment is defined
+    expect('ovulation' in FERTILITY_MARKER_VISUALS).toBe(false)
     expect(FERTILITY_FORECAST_VISUAL.fill).toBe('bg-fertility-forecast-bg')
     expect(FERTILITY_FORECAST_VISUAL.cellBorder).toBe('border-dashed border-fertility-forecast-border')
     expect(FERTILITY_FORECAST_VISUAL.text).toBe('text-fertility-forecast-fg')

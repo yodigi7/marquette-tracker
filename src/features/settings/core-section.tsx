@@ -57,6 +57,22 @@ export function CoreSection() {
         />
       </div>
 
+      <div className="flex items-center justify-between gap-4">
+        <div className="space-y-1">
+          <Label htmlFor="settings-project-future-cycles">Project future cycles on the calendar</Label>
+          <p className="text-sm text-stone-500">
+            Off = only the current cycle is shown. On = projected cycles, their expected period days, and
+            their fertile windows are drawn ahead on the calendar.
+          </p>
+        </div>
+        <Switch
+          id="settings-project-future-cycles"
+          data-testid="settings-project-future-cycles"
+          checked={settings.projectFutureCycles}
+          onCheckedChange={(checked) => updateSettings({ projectFutureCycles: checked })}
+        />
+      </div>
+
       <div className="grid gap-5 sm:grid-cols-2">
         <NumberField
           testId="settings-post-peak-days"

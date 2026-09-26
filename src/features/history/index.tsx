@@ -77,6 +77,13 @@ function ForecastPanel({ forecast }: { forecast: Forecast | null }) {
           <Stat label="Next fertile window" value={`${forecast.nextFertileWindow.begin} → ${forecast.nextFertileWindow.end}`} />
         </div>
         <Stat label="Based on" value={`${forecast.basedOnCycles} cycle${forecast.basedOnCycles === 1 ? '' : 's'}`} />
+        <p className={cn('text-xs', FERTILITY_TEXT_VISUALS.muted)}>
+          Projected dates use the median of your last {forecast.lookbackWindow} completed cycle
+          {forecast.lookbackWindow === 1 ? '' : 's'} — as many as you have on record, up to your
+          configured window of {forecast.configuredLookbackWindow}. The median is used so a single
+          atypical cycle does not shift every date. The averages above are shown for reference and are
+          not what produces them.
+        </p>
         {forecast.outOfBandCount >= 2 && (
           <p className={cn('text-xs', FERTILITY_TEXT_VISUALS.warning)}>
             {forecast.outOfBandCount} cycles fell outside the 21–42 day band. Consider consulting a Marquette-certified instructor.
@@ -90,7 +97,6 @@ function ForecastPanel({ forecast }: { forecast: Forecast | null }) {
 function CycleStats({ results, forecast }: { results: CycleResult[]; forecast: Forecast | null }) {
   const fertileTotals = results.map(countFertileDays)
   const total = fertileTotals.reduce((sum, n) => sum + n, 0)
-  const peakDays = results.filter((r) => r.peakDay !== null)
 
   return (
     <Card>
@@ -102,10 +108,6 @@ function CycleStats({ results, forecast }: { results: CycleResult[]; forecast: F
           <Stat label="Avg length" value={forecast ? `${forecast.meanLength} days` : '—'} />
           <Stat label="Median length" value={forecast ? `${forecast.medianLength} days` : '—'} />
           <Stat label="Range" value={forecast ? `${forecast.earliestLength}–${forecast.latestLength}` : '—'} />
-          <Stat
-            label="Peak day (avg)"
-            value={peakDays.length > 0 ? `day ${Math.round(forecast?.peakDayMean ?? 0)}` : '—'}
-          />
           <Stat
             label="Peak day range"
             value={

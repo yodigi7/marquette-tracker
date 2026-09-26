@@ -28,6 +28,7 @@ export const END_RULE_LABELS: Record<FertileWindow['endRule'], string> = {
   'current-peak-plus-n': 'current Peak + N days',
   'historic-peak-plus-n': 'latest historical Peak + N days',
   'earliest-end': 'earliest of historical vs current Peak',
+  'protocol-default-band': 'protocol default band (no Peak history)',
   none: 'no end (no Peak yet)',
 }
 

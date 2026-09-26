@@ -263,16 +263,105 @@ describe('resolveCell', () => {
     expect(noRecord.intercourse).toBe(false)
   })
 
-  it('marks only the predicted ovulation day of the open cycle, in the present/future', () => {
-    const day1 = '2026-08-03'
-    const open = { ...CYCLE, day1 }
-    // today = Aug 12 → predicted ovulation at day 14 = Aug 16 (future)
-    const ovulationDay = '2026-08-16'
-    const today = '2026-08-12'
-    expect(resolveCell([open], NO_RECORDS, results, undefined, ovulationDay, today, 14).ovulation).toBe(true)
-    // Other future days are not ovulation.
-    expect(resolveCell([open], NO_RECORDS, results, undefined, '2026-08-17', today, 14).ovulation).toBe(false)
-    // A past predicted-ovulation date (before today) is not marked.
-    expect(resolveCell([open], NO_RECORDS, results, undefined, '2026-08-16', '2026-08-20', 14).ovulation).toBe(false)
+  it('reports no single-day ovulation estimate', () => {
+    // The protocol's calendar rule yields a range, not a single ovulatory day,
+    // so CellInfo carries no ovulation marker at all.
+    const cell = resolveCell([CYCLE], NO_RECORDS, results, undefined, '2026-08-16', '2026-08-12')
+    expect('ovulation' in cell).toBe(false)
+  })
+})
+// --- projected cycle resolution -------------------------------------------
+
+const TODAY = '2026-08-20'
+const PROJECTED_DAY1 = '2026-08-03'
+
+/** A projected 28-day cycle beginning on the same day as CYCLE. */
+const PROJECTED: CycleResult = {
+  ...PEAKED_RESULT,
+  cycleId: 'projected-1',
+  cycleNo: 2,
+  length: 28,
+  fertileWindow: {
+    begin: 6,
+    end: 16,
+    beginRule: 'calendar-earliest-peak-minus-6',
+    endRule: 'historic-peak-plus-n',
+  },
+}
+
+const RESULTS = new Map([['c1', RESULT]])
+const NO_FORECAST = undefined
+
+describe('resolveCell with projected cycles', () => {
+  it('leaves a real cycle date unchanged when projection is absent', () => {
+    const cell = resolveCell([CYCLE], NO_RECORDS, RESULTS, NO_FORECAST, '2026-08-10', TODAY)
+    expect(cell.info).toBe('fertile')
+    expect(cell.forecast).toBe(false)
+    expect(cell.menses).toBe(false)
+  })
+
+  it('leaves a real cycle date unchanged when a projection is supplied', () => {
+    const cell = resolveCell([CYCLE], NO_RECORDS, RESULTS, NO_FORECAST, '2026-08-10', TODAY, [PROJECTED])
+    expect(cell.info).toBe('fertile')
+    expect(cell.forecast).toBe(false)
+  })
+
+  it('resolves a status for a date inside a projected cycle', () => {
+    // day 8 of the projected cycle -> inside the 6..16 window
+    const cell = resolveCell([CYCLE], NO_RECORDS, RESULTS, NO_FORECAST, '2026-08-10', TODAY, [PROJECTED])
+    expect(cell.info).toBe('fertile')
+  })
+
+  it('marks a projected date as forecast', () => {
+    const cell = resolveCell([CYCLE], NO_RECORDS, RESULTS, NO_FORECAST, '2026-08-25', TODAY, [PROJECTED])
+    expect(cell.forecast).toBe(true)
+  })
+
+  it('reports pre-fertile days inside a projected cycle', () => {
+    // day 3 of the projected cycle, before the window begins
+    const cell = resolveCell([CYCLE], NO_RECORDS, RESULTS, NO_FORECAST, '2026-08-05', TODAY, [PROJECTED])
+    expect(cell.info).toBe('pre-fertile')
+  })
+
+  it('reports post-window days inside a projected cycle', () => {
+    // day 20 of the projected cycle, after the window ends on 16
+    const cell = resolveCell([CYCLE], NO_RECORDS, RESULTS, NO_FORECAST, '2026-08-22', TODAY, [PROJECTED])
+    expect(cell.info).toBe('post-peak')
+  })
+
+  it('marks a projected day 1 as menses', () => {
+    const cell = resolveCell([CYCLE], NO_RECORDS, RESULTS, NO_FORECAST, PROJECTED_DAY1, TODAY, [PROJECTED])
+    expect(cell.menses).toBe(true)
+  })
+
+  it('does not mark other projected days as menses', () => {
+    const cell = resolveCell([CYCLE], NO_RECORDS, RESULTS, NO_FORECAST, '2026-08-25', TODAY, [PROJECTED])
+    expect(cell.menses).toBe(false)
+  })
+
+  it('does not treat a projected past date as projected', () => {
+    // 2026-08-10 is at or before today, so the real cycle's derived status wins
+    const cell = resolveCell([CYCLE], NO_RECORDS, RESULTS, NO_FORECAST, '2026-08-10', TODAY, [PROJECTED])
+    expect(cell.forecast).toBe(false)
+  })
+
+  it('ignores projected cycles that do not cover the date', () => {
+    const later: CycleResult = { ...PROJECTED, day1: '2027-01-01' }
+    const cell = resolveCell([CYCLE], NO_RECORDS, RESULTS, NO_FORECAST, '2026-08-25', TODAY, [later])
+    expect(cell.forecast).toBe(false)
+    expect(cell.info).toBeNull()
+  })
+
+  it('never shows a monitor marker or intercourse on a projected day', () => {
+    const cell = resolveCell([CYCLE], NO_RECORDS, RESULTS, NO_FORECAST, '2026-08-25', TODAY, [PROJECTED])
+    expect(cell.monitor).toBeUndefined()
+    expect(cell.intercourse).toBe(false)
+  })
+
+  it('still scopes the existing single-window forecast to future dates', () => {
+    const forecast = { begin: '2026-08-01', end: '2026-08-20' }
+    const past = resolveCell([CYCLE], NO_RECORDS, RESULTS, forecast, '2026-08-10', TODAY)
+    expect(past.forecast).toBe(false)
+    expect(past.info).toBe('fertile')
   })
 })

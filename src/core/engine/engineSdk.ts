@@ -50,7 +50,7 @@ export function computeAll(
   }
 
   const warnings = collectWarnings(results, settings)
-  const forecast = computePredictions(results, settings)
+  const forecast = computePredictions(results, settings, today)
 
   return { cycles: results, forecast, warnings }
 }

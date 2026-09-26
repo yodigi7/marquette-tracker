@@ -277,6 +277,9 @@ function validateSettings(settings: SettingsEntity): void {
   if (settings.calendarDetailMode !== 'simple' && settings.calendarDetailMode !== 'full') {
     fail('invalid-settings', 'Calendar detail mode is invalid')
   }
+  if (typeof settings.projectFutureCycles !== 'boolean') {
+    fail('invalid-settings', 'Cycle projection setting is invalid')
+  }
   if (typeof settings.demoSeeded !== 'boolean') {
     fail('invalid-settings', 'Demo marker is invalid')
   }

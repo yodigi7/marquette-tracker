@@ -1,10 +1,9 @@
 /** Month grid math: 6 weeks × 7 days, Monday-first, keys = local `YYYY-MM-DD`. */
 
 import { dayInfo } from '@/core/cycleStatus'
-import { addDays } from '@/core/engine/dateUtils'
 import { dayInCycle, dateKeyLocal } from '@/core/dateKeys'
 import type { CycleResult, DayStatus } from '@/core/engine/types'
-import { cycleForDate, latestOpenCycle } from '@/core/store/selectors'
+import { cycleForDate } from '@/core/store/selectors'
 import type { CycleEntity, DayRecordEntity, WeekStart } from '@/core/store/entities'
 
 export interface MonthGrid {
@@ -58,17 +57,26 @@ export interface CellInfo {
   menses: boolean
   monitor: DayRecordEntity['monitor']
   intercourse: boolean
-  /** True on the predicted ovulation day of the current open cycle (see `predictedOvulationDay`). */
-  ovulation: boolean
 }
 
-/** Per-day resolution: cycle lookup → engine status → record markers → forecast overlay.
+/** Latest projected cycle covering the date, if any. */
+function projectedCycleForDate(projected: CycleResult[], dateKey: string): CycleResult | undefined {
+  for (let index = projected.length - 1; index >= 0; index--) {
+    if (projected[index].day1 <= dateKey) {
+      return projected[index]
+    }
+  }
+  return undefined
+}
+
+/** Per-day resolution: real cycle → projected cycle → record markers → forecast overlay.
  * The status band is derived from the cycle's window, so it is painted for every
  * past day inside a cycle whether or not an observation was recorded. Future dates
  * stay blank and are covered only by the forecast outline; they get no menses dot.
  *
- * `predictedOvulationDay` is the cycle-day on which ovulation is estimated to occur in the
- * current open cycle (derived from historical Peak days). It marks a single future day.
+ * A date covered by a projected cycle resolves its status from that cycle's window
+ * and is marked as forecast. Projected cycles are only consulted for dates after
+ * today, so a real cycle's derived days keep their own treatment.
  */
 export function resolveCell(
   cycles: CycleEntity[],
@@ -77,20 +85,27 @@ export function resolveCell(
   forecast: { begin: string; end: string } | undefined,
   dateKey: string,
   today: string,
-  predictedOvulationDay?: number,
+  projected: CycleResult[] = [],
 ): CellInfo {
   const cycle = cycleForDate(cycles, dateKey)
   const record = cycle ? dayRecords.find((r) => r.cycleId === cycle.id && r.date === dateKey) : undefined
 
   const isFuture = dateKey > today
   const inForecast = !!forecast && dateKey >= forecast.begin && dateKey <= forecast.end
-  const openCycle = latestOpenCycle(cycles)
-  const ovulation =
-    !!predictedOvulationDay &&
-    !!openCycle &&
-    cycle?.id === openCycle.id &&
-    dateKey >= today &&
-    dateKey === addDays(openCycle.day1, predictedOvulationDay - 1)
+
+  const projectedCycle = isFuture ? projectedCycleForDate(projected, dateKey) : undefined
+  if (projectedCycle) {
+    const dayNo = dayInCycle(projectedCycle.day1, dateKey)
+    return {
+      // The phase still comes from the projected window; the forecast flag is
+      // what tells the cell this day has not happened yet.
+      info: statusForWindow(projectedCycle, dayNo),
+      forecast: true,
+      menses: dayNo === 1,
+      monitor: undefined,
+      intercourse: false,
+    }
+  }
 
   return {
     // Derived from the window, so an unlogged day inside a cycle still has a
@@ -100,8 +115,14 @@ export function resolveCell(
     menses: !isFuture && mensesFor(record, cycle ? dayInCycle(cycle.day1, dateKey) : 0),
     monitor: record?.monitor && record.monitor !== 'none' ? record.monitor : undefined,
     intercourse: !!record?.intercourse,
-    ovulation,
   }
+}
+
+function statusForWindow(result: CycleResult, dayNo: number): DayStatus | null {
+  if (dayNo < 1 || (result.length !== null && dayNo > result.length)) {
+    return null
+  }
+  return dayInfo(result.fertileWindow, result.peakDay !== null, dayNo)
 }
 
 function statusForCell(cycle: CycleEntity | undefined, results: Map<string, CycleResult>, dateKey: string): DayStatus | null {

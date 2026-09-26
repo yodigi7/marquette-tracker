@@ -168,6 +168,56 @@ describe('JSON backup contract', () => {
     expect(prepared.document.data.settings.calendarDetailMode).toBe('simple')
   })
 
+  it('round-trips the cycle projection setting', () => {
+    const document = createBackup(snapshot({ settings: settings({ projectFutureCycles: true }) }), {
+      appVersion: '1.0.0',
+      exportedAt: createdAt,
+    })
+
+    const prepared = prepareBackup(serializeBackup(document))
+
+    expect(prepared.document.data.settings.projectFutureCycles).toBe(true)
+  })
+
+  it('defaults a legacy settings row without a cycle projection value to off', () => {
+    const legacy = settings({ projectFutureCycles: true })
+    delete (legacy as Partial<SettingsEntity>).projectFutureCycles
+
+    const prepared = prepareBackup(
+      serializeBackup(
+        createBackup(snapshot({ settings: legacy }), {
+          appVersion: '1.0.0',
+          exportedAt: createdAt,
+        }),
+      ),
+    )
+
+    expect(prepared.document.data.settings.projectFutureCycles).toBe(false)
+  })
+
+  it('rejects a non-boolean cycle projection setting', () => {
+    const document = createBackup(snapshot(), { appVersion: '1.0.0', exportedAt: createdAt })
+    const raw = JSON.parse(serializeBackup(document)) as {
+      data: { settings: Record<string, unknown> }
+    }
+    raw.data.settings.projectFutureCycles = 'yes'
+
+    expect(() => prepareBackup(JSON.stringify(raw))).toThrow()
+  })
+
+  it('leaves the backup format version unchanged for the additive setting', () => {
+    const document = createBackup(snapshot({ settings: settings({ projectFutureCycles: true }) }), {
+      appVersion: '1.0.0',
+      exportedAt: createdAt,
+    })
+
+    expect(document.formatVersion).toBe(CURRENT_BACKUP_VERSION)
+    // additive field only: no other key appears or disappears
+    expect(Object.keys(document.data.settings).sort()).toEqual(
+      Object.keys(createBackup(snapshot(), { appVersion: '1.0.0', exportedAt: createdAt }).data.settings).sort(),
+    )
+  })
+
   it('accepts an empty dataset when settings are valid', () => {
     const prepared = prepareBackup(
       serializeBackup(

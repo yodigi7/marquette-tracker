@@ -12,6 +12,7 @@ import { db } from './db'
 import { DEFAULT_SETTINGS } from './entities'
 import type { CycleEntity, DayRecordEntity, SettingsEntity } from './entities'
 import { createRepositories } from './repositories'
+import { engineSettingsOf } from './selectors'
 
 export class FutureDateError extends Error {
   constructor() {
@@ -65,15 +66,6 @@ export interface AppState {
   clearAllData(): Promise<void>
   createBackup(): Promise<BackupDocument>
   restoreBackup(prepared: PreparedBackup): Promise<BackupRestoreResult>
-}
-
-function engineSettingsOf(settings: SettingsEntity) {
-  return {
-    postPeakDays: settings.postPeakDays,
-    historyWindow: settings.historyWindow,
-    cycleMinLength: settings.cycleMinLength,
-    cycleMaxLength: settings.cycleMaxLength,
-  }
 }
 
 function toPlacedDay(record: DayRecordEntity): PlacedDay {
