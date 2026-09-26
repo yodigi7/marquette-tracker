@@ -1,10 +1,9 @@
 /** Month grid math: 6 weeks × 7 days, Monday-first, keys = local `YYYY-MM-DD`. */
 
 import { dayInfo } from '@/core/cycleStatus'
-import type { DayInfo } from '@/core/cycleStatus'
 import { addDays } from '@/core/engine/dateUtils'
 import { dayInCycle, dateKeyLocal } from '@/core/dateKeys'
-import type { CycleResult } from '@/core/engine/types'
+import type { CycleResult, DayStatus } from '@/core/engine/types'
 import { cycleForDate, latestOpenCycle } from '@/core/store/selectors'
 import type { CycleEntity, DayRecordEntity, WeekStart } from '@/core/store/entities'
 
@@ -53,23 +52,20 @@ export function weekdayLabels(weekStart: WeekStart = 'monday'): string[] {
   return weekStart === 'sunday' ? WEEKDAY_LABELS_SUNDAY : WEEKDAY_LABELS
 }
 
-export type CellOrigin = 'user' | 'inferred' | 'none'
-
 export interface CellInfo {
-  info: DayInfo | null
+  info: DayStatus | null
   forecast: boolean
   menses: boolean
   monitor: DayRecordEntity['monitor']
   intercourse: boolean
-  origin: CellOrigin
   /** True on the predicted ovulation day of the current open cycle (see `predictedOvulationDay`). */
   ovulation: boolean
 }
 
 /** Per-day resolution: cycle lookup → engine status → record markers → forecast overlay.
- * A filled status band is only painted where an observation was actually recorded.
- * Days with no entry (past or future) stay blank; the predicted fertile window is shown
- * only as the forecast outline (never a filled band). Future days get no menses dot.
+ * The status band is derived from the cycle's window, so it is painted for every
+ * past day inside a cycle whether or not an observation was recorded. Future dates
+ * stay blank and are covered only by the forecast outline; they get no menses dot.
  *
  * `predictedOvulationDay` is the cycle-day on which ovulation is estimated to occur in the
  * current open cycle (derived from historical Peak days). It marks a single future day.
@@ -97,17 +93,18 @@ export function resolveCell(
     dateKey === addDays(openCycle.day1, predictedOvulationDay - 1)
 
   return {
-    info: record ? statusForCell(cycle, results, dateKey) : null,
-    forecast: inForecast && !record,
+    // Derived from the window, so an unlogged day inside a cycle still has a
+    // status. Future dates are left to the forecast treatment.
+    info: isFuture ? null : statusForCell(cycle, results, dateKey),
+    forecast: inForecast && isFuture && !record,
     menses: !isFuture && mensesFor(record, cycle ? dayInCycle(cycle.day1, dateKey) : 0),
     monitor: record?.monitor && record.monitor !== 'none' ? record.monitor : undefined,
     intercourse: !!record?.intercourse,
-    origin: record ? (record.dataOrigin ?? 'user') : 'none',
     ovulation,
   }
 }
 
-function statusForCell(cycle: CycleEntity | undefined, results: Map<string, CycleResult>, dateKey: string): DayInfo | null {
+function statusForCell(cycle: CycleEntity | undefined, results: Map<string, CycleResult>, dateKey: string): DayStatus | null {
   if (!cycle) {
     return null
   }

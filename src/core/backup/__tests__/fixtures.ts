@@ -39,23 +39,15 @@ export function fullSnapshot(): BackupSnapshot {
       monitor: 'peak',
       mucus: 'low',
       bloodFlow: 'medium',
-      dataOrigin: 'user',
       notes: 'User note',
       ...meta(5),
     },
     {
-      id: 'inferred-low',
+      id: 'user-low',
       cycleId: 'cycle-january',
       date: '2026-01-19',
       dayInCycle: 19,
       monitor: 'low',
-      dataOrigin: 'inferred',
-      inference: {
-        rule: 'post-peak-low-tail',
-        peakDay: 14,
-        postPeakDays: 4,
-        mode: 'auto-after-window',
-      },
       ...meta(1),
     },
     {
@@ -64,23 +56,15 @@ export function fullSnapshot(): BackupSnapshot {
       date: '2026-02-01',
       dayInCycle: 1,
       bloodFlow: 'medium',
-      dataOrigin: 'user',
       ...meta(1),
     },
     {
-      id: 'edited-inferred-low',
+      id: 'user-high',
       cycleId: 'cycle-january',
       date: '2026-01-20',
       dayInCycle: 20,
       monitor: 'high',
-      dataOrigin: 'user',
-      inference: {
-        rule: 'post-peak-low-tail',
-        peakDay: 14,
-        postPeakDays: 4,
-        mode: 'auto-after-window',
-      },
-      notes: 'Edited after generation',
+      notes: 'Entered by hand',
       ...meta(3),
     },
   ]
@@ -89,17 +73,6 @@ export function fullSnapshot(): BackupSnapshot {
     ...DEFAULT_SETTINGS,
     key: 'main',
     goal: 'achieve-pregnancy',
-    postPeakFillMode: 'after-user-low',
-    postPeakSuppressions: [
-      {
-        date: '2026-01-21',
-        cycleId: 'cycle-january',
-        cycleDay1: '2026-01-01',
-        peakDay: 14,
-        postPeakDays: 4,
-        mode: 'after-user-low',
-      },
-    ],
     ...meta(6),
   }
 

@@ -98,7 +98,6 @@ function normalizeDayRecord(value: unknown): DayRecordEntity {
     cycleId: stringOr(value.cycleId, ''),
     date: stringOr(value.date, ''),
     dayInCycle: numberOr(value.dayInCycle, 0),
-    dataOrigin: value.dataOrigin === 'inferred' ? 'inferred' : 'user',
     ...normalizeMeta(value),
   } as DayRecordEntity
 }
@@ -107,9 +106,18 @@ function normalizeSettings(value: unknown): SettingsEntity {
   if (!isRecord(value)) {
     return fail('invalid-settings', 'Backup settings must be an object')
   }
+  // Destructure-to-drop is the removal mechanism, not dead code: a backup taken
+  // before post-Peak fill was removed still carries these two settings, and
+  // they must not be written back to the store. The feature they configured no
+  // longer exists, so the restored settings row is authoritative without them.
+  const {
+    postPeakFillMode: _fillMode,
+    postPeakSuppressions: _suppressions,
+    ...supported
+  } = value
   return {
     ...DEFAULT_SETTINGS,
-    ...value,
+    ...supported,
     key: SETTINGS_KEY,
     ...normalizeMeta(value),
   } as SettingsEntity
@@ -205,23 +213,6 @@ function validateCycle(cycle: CycleEntity): void {
   validateMeta(cycle, 'invalid-cycle')
 }
 
-function validateInference(value: unknown): void {
-  if (!isRecord(value) || value.rule !== 'post-peak-low-tail') {
-    fail('invalid-record', 'Inference lineage is invalid')
-  }
-  if (typeof value.peakDay !== 'number' || !Number.isInteger(value.peakDay) || value.peakDay < 1) {
-    fail('invalid-record', 'Inference Peak day is invalid')
-  }
-  if (typeof value.postPeakDays !== 'number' || !Number.isInteger(value.postPeakDays) || value.postPeakDays < 0) {
-    fail('invalid-record', 'Inference post-Peak days are invalid')
-  }
-  if (value.anchorDate !== undefined && !isDateKeyValue(value.anchorDate)) {
-    fail('invalid-record', 'Inference anchor date is invalid')
-  }
-  if (value.mode !== 'auto-after-window' && value.mode !== 'after-user-low') {
-    fail('invalid-record', 'Inference mode is invalid')
-  }
-}
 
 function validateDayRecord(record: DayRecordEntity, today: string): void {
   if (!record.id || typeof record.cycleId !== 'string' || !isDateKeyValue(record.date) || record.date > today) {
@@ -238,12 +229,6 @@ function validateDayRecord(record: DayRecordEntity, today: string): void {
   }
   if (record.bloodFlow !== undefined && !['none', 'light', 'medium', 'heavy'].includes(record.bloodFlow)) {
     fail('invalid-record', 'Blood flow reading is invalid')
-  }
-  if (record.dataOrigin !== 'user' && record.dataOrigin !== 'inferred') {
-    fail('invalid-record', 'Record origin is invalid')
-  }
-  if (record.inference !== undefined) {
-    validateInference(record.inference)
   }
   if (record.intercourse !== undefined && typeof record.intercourse !== 'boolean') {
     fail('invalid-record', 'Intercourse value is invalid')
@@ -266,20 +251,6 @@ function validateDayRecord(record: DayRecordEntity, today: string): void {
   validateMeta(record, 'invalid-record')
 }
 
-function validateSuppression(value: unknown): void {
-  if (!isRecord(value) || !isDateKeyValue(value.date) || typeof value.cycleId !== 'string' || !isDateKeyValue(value.cycleDay1)) {
-    fail('invalid-settings', 'Post-Peak suppression is invalid')
-  }
-  if (typeof value.peakDay !== 'number' || !Number.isInteger(value.peakDay) || value.peakDay < 1) {
-    fail('invalid-settings', 'Post-Peak suppression Peak day is invalid')
-  }
-  if (typeof value.postPeakDays !== 'number' || !Number.isInteger(value.postPeakDays) || value.postPeakDays < 0) {
-    fail('invalid-settings', 'Post-Peak suppression post-Peak days are invalid')
-  }
-  if (value.mode !== 'auto-after-window' && value.mode !== 'after-user-low') {
-    fail('invalid-settings', 'Post-Peak suppression mode is invalid')
-  }
-}
 
 function validateSettings(settings: SettingsEntity): void {
   if (settings.key !== SETTINGS_KEY || !['avoid-pregnancy', 'achieve-pregnancy', 'track-only'].includes(settings.goal)) {
@@ -300,13 +271,6 @@ function validateSettings(settings: SettingsEntity): void {
   if (!Number.isInteger(settings.cycleMinLength) || !Number.isInteger(settings.cycleMaxLength) || settings.cycleMinLength < 15 || settings.cycleMaxLength > 60 || settings.cycleMinLength >= settings.cycleMaxLength) {
     fail('invalid-settings', 'Cycle length band is invalid')
   }
-  if (settings.postPeakFillMode !== 'auto-after-window' && settings.postPeakFillMode !== 'after-user-low') {
-    fail('invalid-settings', 'Post-Peak fill mode is invalid')
-  }
-  if (!Array.isArray(settings.postPeakSuppressions)) {
-    fail('invalid-settings', 'Post-Peak suppressions must be an array')
-  }
-  settings.postPeakSuppressions.forEach(validateSuppression)
   if (typeof settings.overlayMucus !== 'boolean' || typeof settings.overlayBbt !== 'boolean' || typeof settings.overlayIntercourse !== 'boolean') {
     fail('invalid-settings', 'Chart overlay settings are invalid')
   }

@@ -42,6 +42,9 @@ function emptyHistory(): CycleHistory {
   return { peaksByCycle: [], cycleNos: [] }
 }
 
+/** Fixed "today" for closed-cycle cases, where the open-cycle bound is inert. */
+const TODAY = '2026-06-01'
+
 function historyWithPeaks(peaks: (number | null)[]): CycleHistory {
   return { peaksByCycle: peaks, cycleNos: peaks.map((_, i) => i + 1) }
 }
@@ -166,16 +169,6 @@ const CASES: Case[] = [
     expect: { begin: 6, end: 19, beginRule: 'calendar-earliest-peak-minus-6', endRule: 'current-peak-plus-n' },
   },
   {
-    name: 'inferred monitor readings are not user evidence',
-    cycleNo: 1,
-    records: [
-      record(1, 14, { monitor: 'peak' }),
-      record(1, 19, { monitor: 'high', dataOrigin: 'inferred' }),
-      record(1, 20, { monitor: 'peak', dataOrigin: 'inferred' }),
-    ],
-    expect: { begin: 6, end: 18, beginRule: 'calendar-day-6', endRule: 'current-peak-plus-n', peakDay: 14, peakSource: 'monitor' },
-  },
-  {
     name: 'records without provenance count as user evidence',
     cycleNo: 1,
     records: [record(1, 14, { monitor: 'peak' }), record(1, 21, { monitor: 'peak' })],
@@ -193,6 +186,7 @@ describe('marquette computeCycle', () => {
         testCase.expect.length ?? 28,
         testCase.history ?? emptyHistory(),
         testCase.settings ?? settings(),
+        TODAY,
       )
       expect(result.fertileWindow.begin).toBe(testCase.expect.begin)
       expect(result.fertileWindow.end).toBe(testCase.expect.end)
@@ -222,6 +216,7 @@ describe('marquette computeCycle', () => {
       28,
       emptyHistory(),
       settings(),
+      TODAY,
     )
 
     expect(result.fertileWindow.end).toBe(18)
@@ -238,22 +233,13 @@ describe('marquette computeCycle', () => {
       dayInCycle: i + 1,
       monitor: i + 1 === 14 ? 'peak' : 'low',
     }))
-    const result = computeCycle({ id: 'c1', day1: start }, records, 1, 28, emptyHistory(), settings())
+    const result = computeCycle({ id: 'c1', day1: start }, records, 1, 28, emptyHistory(), settings(), TODAY)
     const byStatus = new Map(result.days.map((d) => [d.day, d.status]))
     expect(byStatus.get(5)).toBe('pre-fertile')
     expect(byStatus.get(6)).toBe('fertile')
     expect(byStatus.get(18)).toBe('fertile')
     expect(byStatus.get(19)).toBe('post-peak')
     expect(byStatus.get(25)).toBe('post-peak')
-  })
-
-  it('treats calendar-based status as predicted and monitor-based as confirmed', () => {
-    const records = [record(1, 3, { monitor: 'low' }), record(1, 14, { monitor: 'peak' }), record(1, 20, { monitor: 'low' })]
-    const result = computeCycle(cycle(1), records, 1, 28, emptyHistory(), settings())
-    const day3 = result.days.find((d) => d.day === 3)
-    const day20 = result.days.find((d) => d.day === 20)
-    expect(day3?.source).toBe('predicted')
-    expect(day20?.source).toBe('confirmed')
   })
 
   it('does not treat Low-only records as Peak evidence or a fertile-window end', () => {
@@ -264,32 +250,33 @@ describe('marquette computeCycle', () => {
       28,
       emptyHistory(),
       settings(),
+      TODAY,
     )
 
     expect(result.peakDay).toBeNull()
     expect(result.peakSource).toBe('none')
     expect(result.fertileWindow.end).toBeNull()
     expect(result.fertileWindow.endRule).toBe('none')
-    expect(result.days[0]?.status).toBe('fertile')
+    // No window end, so every day from the day-6 begin onward stays fertile.
+    expect(result.days.find((d) => d.day === 6)?.status).toBe('fertile')
+    expect(result.days.find((d) => d.day === 18)?.status).toBe('fertile')
   })
 
-  it('returns day results for inferred records without using them as evidence', () => {
+  it('returns day results across the whole cycle from a single Peak record', () => {
     const result = computeCycle(
       cycle(1),
-      [
-        record(1, 14, { monitor: 'peak' }),
-        record(1, 19, { monitor: 'low', dataOrigin: 'inferred' }),
-        record(1, 20, { monitor: 'low', dataOrigin: 'inferred' }),
-      ],
+      [record(1, 14, { monitor: 'peak' })],
       1,
       28,
       emptyHistory(),
       settings(),
+      TODAY,
     )
 
     expect(result.peakDay).toBe(14)
     expect(result.fertileWindow.end).toBe(18)
-    expect(result.days.map((day) => day.day)).toEqual([14, 19, 20])
+    // Day coverage is now derived, so the array spans the whole closed cycle.
+    expect(result.days).toHaveLength(28)
     expect(result.days.find((d) => d.day === 19)?.status).toBe('post-peak')
   })
 
@@ -301,6 +288,131 @@ describe('marquette computeCycle', () => {
     expect(statusForCycleDay(window, true, 19)).toBe('post-peak')
     expect(statusForCycleDay(window, false, 19)).toBe('post-calendar')
     expect(statusForCycleDay({ ...window, end: null }, true, 40)).toBe('fertile')
+  })
+
+  describe('day results span the derived window', () => {
+    const START = '2026-01-01'
+
+    it('covers the whole fertile window when only the Peak is recorded', () => {
+      const result = computeCycle(
+        { id: 'c1', day1: START },
+        [record(1, 12, { monitor: 'peak' })],
+        1,
+        28,
+        emptyHistory(),
+        settings(),
+        '2026-01-20',
+      )
+
+      const byDay = new Map(result.days.map((d) => [d.day, d.status]))
+      expect(result.fertileWindow.end).toBe(16)
+      for (const day of [13, 14, 15, 16]) {
+        expect(byDay.get(day)).toBe('fertile')
+      }
+      expect(byDay.get(17)).toBe('post-peak')
+    })
+
+    it('covers days before the window begin with no records at all', () => {
+      const result = computeCycle(
+        { id: 'c1', day1: START },
+        [record(1, 12, { monitor: 'peak' })],
+        1,
+        28,
+        emptyHistory(),
+        settings(),
+        '2026-01-20',
+      )
+
+      const byDay = new Map(result.days.map((d) => [d.day, d.status]))
+      for (const day of [1, 2, 3, 4, 5]) {
+        expect(byDay.get(day)).toBe('pre-fertile')
+      }
+    })
+
+    it('emits one result per day for a closed cycle regardless of records', () => {
+      const result = computeCycle(
+        { id: 'c1', day1: START },
+        [record(1, 12, { monitor: 'peak' })],
+        1,
+        28,
+        emptyHistory(),
+        settings(),
+        '2026-02-28',
+      )
+
+      expect(result.days).toHaveLength(28)
+      expect(result.days.map((d) => d.day)).toEqual(Array.from({ length: 28 }, (_, i) => i + 1))
+    })
+
+    it('bounds an open cycle at the current day when no Peak is known', () => {
+      const result = computeCycle({ id: 'c1', day1: START }, [], 1, null, emptyHistory(), settings(), '2026-01-09')
+
+      expect(result.fertileWindow.end).toBeNull()
+      expect(result.days).toHaveLength(9)
+      const byDay = new Map(result.days.map((d) => [d.day, d.status]))
+      expect(byDay.get(5)).toBe('pre-fertile')
+      expect(byDay.get(6)).toBe('fertile')
+      expect(byDay.get(9)).toBe('fertile')
+    })
+
+    it('never covers a day after the current day', () => {
+      const result = computeCycle(
+        { id: 'c1', day1: START },
+        [record(1, 30, { monitor: 'peak' })],
+        1,
+        null,
+        emptyHistory(),
+        settings(),
+        '2026-01-10',
+      )
+
+      expect(result.days.map((d) => d.day)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+      expect(result.days.every((d) => d.day <= 10)).toBe(true)
+    })
+
+    it('emits no source, record identity, or data-origin value per day', () => {
+      const result = computeCycle(
+        { id: 'c1', day1: START },
+        [record(1, 12, { monitor: 'peak' })],
+        1,
+        28,
+        emptyHistory(),
+        settings(),
+        TODAY,
+      )
+
+      for (const day of result.days) {
+        expect(Object.keys(day).sort()).toEqual(['date', 'day', 'status'])
+      }
+    })
+
+    it('covers the same days with or without records', () => {
+      const withPeak = computeCycle(
+        { id: 'c1', day1: START },
+        [record(1, 12, { monitor: 'peak' })],
+        1,
+        28,
+        emptyHistory(),
+        settings(),
+        TODAY,
+      )
+      const withoutRecords = computeCycle(
+        { id: 'c1', day1: START },
+        [],
+        1,
+        28,
+        emptyHistory(),
+        settings(),
+        TODAY,
+      )
+
+      // Coverage no longer varies with what is stored. Statuses still do,
+      // because the Peak is evidence and an absent window end stays fertile.
+      expect(withoutRecords.days).toHaveLength(withPeak.days.length)
+      expect(withoutRecords.days.map((d) => d.date)).toEqual(withPeak.days.map((d) => d.date))
+      expect(withoutRecords.days.find((d) => d.day === 20)?.status).toBe('fertile')
+      expect(withPeak.days.find((d) => d.day === 20)?.status).toBe('post-peak')
+    })
   })
 })
 
@@ -327,7 +439,7 @@ describe('cycle band configurability (band-shift)', () => {
     const engineSettings = band
       ? settings({ cycleMinLength: band.min, cycleMaxLength: band.max })
       : settings()
-    return computeAll(cyclesOfLengths(lengths), [], engineSettings)
+    return computeAll(cyclesOfLengths(lengths), [], engineSettings, TODAY)
   }
 
   function outOfBandWarnings(out: ReturnType<typeof computeAll>) {

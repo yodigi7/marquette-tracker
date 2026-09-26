@@ -37,8 +37,10 @@ describe('HistoryView', () => {
     const open = store().cycles.find((c) => c.closedAt === null)!
     expect(store().output!.cycles.find((c) => c.cycleId === open.id)!.peakDay).toBeNull()
 
-    const openResult = store().output!.cycles.find((c) => c.cycleId === open.id)!
-    const lastDay = openResult.days[openResult.days.length - 1]!.day
+    // Derive the target from the stored records, not the engine's day array:
+    // day results now span the cycle, so their last entry is "today", not the
+    // last day the user actually recorded.
+    const lastDay = Math.max(...store().dayRecords.filter((r) => r.cycleId === open.id).map((r) => r.dayInCycle))
     const lastDate = addDays(open.day1, lastDay - 1)
     await store().addDayRecord(open.id, lastDate, lastDay, { monitor: 'peak' })
 
@@ -85,7 +87,6 @@ describe('HistoryView', () => {
     const cycle = await store().setNewCycle(start)
     await store().addDayRecord(cycle.id, start, 1, { bloodFlow: 'medium' })
     await store().addDayRecord(cycle.id, addDays(start, 13), 14, { monitor: 'peak' })
-    const generatedDate = addDays(start, 18)
     await store().updateSettings({ algorithmEnabled: false })
 
     const { rerender } = render(<HistoryView />)
@@ -95,7 +96,8 @@ describe('HistoryView', () => {
     expect(screen.queryByText('Fertile days')).toBeNull()
     expect(screen.getByRole('table')).toBeInTheDocument()
     expect(screen.getAllByRole('row')).toHaveLength(2)
-    expect(store().output?.cycles[0].days.some((day) => day.date === generatedDate)).toBe(false)
+    // Only the two logged days exist; nothing is synthesized.
+    expect(store().dayRecords).toHaveLength(2)
 
     await store().updateSettings({ algorithmEnabled: true })
     rerender(<HistoryView />)

@@ -9,16 +9,15 @@ import {
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { cycleResultsByCycleId, recordsForMode } from '@/core/store/selectors'
+import { cycleResultsByCycleId } from '@/core/store/selectors'
 import { useAppStore } from '@/core/store/useAppStore'
 import { buildStripModel, cycleLabel, cycleSpanOf, resolveSelectedCycle } from './lib'
 import { StripChart } from './strip-chart'
 
 export function CycleChartView() {
   const cycles = useAppStore((s) => s.cycles)
-  const allDayRecords = useAppStore((s) => s.dayRecords)
+  const dayRecords = useAppStore((s) => s.dayRecords)
   const settings = useAppStore((s) => s.settings)
-  const dayRecords = useMemo(() => recordsForMode(allDayRecords, settings.algorithmEnabled), [allDayRecords, settings.algorithmEnabled])
   const output = useAppStore((s) => s.output)
   const updateSettings = useAppStore((s) => s.updateSettings)
   const { cycleId } = useParams()

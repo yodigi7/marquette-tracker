@@ -1,7 +1,7 @@
 import { diffDays } from './dateUtils'
 import { computeCycle } from './marquette'
 import { computePredictions } from './predict'
-import type { CycleHistory, CycleInput, CycleResult, DayRecordInput, EngineSettings, EngineWarning } from './types'
+import type { CycleHistory, CycleInput, CycleResult, DateKey, DayRecordInput, EngineSettings, EngineWarning } from './types'
 
 export interface EngineOutput {
   cycles: CycleResult[]
@@ -13,12 +13,16 @@ export interface EngineOutput {
  * Full-engine entry point. Sorts cycles by day1, assigns cycle numbers,
  * threads the calendar history, computes every cycle and the forecast.
  *
+ * `today` bounds each open cycle's day results; it is passed in rather than
+ * read from the clock so the engine stays pure.
+ *
  * Pure: no I/O, no framework imports.
  */
 export function computeAll(
   cycles: CycleInput[],
   dayRecords: DayRecordInput[],
   settings: EngineSettings,
+  today: DateKey,
 ): EngineOutput {
   const sorted = [...cycles].sort((a, b) => (a.day1 < b.day1 ? -1 : a.day1 > b.day1 ? 1 : 0))
   const byCycle = new Map<string, DayRecordInput[]>()
@@ -39,7 +43,7 @@ export function computeAll(
     const cycleNo = index + 1
     const next = sorted[index + 1]
     const length = next ? diffDays(cycle.day1, next.day1) : null
-    const result = computeCycle(cycle, byCycle.get(cycle.id) ?? [], cycleNo, length, history, settings)
+    const result = computeCycle(cycle, byCycle.get(cycle.id) ?? [], cycleNo, length, history, settings, today)
     results.push(result)
     history.peaksByCycle.push(result.peakDay)
     history.cycleNos.push(cycleNo)

@@ -11,7 +11,7 @@ function bandByDay(day: number): HTMLElement | null {
 }
 
 function day(day: number): StripModel['days'][number] {
-  return { day, date: '2026-01-01', monitor: undefined, mucus: undefined, bbt: null, intercourse: false, status: 'pre-fertile', source: 'predicted' }
+  return { day, date: '2026-01-01', monitor: undefined, mucus: undefined, bbt: null, intercourse: false, status: 'pre-fertile' }
 }
 
 const SPAN = 10
@@ -67,7 +67,7 @@ it('colors bands with the shared monitor tokens', () => {
     render(
       <StripChart
         model={makeModel({
-          window: { begin: 6, end: 17, source: 'predicted', beginRule: 'calendar-day-6', endRule: 'current-peak-plus-n' },
+          window: { begin: 6, end: 17, beginRule: 'calendar-day-6', endRule: 'current-peak-plus-n' },
         })}
       />,
     )
@@ -77,32 +77,32 @@ it('colors bands with the shared monitor tokens', () => {
     expect(area?.getAttribute('stroke')).toBe('var(--fertility-window-border)')
   })
 
-  it('renders a solid window band (no dashes) when confirmed (SR element data-source)', () => {
+  it('renders one window treatment with no source attribute', () => {
     render(
       <StripChart
         model={makeModel({
-          window: { begin: 5, end: 9, source: 'confirmed', beginRule: 'first-high-or-peak', endRule: 'current-peak-plus-n' },
+          window: { begin: 5, end: 9, beginRule: 'first-high-or-peak', endRule: 'current-peak-plus-n' },
         })}
       />,
     )
     const band = screen.getByTestId('fertile-window-band')
-    expect(band.getAttribute('data-source')).toBe('confirmed')
+    expect(band.getAttribute('data-source')).toBeNull()
     expect(band.getAttribute('data-begin')).toBe('5')
     expect(band.getAttribute('data-end')).toBe('9')
     expect(document.querySelector('.recharts-reference-area-rect')?.getAttribute('stroke-dasharray')).toBeNull()
   })
 
-  it('renders a dashed window band when predicted (SC-002)', () => {
+  it('renders the same window treatment for a calendar-rule window', () => {
     render(
       <StripChart
         model={makeModel({
-          window: { begin: 6, end: 17, source: 'predicted', beginRule: 'calendar-day-6', endRule: 'current-peak-plus-n' },
+          window: { begin: 6, end: 17, beginRule: 'calendar-day-6', endRule: 'current-peak-plus-n' },
         })}
       />,
     )
     const band = screen.getByTestId('fertile-window-band')
-    expect(band.getAttribute('data-source')).toBe('predicted')
-    expect(document.querySelector('.recharts-reference-area-rect')?.getAttribute('stroke-dasharray')).not.toBeNull()
+    expect(band.getAttribute('data-source')).toBeNull()
+    expect(document.querySelector('.recharts-reference-area-rect')?.getAttribute('stroke-dasharray')).toBeNull()
   })
 
   it('renders NO window band when the window is null (algorithm off, FR-004)', () => {
@@ -115,7 +115,7 @@ it('colors bands with the shared monitor tokens', () => {
     render(
       <StripChart
         model={makeModel({
-          window: { begin: 6, end: null, source: 'predicted', beginRule: 'calendar-day-6', endRule: 'none' },
+          window: { begin: 6, end: null, beginRule: 'calendar-day-6', endRule: 'none' },
         })}
       />,
     )

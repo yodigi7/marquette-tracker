@@ -40,17 +40,36 @@ describe('StatusView', () => {
     expect(screen.queryByText(/medical device|marquette-certified instructor/i)).toBeNull()
   })
 
-  it('marks calendar-derived status as predicted', async () => {
+  it('shows no status source badge', async () => {
     const cycle = await store().setNewCycle(addDays(todayKey(), -5))
     await store().addDayRecord(cycle.id, addDays(todayKey(), -5), 1, { bloodFlow: 'medium' })
 
     render(<StatusView />)
 
-    expect(screen.getByText('predicted')).toBeInTheDocument()
-    expect(screen.getByText('Fertile window')).toHaveClass('bg-fertility-status-fertile-predicted')
+    expect(screen.queryByText('predicted')).not.toBeInTheDocument()
+    expect(screen.queryByText('confirmed')).not.toBeInTheDocument()
+    expect(screen.getByText('Fertile window')).toHaveClass('bg-fertility-status-fertile')
   })
 
-  it('shows source, window explanation, and a next-period estimate when available', async () => {
+  it('reports a status for a date inside the cycle that has no record', async () => {
+    // Cycle day 8 today, so yesterday is day 7 — inside the day-6 window,
+    // with nothing logged on it.
+    const cycle = await store().setNewCycle(addDays(todayKey(), -7))
+    await store().addDayRecord(cycle.id, addDays(todayKey(), -7), 1, { bloodFlow: 'medium' })
+
+    const user = userEvent.setup()
+    render(<StatusView />)
+    await user.click(screen.getByTestId('date-trigger'))
+    const inWindow = new Date()
+    inWindow.setDate(inWindow.getDate() - 1)
+    const dayButton = await pickDayButton(user, inWindow.getDate())
+    if (dayButton) await user.click(dayButton)
+
+    expect(await screen.findByText('Fertile window')).toBeInTheDocument()
+    expect(cycle.id).toBeTruthy()
+  })
+
+  it('shows the window explanation and a next-period estimate when available', async () => {
     const previousStart = addDays(todayKey(), -60)
     const previous = await store().setNewCycle(previousStart)
     await store().addDayRecord(previous.id, previousStart, 1, { bloodFlow: 'medium' })
@@ -60,7 +79,7 @@ describe('StatusView', () => {
 
     render(<StatusView />)
 
-    expect(screen.getByText('confirmed')).toBeInTheDocument()
+    expect(screen.queryByText('confirmed')).not.toBeInTheDocument()
     expect(screen.getByText(/Fertile from cycle day/i)).toBeInTheDocument()
     expect(screen.getByText(/estimated next period:/i)).toBeInTheDocument()
   })
@@ -89,17 +108,17 @@ describe('StatusView', () => {
     expect(screen.queryByText('Fertile window')).toBeNull()
   })
 
-  it('omits inferred days from derived output while logging-only mode is active', async () => {
+  it('suppresses derived output while logging-only mode is active', async () => {
     const start = addDays(todayKey(), -20)
     const cycle = await store().setNewCycle(start)
     await store().addDayRecord(cycle.id, start, 1, { bloodFlow: 'medium' })
     await store().addDayRecord(cycle.id, addDays(start, 13), 14, { monitor: 'peak' })
-    const generatedDate = addDays(start, 18)
     await store().updateSettings({ algorithmEnabled: false })
 
     render(<StatusView />)
 
-    expect(store().output?.cycles[0].days.some((day) => day.date === generatedDate)).toBe(false)
+    // The toggle suppresses interpretation in the view; stored records remain.
+    expect(store().dayRecords).toHaveLength(2)
     expect(screen.getByText(/algorithm is off/i)).toBeInTheDocument()
     expect(screen.queryByText('Fertile window')).toBeNull()
   })
@@ -119,17 +138,14 @@ describe('StatusView', () => {
     expect(await screen.findByText(/until day 16 \(current Peak \+ 2 days\)/)).toBeInTheDocument()
   })
 
-  it('uses the shared status and source visual tokens', async () => {
+  it('uses the shared status visual token with no source token', async () => {
     await bootWithCycle()
     render(<StatusView />)
 
     const statusBadge = screen.getByText('Fertile window')
     expect(statusBadge.className).toContain('bg-fertility-status-fertile')
     expect(statusBadge.className).toContain('text-fertility-status-fertile-fg')
-
-    const sourceBadge = screen.getByText('confirmed')
-    expect(sourceBadge.className).toContain('border-fertility-source-confirmed')
-    expect(sourceBadge.className).toContain('text-fertility-source-confirmed')
+    expect(statusBadge.className).not.toContain('predicted')
   })
 
   it('marks the estimated next period as predictive and uses readable body text', async () => {

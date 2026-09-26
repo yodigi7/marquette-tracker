@@ -1,5 +1,5 @@
 import { useAppStore } from '@/core/store/useAppStore'
-import type { Goal, PostPeakFillMode } from '@/core/engine/types'
+import type { Goal } from '@/core/engine/types'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -10,11 +10,6 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { NumberField } from './number-field'
-
-const POST_PEAK_FILL_OPTIONS: { value: PostPeakFillMode; label: string }[] = [
-  { value: 'auto-after-window', label: 'Automatically after fertile window' },
-  { value: 'after-user-low', label: 'After first user Low' },
-]
 
 const GOAL_OPTIONS: { value: Goal; label: string }[] = [
   { value: 'track-only', label: 'Track only' },
@@ -60,28 +55,6 @@ export function CoreSection() {
           checked={settings.algorithmEnabled}
           onCheckedChange={(checked) => updateSettings({ algorithmEnabled: checked })}
         />
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="settings-post-peak-fill-mode">Inferred post-Peak readings</Label>
-        <p className="text-sm text-stone-500">
-          Choose when assumed Low readings may be stored after the fertile window.
-        </p>
-        <Select
-          value={settings.postPeakFillMode}
-          onValueChange={(value) => updateSettings({ postPeakFillMode: value as PostPeakFillMode })}
-        >
-          <SelectTrigger id="settings-post-peak-fill-mode" data-testid="settings-post-peak-fill-mode">
-            <SelectValue placeholder="Select when to fill" />
-          </SelectTrigger>
-          <SelectContent>
-            {POST_PEAK_FILL_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2">

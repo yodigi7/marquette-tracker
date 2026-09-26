@@ -1,8 +1,10 @@
+import { addDays, diffDays } from './dateUtils'
 import type {
   BeginRule,
   CycleHistory,
   CycleInput,
   CycleResult,
+  DateKey,
   DayRecordInput,
   DayResult,
   DayStatus,
@@ -22,14 +24,6 @@ export const DEFAULT_HISTORY_WINDOW = 6
 
 function isHighOrPeak(record: DayRecordInput): boolean {
   return record.monitor === 'high' || record.monitor === 'peak'
-}
-
-/**
- * User-authored records only. An absent `dataOrigin` is legacy user data, so
- * inferred rows never become Peak, begin, or end evidence.
- */
-function isUserEvidence(record: DayRecordInput): boolean {
-  return record.dataOrigin !== 'inferred'
 }
 
 /** Monitor-only Peak evidence: a user-entered monitor Peak, never mucus. */
@@ -125,14 +119,16 @@ export function statusForCycleDay(window: FertileWindow, peakKnown: boolean, day
   return statusForDay(day, window, peakKnown)
 }
 
-function sourceForDay(day: number, window: FertileWindow, peakKnown: boolean): DayResult['source'] {
-  if (day < window.begin) {
-    return 'predicted'
+/**
+ * Days covered by a cycle's day results: its length when closed, otherwise the
+ * days elapsed through `today`. An open cycle never reaches a future date —
+ * the window can still move, and future dates belong to the forecast treatment.
+ */
+function cycleSpan(cycle: CycleInput, length: number | null, today: DateKey): number {
+  if (length !== null) {
+    return length
   }
-  if (day <= (window.end ?? Infinity)) {
-    return window.beginRule === 'first-high-or-peak' ? 'confirmed' : 'predicted'
-  }
-  return peakKnown ? 'confirmed' : 'predicted'
+  return Math.max(1, diffDays(cycle.day1, today) + 1)
 }
 
 /**
@@ -145,6 +141,8 @@ function sourceForDay(day: number, window: FertileWindow, peakKnown: boolean): D
  * @param cycleNo     cycle number (1-based), assigned by engineSdk via day1 ordering
  * @param length      cycle length in days; null while the cycle is open
  * @param history     previous cycles (peaks oldest → newest) for the calendar rules
+ * @param today       current date; bounds an open cycle so no day result is
+ *                    ever derived for a future date
  */
 export function computeCycle(
   cycle: CycleInput,
@@ -153,23 +151,23 @@ export function computeCycle(
   length: number | null,
   history: CycleHistory,
   settings: EngineSettings,
+  today: DateKey,
 ): CycleResult {
   const sorted = [...records].sort((a, b) => a.dayInCycle - b.dayInCycle)
-  // Day results cover every supplied record; only user-authored records are
-  // allowed to establish Peak, begin, and end evidence.
-  const evidence = sorted.filter(isUserEvidence)
-  const { peakDay, source } = computePeak(evidence)
+  const { peakDay, source } = computePeak(sorted)
 
-  const begin = computeBegin(cycleNo, evidence, history, settings)
+  const begin = computeBegin(cycleNo, sorted, history, settings)
   const end = computeEnd(cycleNo, peakDay, history, settings)
   const fertileWindow: FertileWindow = { begin: begin.begin, end: end.end, beginRule: begin.rule, endRule: end.rule }
 
-  const days: DayResult[] = sorted.map((record) => ({
-    day: record.dayInCycle,
-    date: record.date,
-    status: statusForDay(record.dayInCycle, fertileWindow, peakDay !== null),
-    source: sourceForDay(record.dayInCycle, fertileWindow, peakDay !== null),
-  }))
+  const days: DayResult[] = []
+  for (let day = 1; day <= cycleSpan(cycle, length, today); day++) {
+    days.push({
+      day,
+      date: addDays(cycle.day1, day - 1),
+      status: statusForDay(day, fertileWindow, peakDay !== null),
+    })
+  }
 
   const warnings: EngineWarning[] = []
   if (fertileWindow.end === null) {

@@ -39,8 +39,8 @@ function record(day: number, over: Partial<DayRecordEntity> = {}): DayRecordEnti
   }
 }
 
-function dayResult(day: number, status: DayStatus, source: DayResult['source']): DayResult {
-  return { day, date: '2026-01-01', status, source }
+function dayResult(day: number, status: DayStatus): DayResult {
+  return { day, date: '2026-01-01', status }
 }
 
 function result(over: Partial<CycleResult> = {}): CycleResult {
@@ -57,7 +57,7 @@ function result(over: Partial<CycleResult> = {}): CycleResult {
       beginRule: 'calendar-day-6',
       endRule: 'current-peak-plus-n',
     },
-    days: [dayResult(1, 'pre-fertile', 'predicted'), dayResult(6, 'fertile', 'predicted'), dayResult(14, 'fertile', 'predicted')],
+    days: [dayResult(1, 'pre-fertile'), dayResult(6, 'fertile'), dayResult(14, 'fertile')],
     warnings: [],
     ...over,
   }
@@ -98,12 +98,30 @@ describe('buildStripModel', () => {
     expect(model.days[20].intercourse).toBe(false)
   })
 
-  it('copies per-day status/source verbatim from the engine DayResult', () => {
+  it('carries a status for unrecorded days inside the window', () => {
+    // The engine now emits a day result for every cycle day, so the chart
+    // resolves statuses for days that hold no record.
+    const dense = result({
+      days: Array.from({ length: 28 }, (_, i) =>
+        dayResult(i + 1, i + 1 < 6 ? 'pre-fertile' : i + 1 <= 17 ? 'fertile' : 'post-peak'),
+      ),
+    })
+    const model = buildStripModel(cycle(), dense, [record(14, { monitor: 'peak' })], true)
+    const byDay = new Map(model.days.map((d) => [d.day, d.status]))
+    expect(byDay.get(13)).toBe('fertile')
+    expect(byDay.get(16)).toBe('fertile')
+    expect(byDay.get(18)).toBe('post-peak')
+    // A day with no record still shows the empty monitor track.
+    expect(model.days[12].monitor).toBeUndefined()
+  })
+
+  it('copies per-day status verbatim and exposes no source field', () => {
     const model = buildStripModel(cycle(), result(), [], true)
     expect(model.days[0].status).toBe('pre-fertile')
-    expect(model.days[0].source).toBe('predicted')
     expect(model.days[5].status).toBe('fertile')
     expect(model.days[13].status).toBe('fertile')
+    expect(model.days[0]).not.toHaveProperty('source')
+    expect(model.window).not.toHaveProperty('source')
   })
 
   it('uses max(1, maxDayInCycle) as the span for an open cycle', () => {
@@ -136,20 +154,22 @@ describe('buildStripModel', () => {
     expect(model.window).toEqual({
       begin: 6,
       end: 17,
-      source: 'predicted',
       beginRule: 'calendar-day-6',
       endRule: 'current-peak-plus-n',
     })
   })
 
-  it('classifies the window as confirmed when opened by first High/Peak', () => {
-    const model = buildStripModel(
+  it('uses one window treatment regardless of how the window began', () => {
+    const calendar = buildStripModel(cycle(), result(), [], true)
+    const earlyOpen = buildStripModel(
       cycle(),
       result({ fertileWindow: { begin: 8, end: 17, beginRule: 'first-high-or-peak', endRule: 'current-peak-plus-n' } }),
       [],
       true,
     )
-    expect(model.window?.source).toBe('confirmed')
+    expect(Object.keys(earlyOpen.window!).sort()).toEqual(Object.keys(calendar.window!).sort())
+    expect(earlyOpen.window).not.toHaveProperty('source')
+    expect(calendar.window).not.toHaveProperty('source')
   })
 
   it('returns window === null when algorithmEnabled is false (FR-004)', () => {
@@ -170,10 +190,10 @@ describe('buildStripModel', () => {
 
 describe('overlay series', () => {
   const days: StripDay[] = [
-    { day: 1, date: '2026-01-01', monitor: undefined, mucus: undefined, bbt: null, intercourse: false, status: 'pre-fertile', source: 'predicted' },
-    { day: 2, date: '2026-01-02', monitor: undefined, mucus: 'none', bbt: null, intercourse: false, status: 'pre-fertile', source: 'predicted' },
-    { day: 3, date: '2026-01-03', monitor: 'low', mucus: 'high', bbt: 36.4, intercourse: false, status: 'fertile', source: 'confirmed' },
-    { day: 4, date: '2026-01-04', monitor: 'peak', mucus: 'peak', bbt: null, intercourse: true, status: 'fertile', source: 'confirmed' },
+    { day: 1, date: '2026-01-01', monitor: undefined, mucus: undefined, bbt: null, intercourse: false, status: 'pre-fertile' },
+    { day: 2, date: '2026-01-02', monitor: undefined, mucus: 'none', bbt: null, intercourse: false, status: 'pre-fertile' },
+    { day: 3, date: '2026-01-03', monitor: 'low', mucus: 'high', bbt: 36.4, intercourse: false, status: 'fertile' },
+    { day: 4, date: '2026-01-04', monitor: 'peak', mucus: 'peak', bbt: null, intercourse: true, status: 'fertile' },
   ]
 
   it('bbtSeries drops null/undefined days and keeps the rest', () => {

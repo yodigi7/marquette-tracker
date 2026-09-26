@@ -159,7 +159,6 @@ export function StripChart({ model, showMucus = false, showBbt = false, showInte
                 fill={FERTILITY_FORECAST_VISUAL.windowFill}
                 stroke={FERTILITY_FORECAST_VISUAL.windowBorder}
                 strokeWidth={1}
-                strokeDasharray={window.source === 'predicted' ? '4 3' : undefined}
                 ifOverflow="extendDomain"
               />
             )}
@@ -202,7 +201,7 @@ export function StripChart({ model, showMucus = false, showBbt = false, showInte
           </ComposedChart>
         </ResponsiveContainer>
         {window && (
-          <span className="sr-only" data-testid="fertile-window-band" data-begin={window.begin} data-end={window.end ?? ''} data-source={window.source}>
+          <span className="sr-only" data-testid="fertile-window-band" data-begin={window.begin} data-end={window.end ?? ''}>
             {windowLabel(window)}
           </span>
         )}
@@ -212,7 +211,6 @@ export function StripChart({ model, showMucus = false, showBbt = false, showInte
 }
 
 function windowLabel(window: StripWindow): string {
-  const label = window.source === 'confirmed' ? 'Confirmed fertile' : 'Predicted fertile'
   const end = window.end !== null ? `day ${window.end}` : 'an unknown day (no Peak yet)'
-  return `${label} window from day ${window.begin} to ${end}.`
+  return `Fertile window from day ${window.begin} to ${end}.`
 }

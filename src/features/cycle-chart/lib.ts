@@ -10,13 +10,11 @@ export interface StripDay {
   bbt: number | null
   intercourse: boolean
   status: DayStatus | null
-  source: 'confirmed' | 'predicted'
 }
 
 export interface StripWindow {
   begin: number
   end: number | null
-  source: 'confirmed' | 'predicted'
   beginRule: BeginRule
   endRule: EndRule
 }
@@ -47,10 +45,14 @@ export function buildStripModel(
     byDay.set(record.dayInCycle, record)
   }
 
+  const statusByDay = new Map<number, DayStatus>()
+  for (const day of result?.days ?? []) {
+    statusByDay.set(day.day, day.status)
+  }
+
   const days: StripDay[] = []
   for (let day = 1; day <= span; day++) {
     const record = byDay.get(day)
-    const dayResult = result?.days.find((d) => d.day === day)
     days.push({
       day,
       date: record?.date ?? addDays(cycle.day1, day - 1),
@@ -58,8 +60,7 @@ export function buildStripModel(
       mucus: record?.mucus,
       bbt: record?.bbt ?? null,
       intercourse: record?.intercourse === true,
-      status: dayResult?.status ?? null,
-      source: dayResult?.source ?? 'predicted',
+      status: statusByDay.get(day) ?? null,
     })
   }
 
@@ -105,7 +106,6 @@ function toStripWindow(result: CycleResult): StripWindow {
   return {
     begin: result.fertileWindow.begin,
     end: result.fertileWindow.end,
-    source: result.fertileWindow.beginRule === 'first-high-or-peak' ? 'confirmed' : 'predicted',
     beginRule: result.fertileWindow.beginRule,
     endRule: result.fertileWindow.endRule,
   }

@@ -29,7 +29,7 @@ describe('CycleChartView', () => {
     expect(screen.getAllByTestId('day-band')).toHaveLength(28)
     const band = screen.getByTestId('fertile-window-band')
     expect(band.getAttribute('data-begin')).not.toBeNull()
-    expect(band.getAttribute('data-source')).toBe('predicted')
+    expect(band.getAttribute('data-source')).toBeNull()
     expect(document.querySelector('.recharts-reference-area-rect')?.getAttribute('fill')).toBe('var(--fertility-window-fill)')
     expect(document.querySelector('[data-legend-label="Low"] span')?.getAttribute('class')).toContain('bg-fertility-monitor-low')
   })
@@ -46,7 +46,7 @@ describe('CycleChartView', () => {
     expect(screen.queryByText('Confirmed window')).toBeNull()
   })
 
-  it('hides inferred Low rows while the algorithm is off but keeps user records', async () => {
+  it('keeps user records and drops only the window band while the algorithm is off', async () => {
     await resetStore()
     const start = addDays(todayKey(), -20)
     const cycle = await useAppStore.getState().setNewCycle(start)
@@ -54,8 +54,10 @@ describe('CycleChartView', () => {
     await useAppStore.getState().addDayRecord(cycle.id, addDays(start, 13), 14, { monitor: 'peak' })
 
     const { rerender } = renderAt(cycle.id)
-    const generatedBand = () => screen.getAllByTestId('day-band').find((band) => band.getAttribute('data-day') === '19')
-    expect(generatedBand()?.getAttribute('data-monitor')).toBe('low')
+    // Only the two logged days carry a monitor reading; nothing is synthesized.
+    const bands = () => screen.getAllByTestId('day-band')
+    expect(bands().find((band) => band.getAttribute('data-day') === '14')?.getAttribute('data-monitor')).toBe('peak')
+    expect(bands().find((band) => band.getAttribute('data-day') === '19')?.getAttribute('data-monitor')).toBeUndefined()
 
     await useAppStore.getState().updateSettings({ algorithmEnabled: false })
     rerender(
@@ -66,8 +68,9 @@ describe('CycleChartView', () => {
       </MemoryRouter>,
     )
 
-    expect(generatedBand()?.getAttribute('data-monitor')).not.toBe('low')
-    expect(screen.getAllByTestId('day-band').find((band) => band.getAttribute('data-day') === '14')?.getAttribute('data-monitor')).toBe('peak')
+    expect(screen.queryByTestId('fertile-window-band')).toBeNull()
+    // Stored readings remain visible with interpretation off.
+    expect(bands().find((band) => band.getAttribute('data-day') === '14')?.getAttribute('data-monitor')).toBe('peak')
   })
 
   it('shows the empty state with a Calendar action when no cycles exist', async () => {

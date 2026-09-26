@@ -6,21 +6,18 @@ import {
   FERTILITY_FORECAST_VISUAL,
   FERTILITY_MARKER_VISUALS,
   FERTILITY_MONITOR_VISUALS,
-  FERTILITY_SOURCE_VISUALS,
 } from '@/lib/fertility-visuals'
-import type { DayInfo } from '@/core/cycleStatus'
+import type { DayStatus } from '@/core/engine/types'
 import type { CalendarDetailMode, DayRecordEntity } from '@/core/store/entities'
-import type { CellOrigin } from './grid'
 
 export interface DayCellProps {
   dateKey: string
   dayNumber: number
-  info: DayInfo | null
+  info: DayStatus | null
   forecast: boolean
   menses: boolean
   monitor: DayRecordEntity['monitor']
   intercourse: boolean
-  origin: CellOrigin
   ovulation: boolean
   isToday: boolean
   detailMode?: CalendarDetailMode
@@ -35,23 +32,19 @@ export function DayCell({
   menses,
   monitor,
   intercourse,
-  origin,
   ovulation,
   isToday,
   detailMode = 'simple',
   onSelect,
 }: DayCellProps) {
-  const phase = info ? calendarPhaseForStatus(info.status) : null
+  const phase = info ? calendarPhaseForStatus(info) : null
   const phaseVisual = phase ? FERTILITY_CALENDAR_PHASE_VISUALS[phase] : null
-  const sourceVisual = info && detailMode === 'full' ? FERTILITY_SOURCE_VISUALS[info.source] : null
-  const assumed = origin === 'inferred'
   const monitorText = monitor && monitor !== 'none' ? `monitor ${monitor}` : null
   const accessibleParts = [
     dateKey,
     phaseVisual?.label ?? 'no status',
     monitorText,
     menses ? 'menses' : null,
-    assumed ? 'assumed data' : null,
     detailMode === 'full' && intercourse ? 'intercourse' : null,
     detailMode === 'full' && ovulation ? 'predicted ovulation' : null,
   ].filter((part): part is string => !!part)
@@ -59,25 +52,17 @@ export function DayCell({
   const statusFill = forecast
     ? FERTILITY_FORECAST_VISUAL.fill
     : phaseVisual
-      ? info?.source === 'predicted'
-        ? phaseVisual.predictedFill
-        : phaseVisual.fill
+      ? phaseVisual.fill
       : undefined
-  const statusCue = forecast
-    ? cn('border', FERTILITY_FORECAST_VISUAL.cellBorder)
-    : sourceVisual
-      ? sourceVisual.cellBorder
-      : undefined
+  const statusCue = forecast ? cn('border', FERTILITY_FORECAST_VISUAL.cellBorder) : undefined
 
   return (
     <button
       type="button"
       data-testid="day-cell"
       data-date={dateKey}
-      data-status={info?.status ?? ''}
+      data-status={info ?? ''}
       data-phase={phase ?? undefined}
-      data-source={info?.source ?? ''}
-      data-origin={origin === 'none' ? undefined : origin}
       data-forecast={forecast || undefined}
       aria-label={accessibleParts.join(', ')}
       onClick={() => onSelect(dateKey)}
@@ -89,19 +74,7 @@ export function DayCell({
         'hover:brightness-105 cursor-pointer',
       )}
     >
-      <span className={cn('text-[11px] leading-none', isToday && 'font-bold')}>
-        {dayNumber}
-        {assumed && (
-          <span
-            data-testid="calendar-assumed-marker"
-            title="Assumed data"
-            aria-label="Assumed data"
-            className={cn('ml-0.5 text-[10px] font-semibold', FERTILITY_MARKER_VISUALS.assumed.asterisk)}
-          >
-            *
-          </span>
-        )}
-      </span>
+      <span className={cn('text-[11px] leading-none', isToday && 'font-bold')}>{dayNumber}</span>
       {monitor && monitor !== 'none' && (
         <span
           data-testid="calendar-monitor-marker"

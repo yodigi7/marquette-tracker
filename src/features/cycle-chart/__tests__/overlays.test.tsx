@@ -20,7 +20,6 @@ function day(day: number): StripModel['days'][number] {
     bbt: null,
     intercourse: false,
     status: 'pre-fertile',
-    source: 'predicted',
   }
 }
 
@@ -42,7 +41,7 @@ function makeModel(): StripModel {
     open: false,
     span: 20,
     days,
-    window: { begin: 8, end: 17, source: 'predicted', beginRule: 'calendar-day-6', endRule: 'current-peak-plus-n' },
+    window: { begin: 8, end: 17, beginRule: 'calendar-day-6', endRule: 'current-peak-plus-n' },
   }
 }
 

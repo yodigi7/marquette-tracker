@@ -6,6 +6,7 @@ import { useAppStore } from '@/core/store/useAppStore'
 import { todayKey } from '@/core/dateKeys'
 import { CalendarView } from '@/features/calendar'
 import { StatusView } from '@/features/status'
+import { SettingsView } from '@/features/settings'
 
 const store = () => useAppStore.getState()
 
@@ -43,7 +44,7 @@ describe('Algorithm off = logging only (US2)', () => {
       expect(cell.getAttribute('data-status')).toBe('')
       expect(cell.getAttribute('data-phase')).toBeNull()
       expect(cell.getAttribute('data-forecast')).toBeNull()
-      expect(cell.getAttribute('data-source')).toBe('')
+      expect(cell.getAttribute('data-source')).toBeNull()
       expect(cell.className).not.toContain('bg-fertility-status-')
     }
 
@@ -53,6 +54,14 @@ describe('Algorithm off = logging only (US2)', () => {
     expect(screen.queryByText('Fertile')).toBeNull()
     expect(screen.queryByText('Predicted window')).toBeNull()
     expect(screen.queryByText('Assumed')).toBeNull()
+  })
+
+  it('Settings no longer offers a post-Peak fill mode', async () => {
+    await store().updateSettings({ algorithmEnabled: true })
+    render(<SettingsView />)
+
+    expect(screen.queryByTestId('settings-post-peak-fill-mode')).toBeNull()
+    expect(screen.queryByText(/inferred post-Peak readings/i)).toBeNull()
   })
 
   it('restores interpretation when the algorithm is re-enabled', async () => {

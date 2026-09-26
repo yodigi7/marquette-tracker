@@ -5,32 +5,6 @@ export type Goal = 'avoid-pregnancy' | 'achieve-pregnancy' | 'track-only'
 export type Theme = 'light' | 'dark' | 'system'
 export type PregnancyResult = 'negative' | 'positive'
 
-/** Whether a stored observation came from the user or an app inference. */
-export type DataOrigin = 'user' | 'inferred'
-
-/** Controls when the persisted post-Peak Low tail begins. */
-export type PostPeakFillMode = 'auto-after-window' | 'after-user-low'
-
-/** Lineage for an inferred post-Peak Low reading. */
-export interface PostPeakInference {
-  rule: 'post-peak-low-tail'
-  /** Latest user-entered monitor Peak day that anchors the tail. */
-  peakDay: number
-  postPeakDays: number
-  anchorDate?: DateKey
-  mode: PostPeakFillMode
-}
-
-/** A user deletion that prevents the same inference basis from recreating a date. */
-export interface PostPeakSuppression {
-  date: DateKey
-  cycleId: string
-  cycleDay1: DateKey
-  peakDay: number
-  postPeakDays: number
-  mode: PostPeakFillMode
-}
-
 /** Calendar day key, format 'YYYY-MM-DD' (UTC). */
 export type DateKey = string
 
@@ -69,8 +43,6 @@ export interface DayRecordInput {
   symptoms?: string[]
   pregnancyTest?: PregnancyResult
   notes?: string
-  /** Absent on legacy rows; an absent value is treated as user-authored. */
-  dataOrigin?: DataOrigin
 }
 
 export type DayStatus = 'pre-fertile' | 'fertile' | 'post-peak' | 'post-calendar'
@@ -90,8 +62,6 @@ export interface DayResult {
   day: number
   date: DateKey
   status: DayStatus
-  /** Calendar-derived vs. monitor-confirmed. */
-  source: 'confirmed' | 'predicted'
 }
 
 /** Monitor-only contract: Peak evidence comes from a user-entered monitor Peak. */

@@ -200,13 +200,18 @@ describe('CalendarView', () => {
 
     const day1 = cellByDate(day1Key)
     expect(day1?.getAttribute('data-status')).toBe('pre-fertile')
-    expect(day1?.getAttribute('data-source')).toBe('predicted')
+    expect(day1?.getAttribute('data-source')).toBeNull()
     expect(day1?.querySelector('[title="Menses"]')).not.toBeNull()
 
     const day3 = cellByDate(day3Key)
     expect(day3?.getAttribute('data-status')).toBe('fertile')
-    expect(day3?.getAttribute('data-source')).toBe('confirmed')
+    expect(day3?.getAttribute('data-source')).toBeNull()
     expect(day3?.querySelector('[title="Monitor: high"]')).not.toBeNull()
+
+    // An unlogged day inside the window is painted from the rules alone.
+    const day2 = cellByDate(addDays(day1Key, 1))
+    expect(day2?.getAttribute('data-status')).toBe('pre-fertile')
+    expect(day2?.querySelector('[title="Monitor: high"]')).toBeNull()
   })
 
   it('shows a small filled red heart for recorded intercourse', async () => {
@@ -374,19 +379,19 @@ describe('CalendarView', () => {
 
     const beforeHigh = cellByDate(addDays(day1Key, 2))
     expect(beforeHigh?.getAttribute('data-status')).toBe('pre-fertile')
-    expect(beforeHigh?.getAttribute('data-source')).toBe('predicted')
 
     const firstHighDay = cellByDate(highKey)
     expect(firstHighDay?.getAttribute('data-status')).toBe('fertile')
-    expect(firstHighDay?.getAttribute('data-source')).toBe('confirmed')
   })
 
-  it('uses shared tokenized treatments for all four recorded status/source combinations', () => {
+  it('uses shared tokenized treatments for all four statuses', () => {
+    // The Calendar collapses post-peak and post-calendar into the `after`
+    // phase, which deliberately reuses the post-peak treatment.
     const cases = [
-      { status: 'pre-fertile' as const, source: 'predicted' as const, fill: 'bg-fertility-status-pre-predicted', border: 'border-dashed border-fertility-source-predicted' },
-      { status: 'fertile' as const, source: 'confirmed' as const, fill: 'bg-fertility-status-fertile', border: 'border-fertility-source-confirmed' },
-      { status: 'post-peak' as const, source: 'confirmed' as const, fill: 'bg-fertility-status-post-peak', border: 'border-fertility-source-confirmed' },
-      { status: 'post-calendar' as const, source: 'predicted' as const, fill: 'bg-fertility-status-post-peak-predicted', border: 'border-dashed border-fertility-source-predicted' },
+      { status: 'pre-fertile' as const, fill: 'bg-fertility-status-pre' },
+      { status: 'fertile' as const, fill: 'bg-fertility-status-fertile' },
+      { status: 'post-peak' as const, fill: 'bg-fertility-status-post-peak' },
+      { status: 'post-calendar' as const, fill: 'bg-fertility-status-post-peak' },
     ]
 
     for (const testCase of cases) {
@@ -394,12 +399,11 @@ describe('CalendarView', () => {
         <DayCell
           dateKey="2026-01-01"
           dayNumber={1}
-          info={{ status: testCase.status, source: testCase.source }}
+          info={testCase.status}
           forecast={false}
           menses={false}
           monitor={undefined}
           intercourse={false}
-          origin="user"
           ovulation={false}
           isToday={false}
           detailMode="full"
@@ -408,24 +412,23 @@ describe('CalendarView', () => {
       )
       const cell = screen.getByTestId('day-cell')
       expect(cell.className).toContain(testCase.fill)
-      expect(cell.className).toContain(testCase.border)
       expect(cell.getAttribute('data-status')).toBe(testCase.status)
-      expect(cell.getAttribute('data-source')).toBe(testCase.source)
+      // No evidence-source cue is rendered.
+      expect(cell.getAttribute('data-source')).toBeNull()
       unmount()
     }
   })
 
-  it('renders a simple phase cell with a menses stripe, one monitor marker, and date asterisk', () => {
+  it('renders a simple phase cell with a menses stripe and one monitor marker', () => {
     render(
       <DayCell
         dateKey="2026-01-14"
         dayNumber={14}
-        info={{ status: 'post-calendar', source: 'predicted' }}
+        info={'post-calendar'}
         forecast={false}
         menses
         monitor="high"
         intercourse
-        origin="inferred"
         ovulation
         isToday={false}
         detailMode="simple"
@@ -435,25 +438,26 @@ describe('CalendarView', () => {
 
     const cell = screen.getByTestId('day-cell')
     expect(cell).toHaveAttribute('data-phase', 'after')
-    expect(cell.className).toContain('bg-fertility-status-post-peak-predicted')
+    expect(cell.className).toContain('bg-fertility-status-post-peak')
     expect(cell.querySelector('[data-testid="calendar-menses-stripe"]')).not.toBeNull()
     expect(cell.querySelector('[data-testid="calendar-monitor-marker"]')?.className).toContain('bg-fertility-monitor-high')
-    expect(cell.querySelector('[data-testid="calendar-assumed-marker"]')?.textContent).toBe('*')
+    // No assumed-data asterisk is rendered anywhere.
+    expect(cell.querySelector('[data-testid="calendar-assumed-marker"]')).toBeNull()
+    expect(cell.textContent).not.toContain('*')
     expect(cell.querySelector('[title="Intercourse"]')).toBeNull()
     expect(cell.querySelector('[title="Predicted ovulation"]')).toBeNull()
   })
 
-  it('names the date, phase, monitor value, menses, and provenance in the cell accessible label', () => {
+  it('names the date, phase, monitor value, and menses in the cell accessible label', () => {
     render(
       <DayCell
         dateKey="2026-01-14"
         dayNumber={14}
-        info={{ status: 'post-calendar', source: 'predicted' }}
+        info={'post-calendar'}
         forecast={false}
         menses
         monitor="high"
         intercourse={false}
-        origin="inferred"
         ovulation={false}
         isToday={false}
         detailMode="simple"
@@ -466,7 +470,7 @@ describe('CalendarView', () => {
     expect(label).toContain('After')
     expect(label).toContain('monitor high')
     expect(label).toContain('menses')
-    expect(label).toContain('assumed data')
+    expect(label).not.toContain('assumed')
   })
 
   it('exposes secondary indicators in the full-detail cell presentation', () => {
@@ -474,12 +478,11 @@ describe('CalendarView', () => {
       <DayCell
         dateKey="2026-01-15"
         dayNumber={15}
-        info={{ status: 'fertile', source: 'confirmed' }}
+        info={'fertile'}
         forecast={false}
         menses={false}
         monitor="peak"
         intercourse
-        origin="user"
         ovulation
         isToday={false}
         detailMode="full"
@@ -488,11 +491,11 @@ describe('CalendarView', () => {
     )
 
     const cell = screen.getByTestId('day-cell')
-    expect(cell.className).toContain('border-fertility-source-confirmed')
+    expect(cell.className).toContain('bg-fertility-status-fertile')
     expect(cell.querySelector('[title="Intercourse"] svg')).not.toBeNull()
     expect(cell.querySelector('[title="Predicted ovulation"]')).not.toBeNull()
   })
-  it('renders predictive forecast cells and additive raw/provenance markers with tokenized cues', () => {
+  it('renders predictive forecast cells and additive raw markers with tokenized cues', () => {
     render(
       <DayCell
         dateKey="2026-01-02"
@@ -502,7 +505,6 @@ describe('CalendarView', () => {
         menses
         monitor="low"
         intercourse
-        origin="inferred"
         ovulation
         isToday={false}
         detailMode="full"
@@ -516,7 +518,7 @@ describe('CalendarView', () => {
     expect(cell.querySelector('[title="Monitor: low"]')?.className).toContain('bg-fertility-monitor-low')
     expect(cell.querySelector('[title="Menses"]')?.className).toContain('bg-fertility-marker-menses')
     expect(cell.querySelector('[title="Intercourse"] svg')?.getAttribute('class')).toContain('fill-fertility-marker-intercourse')
-    expect(cell.querySelector('[data-testid="calendar-assumed-marker"]')?.textContent).toBe('*')
+    expect(cell.querySelector('[data-testid="calendar-assumed-marker"]')).toBeNull()
     expect(cell.querySelector('[title="Predicted ovulation"]')?.className).toContain('border-fertility-forecast-border')
   })
 
@@ -547,7 +549,8 @@ describe('CalendarView', () => {
     expect(screen.getByText('Low')).toBeInTheDocument()
     expect(screen.getByText('High')).toBeInTheDocument()
     expect(screen.getByText('Peak')).toBeInTheDocument()
-    expect(screen.getByText('Assumed')).toBeInTheDocument()
+    // Provenance and evidence-source cues are gone from the legend.
+    expect(screen.queryByText('Assumed')).not.toBeInTheDocument()
     expect(screen.queryByText('Pre-fertile')).not.toBeInTheDocument()
     expect(screen.queryByText('Post-peak')).not.toBeInTheDocument()
     expect(screen.queryByText('Post-calendar')).not.toBeInTheDocument()
@@ -561,9 +564,9 @@ describe('CalendarView', () => {
 
     expect(await screen.findByText('Intercourse')).toBeInTheDocument()
     expect(screen.getByText('Predicted ovulation')).toBeInTheDocument()
-    expect(screen.getByText('Confirmed source')).toBeInTheDocument()
-    expect(screen.getByText('Predicted status')).toBeInTheDocument()
     expect(screen.getByText('Predicted window')).toBeInTheDocument()
+    expect(screen.queryByText('Confirmed source')).not.toBeInTheDocument()
+    expect(screen.queryByText('Predicted status')).not.toBeInTheDocument()
   })
 })
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Heart } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -7,7 +7,6 @@ import {
   FERTILITY_CALENDAR_PHASE_VISUALS,
   FERTILITY_MARKER_VISUALS,
   FERTILITY_MONITOR_VISUALS,
-  FERTILITY_SOURCE_VISUALS,
   FERTILITY_TEXT_VISUALS,
 } from '@/lib/fertility-visuals'
 import { Button } from '@/components/ui/button'
@@ -22,7 +21,7 @@ import { dayInCycle, todayKey } from '@/core/dateKeys'
 import { dayInfo } from '@/core/cycleStatus'
 import type { EngineOutput } from '@/core/engine/engineSdk'
 import { isMensesFlow, planCycles } from '@/core/engine/placement'
-import { cycleForDate, cycleResultsByCycleId, recordsForMode } from '@/core/store/selectors'
+import { cycleForDate, cycleResultsByCycleId } from '@/core/store/selectors'
 import { useAppStore } from '@/core/store/useAppStore'
 import type { CycleEntity, DayRecordEntity } from '@/core/store/entities'
 import { DayCell } from './day-cell'
@@ -33,12 +32,11 @@ import { QuickEntry } from './quick-entry'
 
 export function CalendarView() {
   const cycles = useAppStore((s) => s.cycles)
-  const allDayRecords = useAppStore((s) => s.dayRecords)
+  const dayRecords = useAppStore((s) => s.dayRecords)
   const output = useAppStore((s) => s.output)
   const interpreted = useAppStore((s) => s.settings.algorithmEnabled)
   const detailMode = useAppStore((s) => s.settings.calendarDetailMode)
   const updateSettings = useAppStore((s) => s.updateSettings)
-  const dayRecords = useMemo(() => recordsForMode(allDayRecords, interpreted), [allDayRecords, interpreted])
   const weekStart = useAppStore((s) => s.settings.weekStart)
 
   const now = new Date()
@@ -135,7 +133,6 @@ export function CalendarView() {
                 menses={cell.menses}
                 monitor={cell.monitor}
                 intercourse={cell.intercourse}
-                origin={cell.origin}
                 ovulation={interpreted ? cell.ovulation : false}
                 isToday={dateKey === today}
                 detailMode={detailMode}
@@ -245,13 +242,10 @@ function Legend({
           <span className="font-medium">Data</span>
           <LegendStripe className={FERTILITY_MARKER_VISUALS.menses.stripe} label="Menses" />
           <LegendMonitorKey />
-          {interpreted && <LegendAsterisk />}
         </div>
         {fullDetail && interpreted && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="font-medium">Details</span>
-            <LegendItem className={cn('rounded border', FERTILITY_SOURCE_VISUALS.confirmed.cellBorder)} label="Confirmed source" />
-            <LegendItem className={cn('rounded border', FERTILITY_SOURCE_VISUALS.predicted.cellBorder)} label="Predicted status" />
             <span className="flex items-center gap-1">
               <Heart aria-hidden="true" className={cn('size-2', FERTILITY_MARKER_VISUALS.intercourse.icon)} />
               Intercourse
@@ -307,15 +301,6 @@ function LegendMonitorKey() {
       <LegendDot className={FERTILITY_MONITOR_VISUALS.low.dot} label="Low" />
       <LegendDot className={FERTILITY_MONITOR_VISUALS.high.dot} label="High" />
       <LegendDot className={FERTILITY_MONITOR_VISUALS.peak.dot} label="Peak" />
-    </span>
-  )
-}
-
-function LegendAsterisk() {
-  return (
-    <span className="flex items-center gap-1" data-legend-label="Assumed">
-      <span className={cn('font-semibold', FERTILITY_MARKER_VISUALS.assumed.asterisk)}>*</span>
-      Assumed
     </span>
   )
 }

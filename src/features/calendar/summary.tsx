@@ -1,13 +1,13 @@
 import { calendarPhaseForStatus, calendarPhaseLabel, FERTILITY_TEXT_VISUALS } from '@/lib/fertility-visuals'
 import { cn } from '@/lib/utils'
-import type { DayInfo } from '@/core/cycleStatus'
+import type { DayStatus } from '@/core/engine/types'
 import type { DayRecordEntity, CycleEntity } from '@/core/store/entities'
 import type { MonitorReading } from '@/core/engine/types'
 
 export interface CalendarSummaryProps {
   cycle: CycleEntity | undefined
   cycleDay: number | null
-  info: DayInfo | null
+  info: DayStatus | null
   monitor: DayRecordEntity['monitor']
   interpreted: boolean
 }
@@ -19,7 +19,7 @@ const monitorLabel: Record<Exclude<MonitorReading, 'none'>, string> = {
 }
 
 export function CalendarSummary({ cycle, cycleDay, info, monitor, interpreted }: CalendarSummaryProps) {
-  const phase = info ? calendarPhaseForStatus(info.status) : null
+  const phase = info ? calendarPhaseForStatus(info) : null
   const monitorText = monitor && monitor !== 'none' ? monitorLabel[monitor] : null
 
   return (

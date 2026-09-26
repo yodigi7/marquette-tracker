@@ -32,9 +32,8 @@ export function StatusView() {
         <>
           <p className={cn('text-sm', FERTILITY_TEXT_VISUALS.muted)}>Cycle {cycle.cycleNo} · day {cycleDay}</p>
           <StatusCard
-            status={info?.status ?? null}
+            status={info ?? null}
             cycleDay={cycleDay}
-            source={info?.source ?? null}
             windowLine={
               result ? windowDescription(result.fertileWindow, result.peakDay !== null, postPeakDays) : ''
             }

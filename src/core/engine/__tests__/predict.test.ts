@@ -47,7 +47,7 @@ function result(
     })
   }
   const cycle: CycleInput = { id: `c${cycleNo}`, day1 }
-  return computeCycle(cycle, records, cycleNo, length, emptyHistory(), settings())
+  return computeCycle(cycle, records, cycleNo, length, emptyHistory(), settings(), '2026-06-01')
 }
 
 describe('predict computePredictions', () => {
@@ -108,6 +108,7 @@ describe('predict computePredictions', () => {
       28,
       emptyHistory(),
       settings(),
+      '2026-06-01',
     )
     expect(mucusOnly.peakDay).toBeNull()
     expect(mucusOnly.peakSource).toBe('none')
@@ -119,21 +120,8 @@ describe('predict computePredictions', () => {
     expect(forecast!.peakDayMean).toBe(15)
   })
 
-  it('excludes inferred monitor readings from historical peak statistics', () => {
-    const inferredPeakOnly = computeCycle(
-      { id: 'c1', day1: '2026-01-01' },
-      [
-        { id: 'c1-d1', cycleId: 'c1', date: '2026-01-01', dayInCycle: 1, bloodFlow: 'medium' },
-        { id: 'c1-d20', cycleId: 'c1', date: '2026-01-20', dayInCycle: 20, monitor: 'peak', dataOrigin: 'inferred' },
-      ],
-      1,
-      28,
-      emptyHistory(),
-      settings(),
-    )
-    expect(inferredPeakOnly.peakDay).toBeNull()
-
-    const forecast = computePredictions([inferredPeakOnly, result(2, '2026-01-29', 28, 15)], settings())
+  it('excludes mucus-only cycles from historical peak statistics', () => {
+    const forecast = computePredictions([result(1, '2026-01-01', 28, 15)], settings())
     expect(forecast!.peakDayEarliest).toBe(15)
     expect(forecast!.peakDayLatest).toBe(15)
   })

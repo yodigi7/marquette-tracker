@@ -51,7 +51,6 @@ function dayRecord(overrides: Partial<DayRecordEntity> = {}): DayRecordEntity {
     date: '2026-01-10',
     dayInCycle: 10,
     monitor: 'peak',
-    dataOrigin: 'user',
     ...meta(),
     ...overrides,
   }
@@ -95,29 +94,12 @@ describe('JSON backup contract', () => {
     expect(serializeBackup(document)).toContain('\n  "format"')
   })
 
-  it('round-trips identity, content, metadata, and provenance while resetting sync flags', () => {
+  it('round-trips identity, content, and metadata while resetting sync flags', () => {
     const document = createBackup(
       snapshot({
         dayRecords: [
-          dayRecord({
-            id: 'day-user',
-            dataOrigin: 'user',
-            notes: 'user note',
-            synced: true,
-          }),
-          dayRecord({
-            id: 'day-inferred',
-            date: '2026-01-20',
-            monitor: 'low',
-            dataOrigin: 'inferred',
-            inference: {
-              rule: 'post-peak-low-tail',
-              peakDay: 14,
-              postPeakDays: 4,
-              mode: 'auto-after-window',
-            },
-            synced: true,
-          }),
+          dayRecord({ id: 'day-user', notes: 'user note', synced: true }),
+          dayRecord({ id: 'day-two', date: '2026-01-20', monitor: 'low', synced: true }),
         ],
         settings: settings({ synced: true, goal: 'achieve-pregnancy' }),
       }),
@@ -126,7 +108,7 @@ describe('JSON backup contract', () => {
 
     const prepared = prepareBackup(serializeBackup(document))
     const user = prepared.document.data.dayRecords.find((record) => record.id === 'day-user')
-    const inferred = prepared.document.data.dayRecords.find((record) => record.id === 'day-inferred')
+    const second = prepared.document.data.dayRecords.find((record) => record.id === 'day-two')
 
     expect(prepared.summary).toMatchObject({
       cycleCount: 1,
@@ -136,38 +118,38 @@ describe('JSON backup contract', () => {
     expect(user).toMatchObject({
       id: 'day-user',
       notes: 'user note',
-      dataOrigin: 'user',
       version: 3,
       createdAt,
       updatedAt,
       synced: false,
     })
-    expect(inferred).toMatchObject({
-      id: 'day-inferred',
-      dataOrigin: 'inferred',
-      inference: { rule: 'post-peak-low-tail', peakDay: 14 },
-      synced: false,
-    })
+    expect(second).toMatchObject({ id: 'day-two', monitor: 'low', synced: false })
     expect(prepared.document.data.settings).toMatchObject({
       goal: 'achieve-pregnancy',
       synced: false,
     })
   })
 
-  it('normalizes legacy records without provenance as user-authored', () => {
-    const legacy = dayRecord()
-    delete legacy.dataOrigin
+  it('exports no record origin and no fill preference', () => {
+    const document = createBackup(snapshot(), { appVersion: '1.0.0', exportedAt: createdAt })
+    const serialized = serializeBackup(document)
 
-    const prepared = prepareBackup(
-      serializeBackup(
-        createBackup(snapshot({ dayRecords: [legacy] }), {
-          appVersion: '1.0.0',
-          exportedAt: createdAt,
-        }),
-      ),
-    )
+    expect(serialized).not.toContain('dataOrigin')
+    expect(serialized).not.toContain('postPeakFillMode')
+    expect(serialized).not.toContain('postPeakSuppressions')
+    expect(document.data.dayRecords[0]).not.toHaveProperty('dataOrigin')
+    expect(document.data.settings).not.toHaveProperty('postPeakFillMode')
+  })
 
-    expect(prepared.document.data.dayRecords[0].dataOrigin).toBe('user')
+  it('accepts a document that still carries the legacy record origin', () => {
+    const document = createBackup(snapshot(), { appVersion: '1.0.0', exportedAt: createdAt })
+    const legacy = JSON.parse(serializeBackup(document)) as Record<string, never>
+    ;(legacy.data as unknown as { dayRecords: Record<string, unknown>[] }).dayRecords[0].dataOrigin =
+      'inferred'
+
+    const prepared = prepareBackup(JSON.stringify(legacy))
+
+    expect(prepared.document.data.dayRecords).toHaveLength(1)
   })
 
   it('defaults a legacy settings row without a calendar detail mode to simple', () => {
@@ -211,17 +193,22 @@ describe('backup migrations and strict validation', () => {
       exportedAt: createdAt,
       data: {
         cycles: [cycle()],
-        dayRecords: [{ ...dayRecord(), dataOrigin: undefined, inference: undefined }],
-        settings: { ...settings(), postPeakFillMode: undefined, postPeakSuppressions: undefined },
+        dayRecords: [{ ...dayRecord(), dataOrigin: 'inferred' }],
+        settings: {
+          ...settings(),
+          postPeakFillMode: 'after-user-low',
+          postPeakSuppressions: [{ date: '2026-01-21' }],
+        },
       },
     }
 
     const prepared = prepareBackup(JSON.stringify(older))
 
+    // Format version is unchanged: the change only removes fields.
     expect(prepared.document.formatVersion).toBe(CURRENT_BACKUP_VERSION)
-    expect(prepared.document.data.settings.postPeakFillMode).toBe('auto-after-window')
-    expect(prepared.document.data.settings.postPeakSuppressions).toEqual([])
-    expect(prepared.document.data.dayRecords[0].dataOrigin).toBe('user')
+    // Removed fields are no longer carried as meaningful state.
+    expect(prepared.document.data.settings).not.toHaveProperty('postPeakFillMode')
+    expect(prepared.document.data.settings).not.toHaveProperty('postPeakSuppressions')
   })
 
   it.each([

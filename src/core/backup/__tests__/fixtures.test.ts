@@ -3,7 +3,7 @@ import { createBackup, prepareBackup, serializeBackup } from '../index'
 import { emptySnapshot, fullSnapshot } from './fixtures'
 
 describe('backup round-trip fixtures', () => {
-  it('round-trips user, inferred, edited, suppression, and cycle metadata', () => {
+  it('round-trips user records and cycle metadata', () => {
     const document = createBackup(fullSnapshot(), {
       appVersion: '1.0.0',
       exportedAt: '2026-02-03T04:05:06.000Z',
@@ -20,25 +20,20 @@ describe('backup round-trip fixtures', () => {
       synced: false,
     })
     expect(prepared.document.data.dayRecords.find((record) => record.id === 'user-peak')).toMatchObject({
-      dataOrigin: 'user',
       monitor: 'peak',
       mucus: 'low',
       notes: 'User note',
       synced: false,
     })
-    expect(prepared.document.data.dayRecords.find((record) => record.id === 'inferred-low')).toMatchObject({
-      dataOrigin: 'inferred',
+    expect(prepared.document.data.dayRecords.find((record) => record.id === 'user-low')).toMatchObject({
       monitor: 'low',
-      inference: { rule: 'post-peak-low-tail' },
       synced: false,
     })
-    expect(prepared.document.data.dayRecords.find((record) => record.id === 'edited-inferred-low')).toMatchObject({
-      dataOrigin: 'user',
+    expect(prepared.document.data.dayRecords.find((record) => record.id === 'user-high')).toMatchObject({
       monitor: 'high',
-      notes: 'Edited after generation',
+      notes: 'Entered by hand',
       synced: false,
     })
-    expect(prepared.document.data.settings.postPeakSuppressions).toHaveLength(1)
     expect(prepared.document.data.settings.synced).toBe(false)
   })
 
