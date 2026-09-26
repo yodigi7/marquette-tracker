@@ -50,14 +50,13 @@ Fertile-window **begin**:
 
 Fertile-window **end**:
 
-|                | Rule                                                                                                                                   |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Cycles 1–6     | 4 full (24-h) days after the last user-entered **monitor** Peak day                                                                    |
-| After 6 cycles | "Latest monitor Peak of last 6 cycles + postPeakDays" OR "current cycle's last monitor Peak + postPeakDays" — whichever **ends first** |
+|                | Rule                                                                                                             |
+| -------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Cycles 1–6     | 3 full (24-h) days after the last user-entered **monitor** Peak day                                              |
+| After 6 cycles | "Latest monitor Peak of last 6 cycles + 3" OR "current cycle's last monitor Peak + 3" — whichever **ends first** |
 
 - Monitor-only evidence: Peak, fertile-window begin/end, and confirmation come from user-entered monitor readings. Mucus stays loggable and visible (calendar/chart overlays) but is never engine evidence.
-- Practical interpretation: the first assumed (inferred) Low begins at **P+5** with the default. The `postPeakDays` setting defaults to **4** and is configurable.
-- A user-entered monitor **High** on or after the active tail start stops the inferred Low tail; a later monitor **Peak** starts a fresh tail with its own 30-row budget.
+- The post-Peak interval is a **fixed protocol constant of 3**, not a preference. The published protocol ends the window "three full days past the last peak reading" (Mu, Fehring & Bouchard, _Linacre Q_ 2022; Fehring 2018), so it is not user-configurable and no stored value can move it. Do not reintroduce a `postPeakDays` setting.
 - If a cycle has **no Peak** (8–10% of cycles), fall back to the calendar rule for the end.
 - Cycles outside 21–42 days: warn if 2+ cycles fall outside the band (protocol says consult a teacher).
 - All computed statuses are **derived at read time** from raw records — never stored — recomputed on every data change.
@@ -80,7 +79,7 @@ src/
 
 - `Cycle`: id (UUID), cycleNo, day1 (date, = first day of menses), closedAt, notes.
 - `DayRecord`: id (UUID), cycleId, date, dayInCycle, monitor (none/low/high/peak), mucus, blood flow, intercourse (bool + optional time), bbt, symptoms (array), medications, pregnancy test (neg/pos), notes — **all optional**.
-- `Settings`: goal (TTA / TTC / track-only), algorithmEnabled (bool), postPeakDays (default 4), historyWindow (default 6; used for calendar-rule peaks), theme (system/light/dark), weekStart (monday default / sunday), cycleMinLength/cycleMaxLength (band, default 21–42), overlayMucus/overlayBbt/overlayIntercourse (cycle-chart overlay persistence, default off).
+- `Settings`: goal (TTA / TTC / track-only), algorithmEnabled (bool), historyWindow (default 6; used for calendar-rule peaks), theme (system/light/dark), weekStart (monday default / sunday), cycleMinLength/cycleMaxLength (band, default 21–42), calendarDetailMode (simple / full), projectFutureCycles (bool, default off), overlayMucus/overlayBbt/overlayIntercourse (cycle-chart overlay persistence, default off).
 - Records carry sync-friendly metadata (UUID keys, `version`/`synced` flags) so a cloud sync layer can be added later.
 
 ## Views
@@ -89,12 +88,12 @@ src/
 2. **Status** — date-selectable read-only status summary at `/status`.
 3. **Cycle chart** — CBPM-style strip chart per cycle (Low/High/Peak bands) with optional mucus/BBT/intercourse overlays (Recharts).
 4. **History/Stats** — cycle table, avg/median cycle length, peak variability, fertile-day counts, forecast panel.
-5. **Settings** — `/settings` view with Core (goal, algorithm toggle, post-Peak days, history window, theme), Display & protocol (week-start, cycle band, chart overlays), and Danger zone (clear all data).
+5. **Settings** — `/settings` view with Core (goal, algorithm toggle, history window, theme), Display & protocol (week-start, cycle band, chart overlays), and Danger zone (clear all data).
 
 ## Predictions / forecasting
 
 - Next period start: mean/median of last N cycles (6–12).
-- Estimated next fertile window: "earliest/latest monitor Peak of last 6 cycles − 6 / + postPeakDays" calendar rule.
+- Estimated next fertile window: "earliest/latest monitor Peak of last 6 cycles − 6 / + 3" calendar rule.
 - Predictions are **always labeled as predictions** until confirmed by readings.
 
 ## Commands

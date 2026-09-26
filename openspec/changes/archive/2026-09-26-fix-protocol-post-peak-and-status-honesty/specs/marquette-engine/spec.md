@@ -1,32 +1,21 @@
-# Marquette Engine Specification
+# Spec Delta
 
-## Purpose
+## REMOVED Requirements
 
-Defines the monitor-only evidence boundary, the fixed three-day post-Peak calculation behavior used by the current fertility engine, and the rule that day status is derived across the cycle's window rather than from stored records.
+### Requirement: The default post-Peak interval is four days
 
-## Requirements
+**Reason**: The published Marquette protocol ends the fertile window "three full days past the last
+peak reading" (Mu, Fehring & Bouchard, _Linacre Q_ 2022;89(1):64–72; Fehring, _The Marquette Model_,
+2018). A default of four is not a documented protocol value; it arrived with commit `871ac4e`
+alongside the inferred post-Peak record feature, which was removed in `32bae5d`. The requirement
+also permitted a user override, which let the app represent a window the protocol does not define
+while rendering it as a Marquette window.
 
-### Requirement: Monitor Peak is the only Peak evidence
+**Migration**: No user action is required. A stored post-Peak value is dropped on load and on
+restore, and the window end becomes the monitor Peak day plus three for every cycle. The current
+backup format version is unchanged.
 
-The engine SHALL derive Peak evidence and the fertile-window begin and end from user-entered monitor readings only. Mucus values MAY remain stored and visible, but MUST NOT contribute to `peakDay` or fertile-window boundaries.
-
-#### Scenario: Monitor Peak wins over mucus Peak
-
-- **WHEN** a cycle contains a user-entered monitor Peak on day 10 and a mucus Peak on day 14
-- **THEN** the engine uses cycle day 10 as the monitor Peak
-- **AND** the mucus Peak does not move the fertile-window end
-
-#### Scenario: Mucus-only Peak is not a Peak
-
-- **WHEN** a cycle contains a mucus Peak but no user-entered monitor Peak
-- **THEN** the engine reports no monitor Peak evidence
-- **AND** the mucus Peak does not establish a fertile-window end
-
-#### Scenario: Mucus observations remain available
-
-- **WHEN** the user records mucus values
-- **THEN** the values remain available to the logging and display surfaces
-- **AND** they do not change the engine's monitor-only Peak or fertile-window result
+## ADDED Requirements
 
 ### Requirement: The post-Peak interval is a fixed three-day protocol constant
 
@@ -57,9 +46,14 @@ rule that extends the window beyond a Peak, including the historical rule used a
 - **AND** the reported window end is the monitor Peak day plus three regardless of any value held in
   previously stored data
 
+## MODIFIED Requirements
+
 ### Requirement: Day results span the derived window
 
-The engine SHALL produce a `DayResult` for every cycle day it covers, deriving each day's status from the computed fertile window rather than from the presence of a stored observation. For a closed cycle the covered span SHALL be the cycle length. For an open cycle the span SHALL be bounded by the current day, because a derived status SHALL NOT be assigned to a future date.
+The engine SHALL produce a `DayResult` for every cycle day it covers, deriving each day's status
+from the computed fertile window rather than from the presence of a stored observation. For a
+closed cycle the covered span SHALL be the cycle length. For an open cycle the span SHALL be
+bounded by the current day, because a derived status SHALL NOT be assigned to a future date.
 
 #### Scenario: Unrecorded days inside the window receive a status
 
@@ -87,19 +81,3 @@ The engine SHALL produce a `DayResult` for every cycle day it covers, deriving e
 - **WHEN** the engine computes a closed cycle
 - **THEN** it produces a day result for every day of the cycle length
 - **AND** the day results do not depend on which of those days hold records
-
-### Requirement: Derived interpretation is never persisted as a record
-
-The engine SHALL produce derived values only. It SHALL NOT create, return, or imply any day record, monitor reading, or other stored observation. A day status SHALL be a function of the window and the cycle day alone, and SHALL NOT require a corresponding stored record to exist.
-
-#### Scenario: Window output carries no record identity
-
-- **WHEN** the engine computes a cycle
-- **THEN** its result contains statuses and window boundaries
-- **AND** it contains no record identifier, monitor reading, or data-origin value for any day
-
-#### Scenario: Deriving a status does not create storage
-
-- **WHEN** the engine computes statuses for unrecorded cycle days
-- **THEN** no stored day record exists for those dates as a result
-- **AND** the stored record set is identical before and after the computation
