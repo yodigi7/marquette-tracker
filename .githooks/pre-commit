@@ -17,18 +17,29 @@ repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
 
 # --- 1. Format staged files and re-stage -------------------------------
+# NUL-delimited throughout so filenames containing spaces survive intact.
 # ACMR: added, copied, modified, renamed. Skips deletions (D) so removing a
 # file never fails the hook, and untracked files (never in --cached anyway).
-staged=$(git diff --cached --name-only --diff-filter=ACMR)
+#
+# --no-error-on-unmatched-pattern is load-bearing: oxfmt exits non-zero when it
+# is handed no file it recognises. Without it, committing a lone binary asset
+# (this repo tracks .png/.ico/.svg, none of them formattable) or a lone file
+# matched by ignorePatterns would be reported as "formatter failed" and blocked.
+# The flag makes "nothing here to format" exit 0, while a genuine parse error
+# still exits non-zero.
+staged_list=$(mktemp)
+trap 'rm -f "$staged_list"' EXIT INT TERM
+git diff --cached --name-only -z --diff-filter=ACMR >"$staged_list"
 
-if [ -n "$staged" ]; then
-  # shellcheck disable=SC2086
-  if ! pnpm exec oxfmt --write $staged; then
+if [ -s "$staged_list" ]; then
+  if ! xargs -0 -r pnpm exec oxfmt --write --no-error-on-unmatched-pattern -- \
+    <"$staged_list"; then
     echo "pre-commit: formatter failed; run 'pnpm format' and re-stage." >&2
     exit 1
   fi
-  # shellcheck disable=SC2086
-  git add -- $staged
+  # Re-stage so the commit contains the formatted content. Re-adding a file the
+  # formatter skipped (a binary, an ignored path) is a no-op.
+  xargs -0 -r git add -- <"$staged_list"
 fi
 
 # --- 2. Lint the whole project -----------------------------------------

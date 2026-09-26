@@ -208,6 +208,15 @@ chaining that would avoid it.
 - **Partially staged files can over-stage.** If a file has both staged and unstaged changes, formatting the
   working-tree copy and re-staging it will also stage the unstaged edits. lint-staged has the identical
   behavior. Mitigation is documentation, plus `--no-verify` for the rare deliberate case.
+- **A naive staged-file list blocks commits that have nothing to format.** oxfmt exits non-zero when handed
+  no file it recognises, so passing it every staged path means a commit touching only a binary asset or only
+  an `ignorePatterns` path is reported as "formatter failed". This was a real defect caught in verification:
+  updating one of the tracked app icons was uncommittable. The hook now passes staged paths NUL-delimited
+  (`git diff --cached -z` into `xargs -0 -r`) and sets `--no-error-on-unmatched-pattern`, so "nothing here to
+  format" exits zero while a genuinely malformed file still exits non-zero. NUL-delivery also fixes
+  filenames containing spaces, which unquoted expansion silently split. Verified across ten cases in an
+  isolated clone: format-and-restage, lone binary, lone ignored file, spaced filename, mixed batch,
+  malformed file, lint error, invalid OpenSpec artifact, empty staging set, and `sh`/`bash` parse.
 - **Hooks may be inactive with no error.** `pnpm install` only runs `prepare` when it does real work, so a
   clone installed with `--ignore-scripts` — or a contributor who unsets `core.hooksPath` — ends up with no
   hooks and no diagnostic. Mitigation: the recovery command is required documentation, and any pre-push or

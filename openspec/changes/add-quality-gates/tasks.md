@@ -62,8 +62,14 @@ parallel. `.oxfmtrc.json` and `.oxlintrc.json` are distinct files, so groups 1 a
 ## 5. Git hooks
 
 - [x] 5.1 Create `.githooks/pre-commit` that collects staged supported files via
-      `git diff --cached --name-only --diff-filter=ACMR`, runs `oxfmt --write` on them, re-stages them with
-      `git add`, then runs full `oxlint` and `openspec validate --all`; verify the script is `sh -n` clean
+      `git diff --cached --name-only -z --diff-filter=ACMR`, pipes them NUL-delimited through
+      `xargs -0 -r pnpm exec oxfmt --write --no-error-on-unmatched-pattern --`, re-stages with
+      `xargs -0 -r git add --`, then runs full `oxlint` and `openspec validate --all`; verify the script is
+      `sh -n` clean. The NUL-delivery handles filenames containing spaces, and
+      `--no-error-on-unmatched-pattern` is required because oxfmt exits non-zero when handed no file it
+      recognises — without it, a commit staging only a binary asset (this repo tracks `.png`/`.ico`/`.svg`)
+      or only an `ignorePatterns` path is falsely reported as "formatter failed" and blocked. A genuinely
+      malformed file still exits non-zero, so real errors are not masked
 - [x] 5.2 Create `.githooks/pre-push` that runs `pnpm check`; verify the script is `sh -n` clean
 - [x] 5.3 `chmod +x` both hooks and verify both are tracked by git as executable, satisfying the
       "hooks are versioned, not local-only" requirement. Result: both tracked at mode `100755`
