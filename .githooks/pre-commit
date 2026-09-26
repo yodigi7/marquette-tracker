@@ -1,0 +1,46 @@
+#!/bin/sh
+# Pre-commit: fast, unconditional gates (~1.4s).
+#
+#   1. Format the staged supported files and re-stage them.
+#   2. Lint the whole project (0.7s — cheaper than filtering staged paths).
+#   3. Validate all OpenSpec artifacts (0.6s).
+#
+# Type checking and tests are intentionally NOT here: `tsc -b` costs ~4s with
+# no useful incrementality on this tree, so it runs in the pre-push hook via the
+# canonical `pnpm check` instead.
+#
+# Bypass deliberately with `git commit --no-verify`.
+
+set -e
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+# --- 1. Format staged files and re-stage -------------------------------
+# ACMR: added, copied, modified, renamed. Skips deletions (D) so removing a
+# file never fails the hook, and untracked files (never in --cached anyway).
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+
+if [ -n "$staged" ]; then
+  # shellcheck disable=SC2086
+  if ! pnpm exec oxfmt --write $staged; then
+    echo "pre-commit: formatter failed; run 'pnpm format' and re-stage." >&2
+    exit 1
+  fi
+  # shellcheck disable=SC2086
+  git add -- $staged
+fi
+
+# --- 2. Lint the whole project -----------------------------------------
+if ! pnpm exec oxlint; then
+  echo "pre-commit: lint failed. Fix the reported issues, or bypass with --no-verify." >&2
+  exit 1
+fi
+
+# --- 3. Validate OpenSpec artifacts ------------------------------------
+if ! pnpm exec openspec validate --all --no-interactive; then
+  echo "pre-commit: OpenSpec validation failed. Fix the artifacts, or bypass with --no-verify." >&2
+  exit 1
+fi
+
+exit 0

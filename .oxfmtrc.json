@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "sortPackageJson": false,
+  "ignorePatterns": [".opencode/**", "openspec/changes/archive/**"],
+  "overrides": [
+    {
+      "files": ["src/index.css"],
+      "options": { "tabWidth": 4 }
+    }
+  ]
+}

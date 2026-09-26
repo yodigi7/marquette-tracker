@@ -1,0 +1,20 @@
+#!/bin/sh
+# Pre-push: the full canonical quality gate (~21s).
+#
+# Runs exactly the command CI runs, so local and remote validation cannot
+# drift: format check, lint, tests, and production build (which includes
+# `tsc -b`, so type errors are caught here).
+#
+# Bypass deliberately with `git push --no-verify`.
+
+set -e
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+if ! pnpm check; then
+  echo "pre-push: quality gate failed; nothing was pushed." >&2
+  exit 1
+fi
+
+exit 0
