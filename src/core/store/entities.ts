@@ -41,7 +41,6 @@ export interface SettingsEntity extends SyncMeta {
   key: "main";
   goal: Goal;
   algorithmEnabled: boolean;
-  postPeakDays: number;
   historyWindow: number;
   theme: Theme;
   weekStart: WeekStart;
@@ -63,7 +62,6 @@ export const DEFAULT_SETTINGS: Omit<SettingsEntity, keyof SyncMeta> = {
   key: SETTINGS_KEY,
   goal: "track-only",
   algorithmEnabled: true,
-  postPeakDays: 4,
   historyWindow: 6,
   theme: "system",
   weekStart: "monday",

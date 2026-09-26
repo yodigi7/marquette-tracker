@@ -155,7 +155,15 @@ export function createRepositories(db: AppDb): Repositories {
       if (row) {
         // Merge defaults so settings introduced after a database was created
         // are available without requiring a destructive schema migration.
-        return { ...DEFAULT_SETTINGS, ...row };
+        // Retired settings are destructured out rather than merged: a row
+        // written before the fertile-window end became a protocol constant can
+        // still carry `postPeakDays` in IndexedDB, and letting it through would
+        // keep the dead key in the settings row and in every later export.
+        const { postPeakDays: _retiredPostPeakDays, ...supported } = row as SettingsEntity & {
+          /** Present only on rows written before it became a protocol constant. */
+          postPeakDays?: number;
+        };
+        return { ...DEFAULT_SETTINGS, ...supported };
       }
       const defaults = defaultSettings();
       await db.settings.add(defaults);

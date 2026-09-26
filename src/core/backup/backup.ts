@@ -110,7 +110,14 @@ function normalizeSettings(value: unknown): SettingsEntity {
   // before post-Peak fill was removed still carries these two settings, and
   // they must not be written back to the store. The feature they configured no
   // longer exists, so the restored settings row is authoritative without them.
-  const { postPeakFillMode: _fillMode, postPeakSuppressions: _suppressions, ...supported } = value;
+  // `postPeakDays` joins them for the same reason: the fertile-window end is a
+  // fixed protocol constant, so a stored interval must never reach the store.
+  const {
+    postPeakFillMode: _fillMode,
+    postPeakSuppressions: _suppressions,
+    postPeakDays: _postPeakDays,
+    ...supported
+  } = value;
   return {
     ...DEFAULT_SETTINGS,
     ...supported,
@@ -293,13 +300,6 @@ function validateSettings(settings: SettingsEntity): void {
   }
   if (typeof settings.algorithmEnabled !== "boolean") {
     fail("invalid-settings", "Algorithm setting is invalid");
-  }
-  if (
-    !Number.isInteger(settings.postPeakDays) ||
-    settings.postPeakDays < 0 ||
-    settings.postPeakDays > 10
-  ) {
-    fail("invalid-settings", "Post-Peak days must be an integer between 0 and 10");
   }
   if (
     !Number.isInteger(settings.historyWindow) ||

@@ -10,8 +10,6 @@ export type DateKey = string;
 
 /** The settings the engine needs. The store's Settings row may carry more (theme, algorithmEnabled). */
 export interface EngineSettings {
-  /** Days from last Peak day the fertile window extends. Monitor-only default: 4. */
-  postPeakDays: number;
   /** Number of previous cycles used for the calendar rules. Marquette default: 6. */
   historyWindow: number;
   /** Protocol band floor in days. Marquette default: 21. */

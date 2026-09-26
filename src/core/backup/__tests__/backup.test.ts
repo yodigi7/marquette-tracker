@@ -137,8 +137,24 @@ describe("JSON backup contract", () => {
     expect(serialized).not.toContain("dataOrigin");
     expect(serialized).not.toContain("postPeakFillMode");
     expect(serialized).not.toContain("postPeakSuppressions");
+    expect(serialized).not.toContain("postPeakDays");
     expect(document.data.dayRecords[0]).not.toHaveProperty("dataOrigin");
     expect(document.data.settings).not.toHaveProperty("postPeakFillMode");
+    expect(document.data.settings).not.toHaveProperty("postPeakDays");
+  });
+
+  it("drops a stored post-Peak interval from a legacy document", () => {
+    // The fertile-window end is a fixed protocol constant, so a value written by
+    // an earlier app version must not survive into the restored settings row.
+    const document = createBackup(snapshot(), { appVersion: "1.0.0", exportedAt: createdAt });
+    const legacy = JSON.parse(serializeBackup(document)) as {
+      data: { settings: Record<string, unknown> };
+    };
+    legacy.data.settings.postPeakDays = 4;
+
+    const prepared = prepareBackup(JSON.stringify(legacy));
+
+    expect(prepared.document.data.settings).not.toHaveProperty("postPeakDays");
   });
 
   it("accepts a document that still carries the legacy record origin", () => {
@@ -308,7 +324,7 @@ describe("backup migrations and strict validation", () => {
     ],
     [
       "invalid settings",
-      snapshot({ settings: settings({ postPeakDays: 99 }) }),
+      snapshot({ settings: settings({ historyWindow: 99 }) }),
       "invalid-settings",
     ],
     [

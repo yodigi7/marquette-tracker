@@ -14,7 +14,6 @@ export function StatusView() {
   const cycles = useAppStore((state) => state.cycles);
   const output = useAppStore((state) => state.output);
   const algorithmEnabled = useAppStore((state) => state.settings.algorithmEnabled);
-  const postPeakDays = useAppStore((state) => state.settings.postPeakDays);
   const [selected, setSelected] = useState(todayKey());
   const results = cycleResultsByCycleId(output);
   const cycle = cycleForDate(cycles, selected);
@@ -40,9 +39,7 @@ export function StatusView() {
             status={info ?? null}
             cycleDay={cycleDay}
             windowLine={
-              result
-                ? windowDescription(result.fertileWindow, result.peakDay !== null, postPeakDays)
-                : ""
+              result ? windowDescription(result.fertileWindow, result.peakDay !== null) : ""
             }
             nextPeriod={output?.forecast?.expectedPeriodStart ?? null}
             algorithmEnabled={algorithmEnabled}

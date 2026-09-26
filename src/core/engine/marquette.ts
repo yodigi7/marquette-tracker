@@ -19,7 +19,12 @@ export const CYCLE_LENGTH_MIN = 21;
 export const CYCLE_LENGTH_MAX = 42;
 /** Calendar fallback: earliest possible peak day 12 minus 6 yields fertile day 6. */
 export const DEFAULT_EARLIEST_PEAK = 12;
-export const DEFAULT_POST_PEAK_DAYS = 4;
+/**
+ * Protocol constant, not a preference: the fertile window ends "three full days past the last
+ * peak reading" (Mu, Fehring & Bouchard, Linacre Q 2022;89(1):64-72). Every rule that extends the
+ * window past a monitor Peak uses this value, so no stored or user-supplied setting can move it.
+ */
+export const DEFAULT_POST_PEAK_DAYS = 3;
 export const DEFAULT_HISTORY_WINDOW = 6;
 
 function isHighOrPeak(record: DayRecordInput): boolean {
@@ -83,15 +88,15 @@ function computeEnd(
     if (peakDay === null) {
       return { end: null, rule: "none" };
     }
-    return { end: peakDay + settings.postPeakDays, rule: "current-peak-plus-n" };
+    return { end: peakDay + DEFAULT_POST_PEAK_DAYS, rule: "current-peak-plus-n" };
   }
 
   if (peakDay !== null) {
-    const currentEnd = peakDay + settings.postPeakDays;
+    const currentEnd = peakDay + DEFAULT_POST_PEAK_DAYS;
     if (historic.length === 0) {
       return { end: currentEnd, rule: "current-peak-plus-n" };
     }
-    const historicEnd = Math.max(...historic) + settings.postPeakDays;
+    const historicEnd = Math.max(...historic) + DEFAULT_POST_PEAK_DAYS;
     if (historicEnd < currentEnd) {
       return { end: historicEnd, rule: "earliest-end" };
     }
@@ -99,7 +104,7 @@ function computeEnd(
   }
 
   if (historic.length > 0) {
-    return { end: Math.max(...historic) + settings.postPeakDays, rule: "historic-peak-plus-n" };
+    return { end: Math.max(...historic) + DEFAULT_POST_PEAK_DAYS, rule: "historic-peak-plus-n" };
   }
   return { end: null, rule: "none" };
 }

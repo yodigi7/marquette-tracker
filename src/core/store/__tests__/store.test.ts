@@ -27,7 +27,6 @@ describe("store hydration", () => {
     expect(s.hydrated).toBe(true);
     expect(s.cycles).toEqual([]);
     expect(s.dayRecords).toEqual([]);
-    expect(s.settings.postPeakDays).toBe(4);
     expect(s.settings.algorithmEnabled).toBe(true);
     expect(s.settings.goal).toBe("track-only");
   });
@@ -102,13 +101,13 @@ describe("day records", () => {
     expect(state(store).dayRecords[0].synced).toBe(false);
   });
 
-  it("engine output recomputes when a peak is logged (end = peak + 4)", async () => {
+  it("engine output recomputes when a peak is logged (end = peak + 3)", async () => {
     const { store } = setup();
     const { id: cycleId } = await store.getState().setNewCycle("2026-01-01");
     await store.getState().addDayRecord(cycleId, "2026-01-14", 14, { monitor: "peak" });
     const cycle = state(store).output?.cycles[0];
     expect(cycle?.fertileWindow.begin).toBe(6);
-    expect(cycle?.fertileWindow.end).toBe(18);
+    expect(cycle?.fertileWindow.end).toBe(17);
     expect(cycle?.peakDay).toBe(14);
   });
 
@@ -159,14 +158,23 @@ describe("cycles", () => {
 });
 
 describe("settings & data lifecycle", () => {
-  it("changing postPeakDays recomputes the window", async () => {
-    const { store } = setup();
-    const { id: cycleId } = await store.getState().setNewCycle("2026-01-01");
-    await store.getState().addDayRecord(cycleId, "2026-01-14", 14, { monitor: "peak" });
-    expect(state(store).output!.cycles[0].fertileWindow.end).toBe(18);
-    await store.getState().updateSettings({ postPeakDays: 6 });
-    expect(state(store).settings.postPeakDays).toBe(6);
-    expect(state(store).output!.cycles[0].fertileWindow.end).toBe(20);
+  it("drops a legacy stored post-Peak value and keeps the window at peak + 3", async () => {
+    const db = createDb();
+    const first = createAppStore(db);
+    await first.getState().hydrate();
+    const { id: cycleId } = await first.getState().setNewCycle("2026-01-01");
+    await first.getState().addDayRecord(cycleId, "2026-01-14", 14, { monitor: "peak" });
+
+    // Simulate a row written before the setting became a protocol constant. The
+    // field must not reach the store, and it must not move the window end.
+    const row = (await db.settings.get("main"))!;
+    await db.settings.put({ ...row, postPeakDays: 6 } as unknown as typeof row);
+
+    const second = createAppStore(db);
+    await second.getState().hydrate();
+
+    expect(state(second).settings).not.toHaveProperty("postPeakDays");
+    expect(state(second).output!.cycles[0].fertileWindow.end).toBe(17);
   });
 
   it("persists across store instances (round trip)", async () => {
@@ -182,37 +190,6 @@ describe("settings & data lifecycle", () => {
     expect(s.cycles).toHaveLength(1);
     expect(s.cycles[0].day1).toBe("2026-01-01");
     expect(s.dayRecords[0].monitor).toBe("peak");
-    expect(s.settings.postPeakDays).toBe(4);
-  });
-
-  it("keeps an explicitly persisted post-Peak value across a restart", async () => {
-    const db = createDb();
-    const first = createAppStore(db);
-    await first.getState().hydrate();
-    await first.getState().updateSettings({ postPeakDays: 3 });
-
-    const second = createAppStore(db);
-    await second.getState().hydrate();
-    expect(state(second).settings.postPeakDays).toBe(3);
-  });
-
-  it("upgrades a legacy settings row without a persisted post-Peak value to the default", async () => {
-    const db = createDb();
-    const first = createAppStore(db);
-    await first.getState().hydrate();
-    // Simulate a row written before the setting existed: the repository must
-    // fill the missing field from defaults instead of leaving it undefined.
-    const row = (await db.settings.get("main"))! as Partial<SettingsEntity>;
-    const { postPeakDays: _dropped, ...legacy } = row;
-    await db.settings.put({ ...legacy, postPeakDays: 3 } as SettingsEntity);
-    const withLegacyValue = createAppStore(db);
-    await withLegacyValue.getState().hydrate();
-    expect(state(withLegacyValue).settings.postPeakDays).toBe(3);
-
-    await db.settings.put({ ...legacy } as SettingsEntity);
-    const withoutValue = createAppStore(db);
-    await withoutValue.getState().hydrate();
-    expect(state(withoutValue).settings.postPeakDays).toBe(4);
   });
 
   it("clearAllData wipes everything and resets defaults", async () => {
@@ -377,15 +354,15 @@ describe("no generated records", () => {
     const { id: cycleId } = await store.getState().setNewCycle("2026-01-01");
     await store.getState().addDayRecord(cycleId, "2026-01-12", 12, { monitor: "peak" });
 
-    // Peak 12 + postPeakDays 4 -> the window ends on day 16.
+    // Peak 12 + the fixed three-day interval -> the window ends on day 15.
     expect(state(store).dayRecords.map((r) => r.date)).toEqual(["2026-01-12"]);
 
-    // The band is derived, not stored: days 13-16 are covered without rows.
+    // The band is derived, not stored: days 13-15 are covered without rows.
     const cycle = state(store).output!.cycles[0];
     const byDay = new Map(cycle.days.map((d) => [d.day, d.status]));
     expect(byDay.get(13)).toBe("fertile");
-    expect(byDay.get(16)).toBe("fertile");
-    expect(byDay.get(17)).toBe("post-peak");
+    expect(byDay.get(15)).toBe("fertile");
+    expect(byDay.get(16)).toBe("post-peak");
   });
 
   it("never writes a record carrying a data origin", async () => {

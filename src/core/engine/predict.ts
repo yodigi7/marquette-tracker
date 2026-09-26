@@ -1,4 +1,5 @@
 import { addDays, diffDays } from "./dateUtils";
+import { DEFAULT_POST_PEAK_DAYS } from "./marquette";
 import {
   estimateProjectedLength,
   PROTOCOL_DEFAULT_WINDOW_BEGIN,
@@ -93,7 +94,7 @@ function predictFertileWindow(
     endDay = PROTOCOL_DEFAULT_WINDOW_END;
   } else {
     beginDay = Math.min(...lastWindow) - 6;
-    endDay = Math.max(...lastWindow) + settings.postPeakDays;
+    endDay = Math.max(...lastWindow) + DEFAULT_POST_PEAK_DAYS;
   }
   return { begin: addDays(day1, beginDay - 1), end: addDays(day1, endDay - 1) };
 }

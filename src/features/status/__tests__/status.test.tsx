@@ -34,10 +34,30 @@ describe("StatusView", () => {
 
     expect(screen.getByTestId("date-trigger")).toBeInTheDocument();
     expect(screen.getByText(/cycle 1 · day 1/i)).toBeInTheDocument();
-    expect(screen.getByText("Fertile window")).toBeInTheDocument();
+    expect(screen.getByText("Fertile")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /save/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /set day 1/i })).toBeNull();
     expect(screen.queryByText(/medical device|marquette-certified instructor/i)).toBeNull();
+  });
+
+  it("renders no medical disclaimer in either interpretation mode", async () => {
+    // The status vocabulary carries the honesty claim, so the view must not
+    // substitute a caveat for accurate wording. Nothing here may render a
+    // disclaimer in place of that.
+    const forbidden =
+      /disclaimer|medical advice|not a substitute|consult (a|your|with)|medical device|marquette-certified instructor|seek (medical|professional)/i;
+
+    await bootWithCycle();
+    const { unmount } = render(<StatusView />);
+    await screen.findByText("Fertile");
+    expect(document.body.textContent ?? "").not.toMatch(forbidden);
+    unmount();
+
+    // The logging-only card is a Status rendering too, and must stay disclaimer-free.
+    await store().updateSettings({ algorithmEnabled: false });
+    render(<StatusView />);
+    expect(await screen.findByText(/algorithm is off/i)).toBeInTheDocument();
+    expect(document.body.textContent ?? "").not.toMatch(forbidden);
   });
 
   it("shows no status source badge", async () => {
@@ -48,7 +68,7 @@ describe("StatusView", () => {
 
     expect(screen.queryByText("predicted")).not.toBeInTheDocument();
     expect(screen.queryByText("confirmed")).not.toBeInTheDocument();
-    expect(screen.getByText("Fertile window")).toHaveClass("bg-fertility-status-fertile");
+    expect(screen.getByText("Fertile")).toHaveClass("bg-fertility-status-fertile");
   });
 
   it("reports a status for a date inside the cycle that has no record", async () => {
@@ -65,7 +85,7 @@ describe("StatusView", () => {
     const dayButton = await pickDayButton(user, inWindow.getDate());
     if (dayButton) await user.click(dayButton);
 
-    expect(await screen.findByText("Fertile window")).toBeInTheDocument();
+    expect(await screen.findByText("Fertile")).toBeInTheDocument();
     expect(cycle.id).toBeTruthy();
   });
 
@@ -105,7 +125,7 @@ describe("StatusView", () => {
     render(<StatusView />);
 
     expect(screen.getByText(/algorithm is off/i)).toBeInTheDocument();
-    expect(screen.queryByText("Fertile window")).toBeNull();
+    expect(screen.queryByText("Fertile")).toBeNull();
   });
 
   it("suppresses derived output while logging-only mode is active", async () => {
@@ -120,29 +140,41 @@ describe("StatusView", () => {
     // The toggle suppresses interpretation in the view; stored records remain.
     expect(store().dayRecords).toHaveLength(2);
     expect(screen.getByText(/algorithm is off/i)).toBeInTheDocument();
-    expect(screen.queryByText("Fertile window")).toBeNull();
+    expect(screen.queryByText("Fertile")).toBeNull();
   });
 
-  it("describes the post-Peak rule with the configured day count", async () => {
+  it("describes the post-Peak rule with the fixed three-day interval", async () => {
     const start = addDays(todayKey(), -20);
     const cycle = await store().setNewCycle(start);
     await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
     await store().addDayRecord(cycle.id, addDays(start, 13), 14, { monitor: "peak" });
 
-    const { unmount } = render(<StatusView />);
-    expect(await screen.findByText(/until day 18 \(current Peak \+ 4 days\)/)).toBeInTheDocument();
-    unmount();
-
-    await store().updateSettings({ postPeakDays: 2 });
     render(<StatusView />);
-    expect(await screen.findByText(/until day 16 \(current Peak \+ 2 days\)/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/until day 17 \(current monitor Peak \+ 3 days\)/),
+    ).toBeInTheDocument();
+  });
+
+  it("renders no label asserting safety", async () => {
+    const start = addDays(todayKey(), -20);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+    await store().addDayRecord(cycle.id, addDays(start, 13), 14, { monitor: "peak" });
+    // A day past the window end resolves post-window, which used to read "Safe".
+    const past = addDays(start, 17);
+    await store().addDayRecord(cycle.id, past, 18, { monitor: "low" });
+
+    const { unmount } = render(<StatusView />);
+    await screen.findByText(/until day 17/);
+    expect(screen.queryByText(/safe/i)).toBeNull();
+    unmount();
   });
 
   it("uses the shared status visual token with no source token", async () => {
     await bootWithCycle();
     render(<StatusView />);
 
-    const statusBadge = screen.getByText("Fertile window");
+    const statusBadge = screen.getByText("Fertile");
     expect(statusBadge.className).toContain("bg-fertility-status-fertile");
     expect(statusBadge.className).toContain("text-fertility-status-fertile-fg");
     expect(statusBadge.className).not.toContain("predicted");

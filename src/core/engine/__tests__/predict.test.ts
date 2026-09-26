@@ -2,12 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { addDays } from "../dateUtils";
 import { computeCycle } from "../marquette";
-import {
-  CYCLE_LENGTH_MAX,
-  CYCLE_LENGTH_MIN,
-  DEFAULT_HISTORY_WINDOW,
-  DEFAULT_POST_PEAK_DAYS,
-} from "../marquette";
+import { CYCLE_LENGTH_MAX, CYCLE_LENGTH_MIN, DEFAULT_HISTORY_WINDOW } from "../marquette";
 import { computePredictions } from "../predict";
 import { PROTOCOL_DEFAULT_WINDOW_BEGIN, PROTOCOL_DEFAULT_WINDOW_END } from "../projection";
 import type {
@@ -22,7 +17,6 @@ const TODAY = "2026-06-01";
 
 function settings(): EngineSettings {
   return {
-    postPeakDays: DEFAULT_POST_PEAK_DAYS,
     historyWindow: DEFAULT_HISTORY_WINDOW,
     cycleMinLength: CYCLE_LENGTH_MIN,
     cycleMaxLength: CYCLE_LENGTH_MAX,
@@ -94,7 +88,7 @@ describe("predict computePredictions", () => {
     expect(forecast!.expectedPeriodStart).toBe("2026-03-01");
   });
 
-  it("predicts the next fertile window via calendar rule (earliest peak -6 / latest +4)", () => {
+  it("predicts the next fertile window via calendar rule (earliest peak -6 / latest +3)", () => {
     const cycles = [
       result(1, "2026-01-01", 28, 14),
       result(2, "2026-01-29", 28, 15),
@@ -103,9 +97,9 @@ describe("predict computePredictions", () => {
     ];
     const forecast = computePredictions(cycles, settings(), TODAY);
     // Newest day1 = 2026-03-26; earliest peak 12 → begin day 6 → date 2026-03-31
-    // latest peak 16 + 4 = 20 → date 2026-04-14
+    // latest peak 16 + 3 = 19 → date 2026-04-13
     expect(forecast!.nextFertileWindow.begin).toBe("2026-03-31");
-    expect(forecast!.nextFertileWindow.end).toBe("2026-04-14");
+    expect(forecast!.nextFertileWindow.end).toBe("2026-04-13");
   });
 
   it("excludes mucus-only Peak cycles from historical peak statistics", () => {
@@ -151,7 +145,7 @@ describe("predict computePredictions", () => {
     const forecast = computePredictions(cycles, settings(), TODAY);
     expect(forecast!.expectedPeriodStart).toBe("2026-01-29");
     expect(forecast!.nextFertileWindow.begin).toBe("2026-01-08");
-    expect(forecast!.nextFertileWindow.end).toBe("2026-01-18");
+    expect(forecast!.nextFertileWindow.end).toBe("2026-01-17");
   });
 });
 describe("protocol default band is shared with the projection", () => {

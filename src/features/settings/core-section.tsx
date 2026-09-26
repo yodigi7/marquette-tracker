@@ -75,24 +75,14 @@ export function CoreSection() {
         />
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <NumberField
-          testId="settings-post-peak-days"
-          label="Days after peak"
-          value={settings.postPeakDays}
-          min={0}
-          max={10}
-          onCommit={(value) => updateSettings({ postPeakDays: value })}
-        />
-        <NumberField
-          testId="settings-history-window"
-          label="History window (cycles)"
-          value={settings.historyWindow}
-          min={1}
-          max={12}
-          onCommit={(value) => updateSettings({ historyWindow: value })}
-        />
-      </div>
+      <NumberField
+        testId="settings-history-window"
+        label="History window (cycles)"
+        value={settings.historyWindow}
+        min={1}
+        max={12}
+        onCommit={(value) => updateSettings({ historyWindow: value })}
+      />
     </div>
   );
 }

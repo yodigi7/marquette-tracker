@@ -7,7 +7,6 @@ import type { CycleEntity, SettingsEntity } from "./entities";
 /** Protocol parameters the engine needs, lifted from the persisted settings row. */
 export function engineSettingsOf(settings: SettingsEntity): EngineSettings {
   return {
-    postPeakDays: settings.postPeakDays,
     historyWindow: settings.historyWindow,
     cycleMinLength: settings.cycleMinLength,
     cycleMaxLength: settings.cycleMaxLength,

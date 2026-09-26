@@ -1,12 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { addDays } from "../dateUtils";
-import {
-  CYCLE_LENGTH_MAX,
-  CYCLE_LENGTH_MIN,
-  DEFAULT_HISTORY_WINDOW,
-  DEFAULT_POST_PEAK_DAYS,
-} from "../marquette";
+import { CYCLE_LENGTH_MAX, CYCLE_LENGTH_MIN, DEFAULT_HISTORY_WINDOW } from "../marquette";
 import { computeCycle } from "../marquette";
 import { computePredictions } from "../predict";
 import {
@@ -23,7 +18,6 @@ const LENGTHS = [26, 28, 29, 29, 30, 45];
 
 function settings(overrides: Partial<EngineSettings> = {}): EngineSettings {
   return {
-    postPeakDays: DEFAULT_POST_PEAK_DAYS,
     historyWindow: DEFAULT_HISTORY_WINDOW,
     cycleMinLength: CYCLE_LENGTH_MIN,
     cycleMaxLength: CYCLE_LENGTH_MAX,
@@ -285,15 +279,9 @@ describe("projectCycles fertile window", () => {
     const cycles = [...eightClosedCycles(), openCycle(9, OPEN_DAY1, null, TODAY)];
     const projected = projectCycles(cycles, settings(), TODAY, "2026-10-31");
 
-    // lookback min peak 12 -> begin 6; max peak 17 + 4 -> end 21
+    // lookback min peak 12 -> begin 6; max peak 17 + 3 -> end 20
     expect(projected[0].fertileWindow.begin).toBe(6);
-    expect(projected[0].fertileWindow.end).toBe(21);
-  });
-
-  it("moves the window end with a configured post-Peak value", () => {
-    const cycles = [...eightClosedCycles(), openCycle(9, OPEN_DAY1, null, TODAY)];
-    const projected = projectCycles(cycles, settings({ postPeakDays: 6 }), TODAY, "2026-10-31");
-    expect(projected[0].fertileWindow.end).toBe(23);
+    expect(projected[0].fertileWindow.end).toBe(20);
   });
 
   it("gives a projected cycle no Peak evidence and no ovulation point estimate", () => {
@@ -311,9 +299,9 @@ describe("projectCycles fertile window", () => {
     const projected = projectCycles(cycles, settings(), TODAY, "2026-10-31");
 
     const first = projected[0];
-    expect(first.fertileWindow.end).toBe(21);
-    const day22 = first.days.find((d) => d.day === 22)!;
-    expect(day22.status).not.toBe("fertile");
+    expect(first.fertileWindow.end).toBe(20);
+    const day21 = first.days.find((d) => d.day === 21)!;
+    expect(day21.status).not.toBe("fertile");
   });
 
   it("falls back to the protocol default band when no Peak history exists", () => {
