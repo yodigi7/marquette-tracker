@@ -175,7 +175,8 @@ export function computeCycle(
   };
 
   const days: DayResult[] = [];
-  for (let day = 1; day <= cycleSpan(cycle, length, today); day++) {
+  const span = cycleSpan(cycle, length, today);
+  for (let day = 1; day <= span; day++) {
     days.push({
       day,
       date: addDays(cycle.day1, day - 1),
@@ -186,6 +187,33 @@ export function computeCycle(
   const warnings: EngineWarning[] = [];
   if (fertileWindow.end === null) {
     warnings.push({ kind: "no-peak-end", cycleNo });
+  } else {
+    const windowEnd = fertileWindow.end;
+
+    // An open cycle that has already run past its computed end is still in progress, so the days
+    // after that end are not settled. `span` is the same bound the day results use, so the two
+    // cannot disagree. A closed cycle is ordinary here and reports nothing.
+    if (length === null && windowEnd < span) {
+      warnings.push({ kind: "open-cycle-past-window-end", cycleNo });
+    }
+
+    // A High or Peak after the window end contradicts the computed window, because the window
+    // closed on a day that reading says was still fertile. Only `high`/`peak` assert fertility;
+    // a `low` is consistent with a closed window, and mucus/BBT are non-evidence. The window is
+    // left untouched -- reporting the contradiction is the response, not moving the end.
+    const offendingDay = sorted
+      .filter(
+        (record) =>
+          (record.monitor === "high" || record.monitor === "peak") && record.dayInCycle > windowEnd,
+      )
+      .reduce<number | null>(
+        (earliest, record) =>
+          earliest === null ? record.dayInCycle : Math.min(earliest, record.dayInCycle),
+        null,
+      );
+    if (offendingDay !== null) {
+      warnings.push({ kind: "monitor-evidence-outside-window", cycleNo, day: offendingDay });
+    }
   }
 
   return {

@@ -40,6 +40,110 @@ describe("StatusView", () => {
     expect(screen.queryByText(/medical device|marquette-certified instructor/i)).toBeNull();
   });
 
+  it("warns when a monitor reading falls outside the computed window", async () => {
+    // Peak on day 10 closes the window on day 13; a High on day 15 contradicts that.
+    const start = addDays(todayKey(), -20);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+    await store().addDayRecord(cycle.id, addDays(start, 9), 10, { monitor: "peak" });
+    await store().addDayRecord(cycle.id, addDays(start, 14), 15, { monitor: "high" });
+
+    render(<StatusView />);
+
+    const banner = await screen.findByTestId("status-warning");
+    // Names the reading, the offending cycle day, and the computed window end.
+    expect(banner).toHaveTextContent(/monitor reading outside the computed window/i);
+    expect(banner).toHaveTextContent(/cycle day 15/i);
+    expect(banner).toHaveTextContent(/ended on day 13/i);
+    // The window itself is unchanged -- the warning reports, it does not move the end.
+    expect(screen.getByText(/until day 13/)).toBeInTheDocument();
+    expect(banner).not.toHaveTextContent(/invalid|error|malfunction/i);
+  });
+
+  it("shows the warning above the status badge", async () => {
+    const start = addDays(todayKey(), -20);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+    await store().addDayRecord(cycle.id, addDays(start, 9), 10, { monitor: "peak" });
+    await store().addDayRecord(cycle.id, addDays(start, 14), 15, { monitor: "high" });
+
+    render(<StatusView />);
+
+    const banner = await screen.findByTestId("status-warning");
+    const badge = document.querySelector('[data-slot="badge"]');
+    expect(badge).not.toBeNull();
+    // Compare document order: the correction precedes the model claim it qualifies.
+    expect(banner.compareDocumentPosition(badge!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("shows the warning for a date earlier in the affected cycle, naming the offending day", async () => {
+    const start = addDays(todayKey(), -20);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+    await store().addDayRecord(cycle.id, addDays(start, 9), 10, { monitor: "peak" });
+    await store().addDayRecord(cycle.id, addDays(start, 14), 15, { monitor: "high" });
+
+    render(<StatusView />);
+    expect(await screen.findByTestId("status-warning")).toHaveTextContent(/cycle day 15/i);
+
+    // Jump back to cycle day 3 -- well before the offending reading.
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("date-trigger"));
+    const early = await pickDateButton(user, addDays(start, 2));
+    if (early) await user.click(early);
+
+    expect(screen.getByTestId("status-warning")).toHaveTextContent(/cycle day 15/i);
+  });
+
+  it("offers no dismiss control for a warning", async () => {
+    const start = addDays(todayKey(), -20);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+    await store().addDayRecord(cycle.id, addDays(start, 9), 10, { monitor: "peak" });
+    await store().addDayRecord(cycle.id, addDays(start, 14), 15, { monitor: "high" });
+
+    render(<StatusView />);
+    const banner = await screen.findByTestId("status-warning");
+
+    expect(banner.querySelector("button")).toBeNull();
+    expect(screen.queryByRole("button", { name: /dismiss|acknowledge|hide/i })).toBeNull();
+  });
+
+  it("suppresses the warning when interpretation is disabled", async () => {
+    const start = addDays(todayKey(), -20);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+    await store().addDayRecord(cycle.id, addDays(start, 9), 10, { monitor: "peak" });
+    await store().addDayRecord(cycle.id, addDays(start, 14), 15, { monitor: "high" });
+
+    await store().updateSettings({ algorithmEnabled: false });
+    render(<StatusView />);
+
+    expect(await screen.findByText(/algorithm is off/i)).toBeInTheDocument();
+    expect(screen.queryByTestId("status-warning")).toBeNull();
+  });
+
+  it("shows no warning for an ordinary cycle", async () => {
+    await bootWithCycle();
+    render(<StatusView />);
+
+    await screen.findByText("Fertile");
+    expect(screen.queryByTestId("status-warning")).toBeNull();
+  });
+
+  it("warns that an unfinished cycle has run past its computed window", async () => {
+    // Open cycle, Peak on day 10 (window ends day 13), today is cycle day 20.
+    const start = addDays(todayKey(), -19);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, addDays(start, 9), 10, { monitor: "peak" });
+
+    render(<StatusView />);
+
+    const banner = await screen.findByTestId("status-warning");
+    expect(banner).toHaveTextContent(/still in progress/i);
+    expect(banner).toHaveTextContent(/ended on day 13/i);
+  });
+
   it("renders no medical disclaimer in either interpretation mode", async () => {
     // The status vocabulary carries the honesty claim, so the view must not
     // substitute a caveat for accurate wording. Nothing here may render a
@@ -201,6 +305,27 @@ describe("StatusView", () => {
     expect(screen.queryByRole("button", { name: /set day 1/i })).toBeNull();
   });
 });
+
+/**
+ * Day button for an exact `YYYY-MM-DD` date. The picker can render the same day number in two
+ * months at once, so a day-number query is ambiguous; `data-day` is not.
+ */
+async function pickDateButton(
+  user: ReturnType<typeof userEvent.setup>,
+  iso: string,
+): Promise<HTMLElement | null> {
+  const [year, month, day] = iso.split("-").map(Number);
+  const selector = `[data-day="${month}/${day}/${year}"]`;
+
+  for (let tries = 0; tries < 3; tries++) {
+    const cell = document.querySelector(selector);
+    if (cell) return cell.querySelector("button");
+    const previous = screen.queryByRole("button", { name: /previous month/i });
+    if (!previous) return null;
+    await user.click(previous);
+  }
+  return null;
+}
 
 async function pickDayButton(
   user: ReturnType<typeof userEvent.setup>,

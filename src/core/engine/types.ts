@@ -85,7 +85,19 @@ export interface CycleResult {
 
 export type EngineWarning =
   | { kind: "cycle-out-of-band"; cycleNo: number; length: number }
-  | { kind: "no-peak-end"; cycleNo: number };
+  | { kind: "no-peak-end"; cycleNo: number }
+  /**
+   * A user-entered monitor `high` or `peak` sits on a cycle day later than the computed window
+   * end. The window is deliberately NOT moved: the protocol defines the end solely through the last
+   * Peak, so the contradiction is reported rather than resolved.
+   */
+  | { kind: "monitor-evidence-outside-window"; cycleNo: number; day: number }
+  /**
+   * An open cycle whose computed window end precedes the current day. The cycle is still in
+   * progress, so its days past that end are not settled and are reported as such. A closed cycle
+   * with an end in the past is ordinary and never produces this.
+   */
+  | { kind: "open-cycle-past-window-end"; cycleNo: number };
 
 /** Previous-cycle peak days (oldest → newest) used by the calendar rules. */
 export interface CycleHistory {

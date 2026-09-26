@@ -1,7 +1,14 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import type { EndRule } from "@/core/engine/types";
-import { END_RULE_LABELS, STATUS_LABELS, endRuleLabel, windowDescription } from "../lib";
+import {
+  END_RULE_LABELS,
+  STATUS_LABELS,
+  WARNING_LABELS,
+  endRuleLabel,
+  windowDescription,
+  warningBanner,
+} from "../lib";
 
 const RULES: EndRule[] = ["current-peak-plus-n", "historic-peak-plus-n", "earliest-end", "none"];
 
@@ -97,5 +104,57 @@ describe("windowDescription", () => {
   it("carries no rule name when the end is undetermined", () => {
     const pending = windowDescription({ ...window, end: null, endRule: "none" }, true);
     expect(pending).not.toContain(END_RULE_LABELS.none);
+  });
+});
+
+describe("warningBanner", () => {
+  const evidence = { kind: "monitor-evidence-outside-window", cycleNo: 1, day: 15 } as const;
+  const inProgress = { kind: "open-cycle-past-window-end", cycleNo: 1 } as const;
+
+  it("names the reading, the offending cycle day, and the computed window end", () => {
+    const banner = warningBanner([evidence], 13)!;
+
+    expect(banner).toContain("cycle day 15");
+    expect(banner).toContain("day 13");
+    expect(banner).toMatch(/high or peak/i);
+  });
+
+  it("states that the window has not changed", () => {
+    expect(warningBanner([evidence], 13)).toMatch(/has not changed/i);
+  });
+
+  it("describes an unfinished cycle as still in progress", () => {
+    const banner = warningBanner([inProgress], 13)!;
+
+    expect(banner).toMatch(/still in progress/i);
+    expect(banner).toContain("day 13");
+  });
+
+  it("prefers the evidence warning when a cycle has both", () => {
+    expect(warningBanner([inProgress, evidence], 13)).toBe(warningBanner([evidence], 13));
+  });
+
+  it("returns nothing for warnings it does not render", () => {
+    expect(warningBanner([{ kind: "no-peak-end", cycleNo: 1 }], null)).toBeNull();
+    expect(warningBanner([{ kind: "cycle-out-of-band", cycleNo: 1, length: 60 }], null)).toBeNull();
+    expect(warningBanner([], 13)).toBeNull();
+  });
+
+  it("handles an undetermined window end without printing a broken day", () => {
+    expect(warningBanner([evidence], null)).toMatch(/undetermined/i);
+    expect(warningBanner([evidence], null)).not.toMatch(/day null|day undefined/);
+  });
+
+  it("uses no error, invalid, malfunction, or disclaimer language", () => {
+    for (const banner of [warningBanner([evidence], 13)!, warningBanner([inProgress], 13)!]) {
+      expect(banner).not.toMatch(/invalid|error|malfunction|fault|incorrect/i);
+      expect(banner).not.toMatch(/disclaimer|medical advice|consult (a|your)/i);
+    }
+  });
+
+  it("gives each warning kind distinct label text", () => {
+    expect(WARNING_LABELS["monitor-evidence-outside-window"]).not.toBe(
+      WARNING_LABELS["open-cycle-past-window-end"],
+    );
   });
 });

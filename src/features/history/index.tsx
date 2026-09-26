@@ -23,7 +23,7 @@ export function HistoryView() {
     <div className="mx-auto w-full max-w-lg space-y-4">
       {algorithmEnabled ? (
         <>
-          <ForecastPanel forecast={forecast} />
+          <ForecastPanel forecast={forecast} cycles={cycleRows} />
           <CycleStats results={cycleRows} forecast={forecast} />
         </>
       ) : (
@@ -53,7 +53,16 @@ function LoggingOnlyCard() {
   );
 }
 
-function ForecastPanel({ forecast }: { forecast: Forecast | null }) {
+function ForecastPanel({ forecast, cycles }: { forecast: Forecast | null; cycles: CycleResult[] }) {
+  // Both reconciliation kinds mean the same thing at a glance from here: this cycle's recorded
+  // data and its computed window disagree, or the cycle is unfinished past that window.
+  const reconciledCycles = cycles.filter((cycle) =>
+    cycle.warnings.some(
+      (w) =>
+        w.kind === "monitor-evidence-outside-window" || w.kind === "open-cycle-past-window-end",
+    ),
+  ).length;
+
   if (!forecast) {
     return (
       <Card>
@@ -102,6 +111,16 @@ function ForecastPanel({ forecast }: { forecast: Forecast | null }) {
           <p className={cn("text-xs", FERTILITY_TEXT_VISUALS.warning)}>
             {forecast.outOfBandCount} cycles fell outside the 21–42 day band. Consider consulting a
             Marquette-certified instructor.
+          </p>
+        )}
+        {reconciledCycles > 0 && (
+          <p
+            data-testid="history-reconciliation-warning"
+            className={cn("text-xs", FERTILITY_TEXT_VISUALS.warning)}
+          >
+            {reconciledCycles === 1 ? "1 cycle has" : `${reconciledCycles} cycles have`} a monitor
+            reading that falls outside the computed window, or are still in progress past it. Open
+            the Status view to see which.
           </p>
         )}
       </CardContent>

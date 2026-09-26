@@ -1,4 +1,4 @@
-import type { DayStatus, FertileWindow } from "@/core/engine/types";
+import type { DayStatus, EngineWarning, FertileWindow } from "@/core/engine/types";
 import { FERTILITY_STATUS_VISUALS } from "@/lib/fertility-visuals";
 import { dayInCycle, dateKeyLocal, parseDateKey, todayKey } from "@/core/dateKeys";
 
@@ -38,6 +38,45 @@ export const END_RULE_LABELS: Record<FertileWindow["endRule"], string> = {
 /** The post-Peak interval is a protocol constant, so the rule text carries the value. */
 export function endRuleLabel(rule: FertileWindow["endRule"]): string {
   return END_RULE_LABELS[rule];
+}
+
+/**
+ * Wording for the two reconciliation warnings. Each describes the user's own recorded readings
+ * and what the computed window said — never error, invalid, or malfunction language, and never a
+ * disclaimer.
+ */
+export const WARNING_LABELS: Record<
+  Extract<EngineWarning["kind"], "monitor-evidence-outside-window" | "open-cycle-past-window-end">,
+  string
+> = {
+  "monitor-evidence-outside-window": "Monitor reading outside the computed window",
+  "open-cycle-past-window-end": "Cycle still in progress",
+};
+
+/**
+ * Text for the most relevant reconciliation warning on a cycle, or null when it has none.
+ *
+ * The cycle day is named explicitly because the warning belongs to the cycle while this view is
+ * date-selectable: someone looking at cycle day 8 still needs to learn their day-15 reading
+ * conflicts. `windowEnd` comes from the caller rather than the warning, because the engine
+ * deliberately reports only the cycle and the day — the window is the caller's to look up.
+ *
+ * Evidence outranks still-in-progress: it is the sharper contradiction.
+ */
+export function warningBanner(warnings: EngineWarning[], windowEnd: number | null): string | null {
+  for (const warning of warnings) {
+    if (warning.kind === "monitor-evidence-outside-window") {
+      const end = windowEnd === null ? "an undetermined day" : `day ${windowEnd}`;
+      return `${WARNING_LABELS[warning.kind]}. Your monitor shows High or Peak on cycle day ${warning.day}, but the computed window ended on ${end}. The window has not changed.`;
+    }
+  }
+  for (const warning of warnings) {
+    if (warning.kind === "open-cycle-past-window-end") {
+      const end = windowEnd === null ? "an undetermined day" : `day ${windowEnd}`;
+      return `${WARNING_LABELS[warning.kind]}. The computed window ended on ${end}, and this cycle has not closed yet.`;
+    }
+  }
+  return null;
 }
 
 export function windowDescription(window: FertileWindow, peakKnown: boolean): string {

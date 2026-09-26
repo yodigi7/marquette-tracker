@@ -93,6 +93,39 @@ describe("HistoryView", () => {
     );
   });
 
+  it("reports how many cycles have monitor data that disagrees with the computed window", () => {
+    const output = store().output;
+    if (!output) {
+      throw new Error("Expected seeded engine output");
+    }
+
+    const cycles = output.cycles.map((cycle, index) =>
+      index === 0
+        ? {
+            ...cycle,
+            warnings: [
+              ...cycle.warnings,
+              { kind: "monitor-evidence-outside-window" as const, cycleNo: cycle.cycleNo, day: 15 },
+            ],
+          }
+        : cycle,
+    );
+
+    useAppStore.setState({ output: { ...output, cycles } });
+
+    render(<HistoryView />);
+
+    const notice = screen.getByTestId("history-reconciliation-warning");
+    expect(notice).toHaveTextContent(/1 cycle has a monitor reading/i);
+    expect(notice).toHaveClass("text-fertility-warning");
+  });
+
+  it("shows no reconciliation notice when every cycle agrees with its window", () => {
+    render(<HistoryView />);
+
+    expect(screen.queryByTestId("history-reconciliation-warning")).toBeNull();
+  });
+
   it("hides computed summaries in logging-only mode and restores them when re-enabled", async () => {
     await store().clearAllData();
     const start = addDays(todayKey(), -20);

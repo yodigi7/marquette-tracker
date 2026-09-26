@@ -25,7 +25,19 @@ context: |
 
   Command gates before a milestone is done: `pnpm test`, `pnpm lint`, `pnpm build` all green.
 
+  Collaboration: the user is the product owner and end user and does not read code. Sort every
+  clarification question into one of two lanes. If it affects the end user, ask at the PM / end-user
+  level — what they see, what they must enter, what a rule should do, what "correct" looks like — with
+  no code and no file paths. If it does not affect the end user, still ask, but as a developer who is
+  not deeply familiar with this codebase: give a short run-down first (3-5 sentences covering the area,
+  why it matters now, the options with their tradeoffs, and your recommendation), then the question.
+  Keep code, diffs, and stack traces out of the conversation. This governs how you TALK to them, not how
+  the artifacts are written: artifact content follows the per-artifact rules below. See the "How to work
+  with me" section in AGENTS.md, which is the authoritative form of this rule.
+
 # Per-artifact rules (optional)
+# Artifact CONTENT is hands-off: do not add style or depth rules here. How the agent talks to the
+# user is a separate concern and lives in the `context` block above and in AGENTS.md.
 rules:
   proposal:
     - Keep proposals focused on the change at hand, no broader roadmap

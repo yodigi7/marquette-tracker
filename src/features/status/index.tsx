@@ -43,6 +43,8 @@ export function StatusView() {
             }
             nextPeriod={output?.forecast?.expectedPeriodStart ?? null}
             algorithmEnabled={algorithmEnabled}
+            warnings={result?.warnings ?? []}
+            windowEnd={result?.fertileWindow.end ?? null}
           />
         </>
       ) : (

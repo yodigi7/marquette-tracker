@@ -8,6 +8,41 @@ Offline-first PWA that tracks a woman's fertility cycle using the **Marquette Me
 
 This is a **solo hobby project**. MVP is small and lean, but data model + algorithm are designed to grow (multi-user, cloud sync, Python backend).
 
+## How to work with me (audience)
+
+I am the product owner and the end user. **I do not read code.** This applies to normal conversation **and to every OpenSpec workflow without exception**: `/opsx-propose`, `/opsx-explore`, `/opsx-apply`, `/opsx-verify`, `/opsx-archive`, `/opsx-bulk-archive`, `/opsx-update`, `/opsx-sync`, `/opsx-onboard`.
+
+**Sort every question into one of two lanes before you ask it.**
+
+**Lane 1 — it affects the end user.** Ask at the PM / end-user level: what I see on screen, what data I am required to enter, what a rule should do, what "correct" looks like, what edge cases I would actually notice. No run-down, no code, no file paths — name things by their user-facing name ("the calendar", "the daily entry dialog", "the status summary").
+
+**Lane 2 — it does not affect the end user.** These are still my calls, so ask me — but as the developer I am: someone who owns this project without being deeply familiar with this codebase. **Give a short run-down first, then the question.** The run-down is 3-5 sentences at most and covers:
+
+- what area is involved and what it does today, in plain English
+- why the decision comes up now
+- the realistic options, one line each, with the tradeoff
+- your recommendation, and the reason for it
+
+Skip the run-down when it would not change my answer. No code, no stack traces, no diffs. Naming a file, library, or tool is acceptable when it is the clearest way to identify the thing — one reference, not a tour. Never open with a wall of context.
+
+Shared rules for both lanes:
+
+- **Bring a recommendation, not an open question.** Batch at most 3 at a time, each answerable in a sentence.
+- **Match the depth I ask for.** End-user framing is the default, not a permanent cap. If I ask "how does that work?", "show me the technical detail", "why did you do it that way?", or name a file, module, or tool, then answer at that level — including code, paths, and tradeoffs. Do not volunteer the deep version when I have not asked for it.
+- **Reading code is your job, not mine.** If an answer requires code inspection, inspect it yourself, then report the consequence in plain language.
+- **Routine internal work with an obvious right answer** (refactor, dependency bump, test or tooling wiring): do not ask. Implement it and report one line of user impact ("no visible change"). Ask only when a genuine tradeoff exists that I would want to weigh in on.
+- **Never read the artifacts back to me as a summary of their contents.** Report the decision and its user-visible effect instead.
+
+### Reporting workflow results (verify, apply, archive, sync)
+
+`tasks.md` and `design.md` are written for you, not for me, so they legitimately contain file paths, function names, and test commands. **Do not paste or quote those contents at me.** When a workflow asks you to report findings, incomplete work, or recommendations, translate each item into what it means for me:
+
+- Report as outcome and user impact — "the cycle chart still doesn't show the new Peak marker" — not "task 7 in `marquette.ts` is incomplete".
+- Convert every incomplete task into the user-visible gap it leaves. If a task has **no** user-visible effect, drop it from the report and note that the remaining items are internal.
+- Give the scorecard in outcome terms (what works, what does not), not as a count of tasks and requirements.
+- Keep file paths, type names, and commands out of the report unless I ask for them. When a finding genuinely needs a path to be actionable, describe it in plain language and offer the path only if I want it.
+- Never make a decision a question just because the underlying artifact is written in technical language. Decide it, then tell me the consequence.
+
 ## Non-negotiable project decisions (as agreed with the user)
 
 - **Audience**: currently personal use (user/partner). Future: possibly open to other users, but NOT in MVP scope.
@@ -56,6 +91,8 @@ Fertile-window **end**:
 | After 6 cycles | "Latest monitor Peak of last 6 cycles + 3" OR "current cycle's last monitor Peak + 3" — whichever **ends first** |
 
 - Monitor-only evidence: Peak, fertile-window begin/end, and confirmation come from user-entered monitor readings. Mucus stays loggable and visible (calendar/chart overlays) but is never engine evidence.
+- **Recorded evidence never moves the window.** If a monitor `high`/`peak` is logged on a day after the computed end, that contradiction is _reported_ as a protocol warning, not resolved by moving the end. `low` outside the window is consistent and is not reported. The window opens on evidence (first High before the calendar begin pulls it earlier) and closes on the Peak alone — the two halves deliberately differ, because the published protocol defines the end only through the last Peak.
+- **An open cycle whose computed end has passed is reported.** The cycle is still in progress, so its remaining days are not settled. A closed cycle with an end in the past is ordinary.
 - The post-Peak interval is a **fixed protocol constant of 3**, not a preference. The published protocol ends the window "three full days past the last peak reading" (Mu, Fehring & Bouchard, _Linacre Q_ 2022; Fehring 2018), so it is not user-configurable and no stored value can move it. Do not reintroduce a `postPeakDays` setting.
 - If a cycle has **no Peak** (8–10% of cycles), fall back to the calendar rule for the end.
 - Cycles outside 21–42 days: warn if 2+ cycles fall outside the band (protocol says consult a teacher).

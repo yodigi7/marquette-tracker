@@ -6,8 +6,8 @@ import {
   fertilityStatusBadge,
 } from "@/lib/fertility-visuals";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { DayStatus } from "@/core/engine/types";
-import { STATUS_LABELS } from "./lib";
+import type { DayStatus, EngineWarning } from "@/core/engine/types";
+import { STATUS_LABELS, warningBanner } from "./lib";
 
 interface StatusCardProps {
   status: DayStatus | null;
@@ -15,6 +15,10 @@ interface StatusCardProps {
   windowLine: string;
   nextPeriod: string | null;
   algorithmEnabled: boolean;
+  /** Warnings for the selected cycle; only the reconciliation kinds are rendered. */
+  warnings: EngineWarning[];
+  /** Computed window end for the selected cycle, quoted by the warning text. */
+  windowEnd: number | null;
 }
 
 export function StatusCard({
@@ -23,6 +27,8 @@ export function StatusCard({
   windowLine: description,
   nextPeriod,
   algorithmEnabled,
+  warnings,
+  windowEnd,
 }: StatusCardProps) {
   if (!algorithmEnabled) {
     return (
@@ -39,12 +45,29 @@ export function StatusCard({
     );
   }
 
+  const banner = warningBanner(warnings, windowEnd);
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Status · cycle day {cycleDay}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
+        {/* Above the badge: the status is the model's answer, the banner reports that a recorded
+            reading contradicts it, and the correction must not sit below the claim it corrects. */}
+        {banner && (
+          <p
+            data-testid="status-warning"
+            role="status"
+            className={cn(
+              "rounded-md border border-fertility-warning/40 bg-fertility-warning/10 px-3 py-2",
+              "text-xs",
+              FERTILITY_TEXT_VISUALS.warning,
+            )}
+          >
+            {banner}
+          </p>
+        )}
         <div className="flex items-center gap-2">
           {status ? (
             <Badge className={cn(fertilityStatusBadge(status))}>{STATUS_LABELS[status]}</Badge>

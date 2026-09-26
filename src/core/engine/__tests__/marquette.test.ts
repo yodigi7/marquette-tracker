@@ -8,7 +8,13 @@ import {
 } from "../marquette";
 import { computeAll } from "../engineSdk";
 import { CYCLE_LENGTH_MIN, CYCLE_LENGTH_MAX } from "../marquette";
-import type { CycleHistory, CycleInput, DayRecordInput, EngineSettings } from "../types";
+import type {
+  CycleHistory,
+  CycleInput,
+  DayRecordInput,
+  EngineSettings,
+  EngineWarning,
+} from "../types";
 
 function settings(overrides: Partial<EngineSettings> = {}): EngineSettings {
   return {
@@ -509,6 +515,148 @@ describe("marquette computeCycle", () => {
       expect(withoutRecords.days.find((d) => d.day === 20)?.status).toBe("fertile");
       expect(withPeak.days.find((d) => d.day === 20)?.status).toBe("post-peak");
     });
+  });
+});
+
+describe("out-of-window monitor evidence", () => {
+  /** Peak on `peakDay`, so the window ends on peakDay + 3. */
+  function withPeakAnd(peakDay: number, extra: DayRecordInput[]): ReturnType<typeof computeCycle> {
+    return computeCycle(
+      cycle(1),
+      [record(1, peakDay, { monitor: "peak" }), ...extra],
+      1,
+      28,
+      emptyHistory(),
+      settings(),
+      TODAY,
+    );
+  }
+
+  function evidenceWarnings(warnings: EngineWarning[]): EngineWarning[] {
+    return warnings.filter((w) => w.kind === "monitor-evidence-outside-window");
+  }
+
+  it("reports a High after the computed end and leaves the end where it was", () => {
+    const result = withPeakAnd(10, [record(1, 15, { monitor: "high" })]);
+
+    expect(result.fertileWindow.end).toBe(13);
+    expect(evidenceWarnings(result.warnings)).toEqual([
+      { kind: "monitor-evidence-outside-window", cycleNo: 1, day: 15 },
+    ]);
+  });
+
+  it("reports the earliest offending day", () => {
+    const result = withPeakAnd(10, [
+      record(1, 15, { monitor: "high" }),
+      record(1, 17, { monitor: "high" }),
+    ]);
+
+    expect(evidenceWarnings(result.warnings)).toEqual([
+      { kind: "monitor-evidence-outside-window", cycleNo: 1, day: 15 },
+    ]);
+  });
+
+  it("treats a High inside the window as no contradiction", () => {
+    const result = withPeakAnd(14, [record(1, 15, { monitor: "high" })]);
+
+    expect(result.fertileWindow.end).toBe(17);
+    expect(evidenceWarnings(result.warnings)).toEqual([]);
+  });
+
+  it("treats a Low outside the window as consistent, not contradictory", () => {
+    const result = withPeakAnd(10, [record(1, 15, { monitor: "low" })]);
+
+    expect(result.fertileWindow.end).toBe(13);
+    expect(evidenceWarnings(result.warnings)).toEqual([]);
+  });
+
+  it("reports nothing when the cycle has no determinable end", () => {
+    const result = computeCycle(
+      cycle(1),
+      [record(1, 15, { monitor: "high" })],
+      1,
+      28,
+      emptyHistory(),
+      settings(),
+      TODAY,
+    );
+
+    expect(result.fertileWindow.end).toBeNull();
+    expect(evidenceWarnings(result.warnings)).toEqual([]);
+  });
+
+  it("does not treat mucus or BBT outside the window as evidence", () => {
+    const result = withPeakAnd(10, [
+      record(1, 15, { mucus: "peak" }),
+      record(1, 16, { bbt: 37.1 }),
+    ]);
+
+    expect(result.fertileWindow.end).toBe(13);
+    expect(evidenceWarnings(result.warnings)).toEqual([]);
+  });
+
+  it("leaves day statuses unchanged by out-of-window evidence", () => {
+    const withEvidence = withPeakAnd(10, [record(1, 15, { monitor: "high" })]);
+    const without = withPeakAnd(10, []);
+
+    expect(withEvidence.fertileWindow).toEqual(without.fertileWindow);
+    expect(withEvidence.days.map((d) => d.status)).toEqual(without.days.map((d) => d.status));
+    expect(evidenceWarnings(without.warnings)).toEqual([]);
+  });
+});
+
+describe("open cycle past its computed end", () => {
+  const START = "2026-01-01";
+
+  /** Open cycle with a Peak on day 10 (window ends day 13) and `today` at cycle day `todayDay`. */
+  function openPast(todayDay: number) {
+    return computeCycle(
+      { id: "c1", day1: START },
+      [record(1, 10, { monitor: "peak" })],
+      1,
+      null,
+      emptyHistory(),
+      settings(),
+      addDaysTo(START, todayDay - 1),
+    );
+  }
+
+  function inProgress(warnings: EngineWarning[]): EngineWarning[] {
+    return warnings.filter((w) => w.kind === "open-cycle-past-window-end");
+  }
+
+  it("reports an open cycle that has run past its computed end", () => {
+    const result = openPast(20);
+
+    expect(result.fertileWindow.end).toBe(13);
+    expect(inProgress(result.warnings)).toEqual([
+      { kind: "open-cycle-past-window-end", cycleNo: 1 },
+    ]);
+    // Statuses are still produced through the current day, not truncated at the window end.
+    expect(result.days).toHaveLength(20);
+    expect(result.days.at(-1)?.status).toBe("post-peak");
+  });
+
+  it("reports nothing for a closed cycle past its computed end", () => {
+    const result = computeCycle(
+      { id: "c1", day1: START },
+      [record(1, 10, { monitor: "peak" })],
+      1,
+      28,
+      emptyHistory(),
+      settings(),
+      TODAY,
+    );
+
+    expect(result.fertileWindow.end).toBe(13);
+    expect(inProgress(result.warnings)).toEqual([]);
+  });
+
+  it("reports nothing while the current day is still inside the computed end", () => {
+    // current day == the computed end
+    expect(inProgress(openPast(13).warnings)).toEqual([]);
+    // current day before the computed end
+    expect(inProgress(openPast(10).warnings)).toEqual([]);
   });
 });
 
