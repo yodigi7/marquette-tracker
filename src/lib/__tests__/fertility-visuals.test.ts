@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest'
 import type { DayStatus, MonitorReading } from '@/core/engine/types'
 import {
   FERTILITY_FORECAST_VISUAL,
+  FERTILITY_CALENDAR_PHASE_VISUALS,
   FERTILITY_MARKER_VISUALS,
   FERTILITY_MONITOR_VISUALS,
   FERTILITY_SOURCE_VISUALS,
   FERTILITY_STATUS_VISUALS,
   FERTILITY_TEXT_VISUALS,
+  calendarPhaseForStatus,
+  calendarPhaseLabel,
   fertilityStatusBadge,
 } from '../fertility-visuals'
 
@@ -24,7 +27,31 @@ const monitorCases: Array<[MonitorReading, string]> = [
   ['peak', 'peak'],
 ]
 
+const phaseCases: Array<[DayStatus, 'before' | 'fertile' | 'after', string]> = [
+  ['pre-fertile', 'before', 'Before'],
+  ['fertile', 'fertile', 'Fertile'],
+  ['post-peak', 'after', 'After'],
+  ['post-calendar', 'after', 'After'],
+]
+
 describe('fertility visual mappings', () => {
+  it.each(phaseCases)('maps %s to the %s calendar phase', (status, phase, label) => {
+    expect(calendarPhaseForStatus(status)).toBe(phase)
+    expect(calendarPhaseLabel(phase)).toBe(label)
+  })
+
+  it('reuses the existing status treatments for the three Calendar phases', () => {
+    expect(FERTILITY_CALENDAR_PHASE_VISUALS.before.fill).toBe(FERTILITY_STATUS_VISUALS['pre-fertile'].fill)
+    expect(FERTILITY_CALENDAR_PHASE_VISUALS.fertile.predictedFill).toBe(
+      FERTILITY_STATUS_VISUALS.fertile.predictedFill,
+    )
+    expect(FERTILITY_CALENDAR_PHASE_VISUALS.after.fill).toBe(FERTILITY_STATUS_VISUALS['post-peak'].fill)
+    expect(FERTILITY_CALENDAR_PHASE_VISUALS.after.predictedFill).toBe(
+      FERTILITY_STATUS_VISUALS['post-peak'].predictedFill,
+    )
+    expect(FERTILITY_CALENDAR_PHASE_VISUALS.after.label).toBe('After')
+  })
+
   it.each(statusCases)('maps %s to a complete tokenized treatment', (status, token) => {
     const visual = FERTILITY_STATUS_VISUALS[status]
 
@@ -59,8 +86,10 @@ describe('fertility visual mappings', () => {
 
   it('keeps raw markers, forecast, and text roles tokenized', () => {
     expect(FERTILITY_MARKER_VISUALS.menses.dot).toBe('bg-fertility-marker-menses')
+    expect(FERTILITY_MARKER_VISUALS.menses.stripe).toBe('bg-fertility-marker-menses')
     expect(FERTILITY_MARKER_VISUALS.intercourse.icon).toContain('fertility-marker-intercourse')
     expect(FERTILITY_MARKER_VISUALS.assumed.dot).toContain('fertility-marker-assumed')
+    expect(FERTILITY_MARKER_VISUALS.assumed.asterisk).toBe('text-fertility-marker-assumed')
     expect(FERTILITY_MARKER_VISUALS.ovulation.dot).toContain('fertility-forecast-border')
     expect(FERTILITY_FORECAST_VISUAL.fill).toBe('bg-fertility-forecast-bg')
     expect(FERTILITY_FORECAST_VISUAL.cellBorder).toBe('border-dashed border-fertility-forecast-border')

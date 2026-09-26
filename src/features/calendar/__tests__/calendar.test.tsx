@@ -51,6 +51,51 @@ describe('CalendarView', () => {
     expect(await screen.findByText(current)).toBeInTheDocument()
   })
 
+  it('shows the current cycle, day, phase, and monitor reading in the summary', async () => {
+    const today = todayKey()
+    const cycleStart = addDays(today, -5)
+    const cycle = await store().setNewCycle(cycleStart)
+    await store().addDayRecord(cycle.id, today, 6, { monitor: 'high' })
+
+    render(<CalendarView />)
+
+    const summary = await screen.findByTestId('calendar-summary')
+    expect(summary).toHaveTextContent('Cycle 1')
+    expect(summary).toHaveTextContent('Day 6')
+    expect(summary).toHaveTextContent('Fertile')
+    expect(summary).toHaveTextContent('High')
+  })
+
+  it('keeps the summary visible with a no-reading state when today has no monitor value', async () => {
+    await store().setNewCycle(todayKey())
+
+    render(<CalendarView />)
+
+    const summary = await screen.findByTestId('calendar-summary')
+    expect(summary).toHaveTextContent('Cycle 1')
+    expect(summary).toHaveTextContent('No monitor logged')
+  })
+
+  it('shows a logging-only summary when interpretation is disabled', async () => {
+    const today = todayKey()
+    const cycle = await store().setNewCycle(addDays(today, -5))
+    await store().addDayRecord(cycle.id, today, 6, { monitor: 'high' })
+    await store().updateSettings({ algorithmEnabled: false })
+
+    render(<CalendarView />)
+
+    const summary = await screen.findByTestId('calendar-summary')
+    expect(summary).toHaveTextContent('Logging only')
+    expect(summary).not.toHaveTextContent('Fertile')
+  })
+
+  it('shows a no-cycle summary before any cycle is derived', async () => {
+    render(<CalendarView />)
+
+    const summary = await screen.findByTestId('calendar-summary')
+    expect(summary).toHaveTextContent('No cycle yet')
+  })
+
   it('auto-opens today when there is no record or Peak and the session has not consumed it', async () => {
     allowAutoOpen()
     const cycleStart = addDays(todayKey(), -5)
@@ -170,6 +215,7 @@ describe('CalendarView', () => {
     const intercourseKey = addDays(day1Key, 2)
     const { id } = await store().setNewCycle(day1Key)
     await store().addDayRecord(id, intercourseKey, 3, { intercourse: true })
+    await store().updateSettings({ calendarDetailMode: 'full' })
 
     render(<CalendarView />)
 
@@ -340,7 +386,7 @@ describe('CalendarView', () => {
       { status: 'pre-fertile' as const, source: 'predicted' as const, fill: 'bg-fertility-status-pre-predicted', border: 'border-dashed border-fertility-source-predicted' },
       { status: 'fertile' as const, source: 'confirmed' as const, fill: 'bg-fertility-status-fertile', border: 'border-fertility-source-confirmed' },
       { status: 'post-peak' as const, source: 'confirmed' as const, fill: 'bg-fertility-status-post-peak', border: 'border-fertility-source-confirmed' },
-      { status: 'post-calendar' as const, source: 'predicted' as const, fill: 'bg-fertility-status-post-calendar-predicted', border: 'border-dashed border-fertility-source-predicted' },
+      { status: 'post-calendar' as const, source: 'predicted' as const, fill: 'bg-fertility-status-post-peak-predicted', border: 'border-dashed border-fertility-source-predicted' },
     ]
 
     for (const testCase of cases) {
@@ -356,6 +402,7 @@ describe('CalendarView', () => {
           origin="user"
           ovulation={false}
           isToday={false}
+          detailMode="full"
           onSelect={() => {}}
         />,
       )
@@ -368,6 +415,83 @@ describe('CalendarView', () => {
     }
   })
 
+  it('renders a simple phase cell with a menses stripe, one monitor marker, and date asterisk', () => {
+    render(
+      <DayCell
+        dateKey="2026-01-14"
+        dayNumber={14}
+        info={{ status: 'post-calendar', source: 'predicted' }}
+        forecast={false}
+        menses
+        monitor="high"
+        intercourse
+        origin="inferred"
+        ovulation
+        isToday={false}
+        detailMode="simple"
+        onSelect={() => {}}
+      />,
+    )
+
+    const cell = screen.getByTestId('day-cell')
+    expect(cell).toHaveAttribute('data-phase', 'after')
+    expect(cell.className).toContain('bg-fertility-status-post-peak-predicted')
+    expect(cell.querySelector('[data-testid="calendar-menses-stripe"]')).not.toBeNull()
+    expect(cell.querySelector('[data-testid="calendar-monitor-marker"]')?.className).toContain('bg-fertility-monitor-high')
+    expect(cell.querySelector('[data-testid="calendar-assumed-marker"]')?.textContent).toBe('*')
+    expect(cell.querySelector('[title="Intercourse"]')).toBeNull()
+    expect(cell.querySelector('[title="Predicted ovulation"]')).toBeNull()
+  })
+
+  it('names the date, phase, monitor value, menses, and provenance in the cell accessible label', () => {
+    render(
+      <DayCell
+        dateKey="2026-01-14"
+        dayNumber={14}
+        info={{ status: 'post-calendar', source: 'predicted' }}
+        forecast={false}
+        menses
+        monitor="high"
+        intercourse={false}
+        origin="inferred"
+        ovulation={false}
+        isToday={false}
+        detailMode="simple"
+        onSelect={() => {}}
+      />,
+    )
+
+    const label = screen.getByTestId('day-cell').getAttribute('aria-label') ?? ''
+    expect(label).toContain('2026-01-14')
+    expect(label).toContain('After')
+    expect(label).toContain('monitor high')
+    expect(label).toContain('menses')
+    expect(label).toContain('assumed data')
+  })
+
+  it('exposes secondary indicators in the full-detail cell presentation', () => {
+    render(
+      <DayCell
+        dateKey="2026-01-15"
+        dayNumber={15}
+        info={{ status: 'fertile', source: 'confirmed' }}
+        forecast={false}
+        menses={false}
+        monitor="peak"
+        intercourse
+        origin="user"
+        ovulation
+        isToday={false}
+        detailMode="full"
+        onSelect={() => {}}
+      />,
+    )
+
+    const cell = screen.getByTestId('day-cell')
+    expect(cell.className).toContain('border-fertility-source-confirmed')
+    expect(cell.querySelector('[title="Intercourse"] svg')).not.toBeNull()
+    expect(cell.querySelector('[title="Predicted ovulation"]')).not.toBeNull()
+  })
   it('renders predictive forecast cells and additive raw/provenance markers with tokenized cues', () => {
     render(
       <DayCell
@@ -381,6 +505,7 @@ describe('CalendarView', () => {
         origin="inferred"
         ovulation
         isToday={false}
+        detailMode="full"
         onSelect={() => {}}
       />,
     )
@@ -391,7 +516,7 @@ describe('CalendarView', () => {
     expect(cell.querySelector('[title="Monitor: low"]')?.className).toContain('bg-fertility-monitor-low')
     expect(cell.querySelector('[title="Menses"]')?.className).toContain('bg-fertility-marker-menses')
     expect(cell.querySelector('[title="Intercourse"] svg')?.getAttribute('class')).toContain('fill-fertility-marker-intercourse')
-    expect(cell.querySelector('[title="Assumed data"]')?.className).toContain('border-fertility-marker-assumed')
+    expect(cell.querySelector('[data-testid="calendar-assumed-marker"]')?.textContent).toBe('*')
     expect(cell.querySelector('[title="Predicted ovulation"]')?.className).toContain('border-fertility-forecast-border')
   })
 
@@ -406,19 +531,39 @@ describe('CalendarView', () => {
     for (const cell of screen.getAllByTestId('day-cell')) {
       expect(cell.className).not.toContain('bg-fertility-status-')
       expect(cell.className).not.toContain('bg-fertility-forecast-bg')
+      expect(cell.getAttribute('data-phase')).toBeNull()
     }
     expect(screen.getByTitle('Monitor: high').className).toContain('bg-fertility-monitor-high')
   })
 
-  it('explains every derived status in the Calendar legend, including post-calendar', () => {
+  it('shows a grouped phase-first legend by default', () => {
     render(<CalendarView />)
 
+    expect(screen.getByText('Before')).toBeInTheDocument()
     expect(screen.getByText('Fertile')).toBeInTheDocument()
-    expect(screen.getByText('Pre-fertile')).toBeInTheDocument()
-    expect(screen.getByText('Post-peak')).toBeInTheDocument()
-    expect(screen.getByText('Post-calendar')).toBeInTheDocument()
-    const sample = document.querySelector('[data-legend-label="Post-calendar"] span')
-    expect(sample?.className).toContain('bg-fertility-status-post-calendar')
+    expect(screen.getByText('After')).toBeInTheDocument()
+    expect(screen.getByText('Menses')).toBeInTheDocument()
+    expect(screen.getByText('Monitor')).toBeInTheDocument()
+    expect(screen.getByText('Low')).toBeInTheDocument()
+    expect(screen.getByText('High')).toBeInTheDocument()
+    expect(screen.getByText('Peak')).toBeInTheDocument()
+    expect(screen.getByText('Assumed')).toBeInTheDocument()
+    expect(screen.queryByText('Pre-fertile')).not.toBeInTheDocument()
+    expect(screen.queryByText('Post-peak')).not.toBeInTheDocument()
+    expect(screen.queryByText('Post-calendar')).not.toBeInTheDocument()
+  })
+
+  it('reveals the full-detail legend from the Calendar', async () => {
+    const user = userEvent.setup()
+    render(<CalendarView />)
+
+    await user.click(screen.getByRole('button', { name: /show full detail/i }))
+
+    expect(await screen.findByText('Intercourse')).toBeInTheDocument()
+    expect(screen.getByText('Predicted ovulation')).toBeInTheDocument()
+    expect(screen.getByText('Confirmed source')).toBeInTheDocument()
+    expect(screen.getByText('Predicted status')).toBeInTheDocument()
+    expect(screen.getByText('Predicted window')).toBeInTheDocument()
   })
 })
 

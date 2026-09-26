@@ -1,10 +1,6 @@
-# Fertility Visuals Specification
+# Spec Delta
 
-## Purpose
-
-Defines a shared, theme-aware visual language for fertility observations, derived status, forecasts, and inferred-data provenance across the Calendar, Status, Cycle chart, and History/Stats surfaces.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Fertility states use a shared theme-aware visual language
 
@@ -100,13 +96,3 @@ Each surface that exposes fertility states SHALL provide a legend or equivalent 
 
 - **WHEN** a user views Status, the Cycle chart, or History/Stats
 - **THEN** each surface's legend continues to describe the treatments that surface actually displays
-
-### Requirement: Theme changes do not change interpretation
-
-Changing between light and dark themes SHALL NOT change any derived status, source, forecast, provenance marker, or algorithm-enabled state.
-
-#### Scenario: Theme toggle preserves data meaning
-
-- **WHEN** the user switches themes while viewing the same records
-- **THEN** the displayed status, source, forecast, and provenance meanings remain identical
-- **AND** only their visual presentation changes

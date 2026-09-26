@@ -41,15 +41,18 @@ describe('Algorithm off = logging only (US2)', () => {
 
     for (const cell of statusCells()) {
       expect(cell.getAttribute('data-status')).toBe('')
+      expect(cell.getAttribute('data-phase')).toBeNull()
       expect(cell.getAttribute('data-forecast')).toBeNull()
       expect(cell.getAttribute('data-source')).toBe('')
+      expect(cell.className).not.toContain('bg-fertility-status-')
     }
 
     const monitorDot = screen.getAllByTitle(/Monitor: high/i)
     expect(monitorDot.length).toBeGreaterThan(0)
+    expect(screen.queryAllByTestId('calendar-assumed-marker')).toHaveLength(0)
     expect(screen.queryByText('Fertile')).toBeNull()
     expect(screen.queryByText('Predicted window')).toBeNull()
-    expect(screen.queryByText('Assumed data')).toBeNull()
+    expect(screen.queryByText('Assumed')).toBeNull()
   })
 
   it('restores interpretation when the algorithm is re-enabled', async () => {

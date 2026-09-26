@@ -1,6 +1,7 @@
 import type { DayStatus, MonitorReading } from '@/core/engine/types'
 
 export type FertilitySource = 'confirmed' | 'predicted'
+export type CalendarPhase = 'before' | 'fertile' | 'after'
 
 export interface FertilityStatusVisual {
   fill: string
@@ -8,6 +9,12 @@ export interface FertilityStatusVisual {
   foreground: string
   border: string
   badge: string
+}
+
+export interface CalendarPhaseVisual {
+  label: string
+  fill: string
+  predictedFill: string
 }
 
 export interface FertilitySourceVisual {
@@ -23,6 +30,8 @@ export interface FertilityMonitorVisual {
 
 export interface FertilityMarkerVisual {
   dot?: string
+  stripe?: string
+  asterisk?: string
   icon?: string
 }
 
@@ -70,6 +79,40 @@ export const FERTILITY_STATUS_VISUALS: Record<DayStatus, FertilityStatusVisual> 
   },
 }
 
+/**
+ * Calendar-only phase treatment; the engine's precise statuses remain unchanged.
+ * Each phase deliberately reuses the existing status treatments so the collapsed
+ * view can never drift from the palette the other surfaces use.
+ */
+export const FERTILITY_CALENDAR_PHASE_VISUALS: Record<CalendarPhase, CalendarPhaseVisual> = {
+  before: {
+    label: 'Before',
+    fill: FERTILITY_STATUS_VISUALS['pre-fertile'].fill,
+    predictedFill: FERTILITY_STATUS_VISUALS['pre-fertile'].predictedFill,
+  },
+  fertile: {
+    label: 'Fertile',
+    fill: FERTILITY_STATUS_VISUALS.fertile.fill,
+    predictedFill: FERTILITY_STATUS_VISUALS.fertile.predictedFill,
+  },
+  after: {
+    label: 'After',
+    fill: FERTILITY_STATUS_VISUALS['post-peak'].fill,
+    predictedFill: FERTILITY_STATUS_VISUALS['post-peak'].predictedFill,
+  },
+}
+
+export function calendarPhaseForStatus(status: DayStatus): CalendarPhase {
+  if (status === 'pre-fertile') {
+    return 'before'
+  }
+  return status === 'fertile' ? 'fertile' : 'after'
+}
+
+export function calendarPhaseLabel(phase: CalendarPhase): string {
+  return FERTILITY_CALENDAR_PHASE_VISUALS[phase].label
+}
+
 /** Shared badge treatment for a status, accounting for its evidence source. */
 export function fertilityStatusBadge(status: DayStatus, source: FertilitySource | null): string {
   const visual = FERTILITY_STATUS_VISUALS[status]
@@ -97,9 +140,15 @@ export const FERTILITY_MONITOR_VISUALS: Record<MonitorReading, FertilityMonitorV
 }
 
 export const FERTILITY_MARKER_VISUALS = {
-  menses: { dot: 'bg-fertility-marker-menses' },
+  menses: {
+    dot: 'bg-fertility-marker-menses',
+    stripe: 'bg-fertility-marker-menses',
+  },
   intercourse: { icon: 'fill-fertility-marker-intercourse text-fertility-marker-intercourse' },
-  assumed: { dot: 'border border-dashed border-fertility-marker-assumed' },
+  assumed: {
+    dot: 'border border-dashed border-fertility-marker-assumed',
+    asterisk: 'text-fertility-marker-assumed',
+  },
   ovulation: { dot: 'border-2 border-fertility-forecast-border bg-fertility-ovulation' },
 } as const
 

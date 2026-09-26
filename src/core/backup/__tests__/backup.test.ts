@@ -170,6 +170,22 @@ describe('JSON backup contract', () => {
     expect(prepared.document.data.dayRecords[0].dataOrigin).toBe('user')
   })
 
+  it('defaults a legacy settings row without a calendar detail mode to simple', () => {
+    const legacy = settings({ calendarDetailMode: 'full' })
+    delete (legacy as Partial<SettingsEntity>).calendarDetailMode
+
+    const prepared = prepareBackup(
+      serializeBackup(
+        createBackup(snapshot({ settings: legacy }), {
+          appVersion: '1.0.0',
+          exportedAt: createdAt,
+        }),
+      ),
+    )
+
+    expect(prepared.document.data.settings.calendarDetailMode).toBe('simple')
+  })
+
   it('accepts an empty dataset when settings are valid', () => {
     const prepared = prepareBackup(
       serializeBackup(

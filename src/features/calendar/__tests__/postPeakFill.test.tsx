@@ -95,7 +95,7 @@ describe('Calendar post-Peak fill presentation', () => {
       expect(found).not.toBeNull()
       return found!
     })
-    expect(screen.getByText('Assumed data')).toBeInTheDocument()
+    expect(screen.getByText('Assumed')).toBeInTheDocument()
     expect(cell.getAttribute('aria-label')).toContain('assumed data')
   })
 

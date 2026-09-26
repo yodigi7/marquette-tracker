@@ -38,6 +38,7 @@ export interface DayRecordEntity extends SyncMeta {
 }
 
 export type WeekStart = 'monday' | 'sunday'
+export type CalendarDetailMode = 'simple' | 'full'
 
 export interface SettingsEntity extends SyncMeta {
   key: 'main'
@@ -54,6 +55,7 @@ export interface SettingsEntity extends SyncMeta {
   overlayMucus: boolean
   overlayBbt: boolean
   overlayIntercourse: boolean
+  calendarDetailMode: CalendarDetailMode
   /** TEMPORARY: one-shot marker so demo data is loaded only on first startup. */
   demoSeeded: boolean
 }
@@ -75,5 +77,6 @@ export const DEFAULT_SETTINGS: Omit<SettingsEntity, keyof SyncMeta> = {
   overlayMucus: false,
   overlayBbt: false,
   overlayIntercourse: false,
+  calendarDetailMode: 'simple',
   demoSeeded: false,
 }

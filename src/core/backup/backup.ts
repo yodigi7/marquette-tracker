@@ -310,6 +310,9 @@ function validateSettings(settings: SettingsEntity): void {
   if (typeof settings.overlayMucus !== 'boolean' || typeof settings.overlayBbt !== 'boolean' || typeof settings.overlayIntercourse !== 'boolean') {
     fail('invalid-settings', 'Chart overlay settings are invalid')
   }
+  if (settings.calendarDetailMode !== 'simple' && settings.calendarDetailMode !== 'full') {
+    fail('invalid-settings', 'Calendar detail mode is invalid')
+  }
   if (typeof settings.demoSeeded !== 'boolean') {
     fail('invalid-settings', 'Demo marker is invalid')
   }

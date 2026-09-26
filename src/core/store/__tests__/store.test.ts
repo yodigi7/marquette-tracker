@@ -31,6 +31,32 @@ describe('store hydration', () => {
     expect(s.settings.algorithmEnabled).toBe(true)
     expect(s.settings.goal).toBe('track-only')
   })
+
+  it('defaults the calendar detail mode to simple and persists an explicit full choice', async () => {
+    const db = createDb()
+    const first = createAppStore(db)
+    await first.getState().hydrate()
+    expect(state(first).settings.calendarDetailMode).toBe('simple')
+
+    await first.getState().updateSettings({ calendarDetailMode: 'full' })
+
+    const second = createAppStore(db)
+    await second.getState().hydrate()
+    expect(state(second).settings.calendarDetailMode).toBe('full')
+  })
+
+  it('fills a missing calendar detail mode from defaults for legacy settings', async () => {
+    const db = createDb()
+    const first = createAppStore(db)
+    await first.getState().hydrate()
+    const row = (await db.settings.get('main'))! as Partial<SettingsEntity>
+    const { calendarDetailMode: _dropped, ...legacy } = row
+    await db.settings.put(legacy as SettingsEntity)
+
+    const second = createAppStore(db)
+    await second.getState().hydrate()
+    expect(state(second).settings.calendarDetailMode).toBe('simple')
+  })
 })
 
 describe('day records', () => {
