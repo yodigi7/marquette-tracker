@@ -9,17 +9,17 @@ Depth: turn-key. Every command, file, and acceptance check is specified. Owner c
 
 ## 0. Decisions locked for this milestone
 
-| Item | Decision |
-|---|---|
-| Package manager | **pnpm** (user choice; must be installed — see 1.1) |
-| Node | v22.22.2 present (`node -v` verified) — satisfies Vite 8 (needs 20.19+) |
-| `@` path alias | `@/*` → `src/*` (shadcn convention) |
-| Router | React Router v8 (package `react-router`, declarative/library mode — *not* `react-router-dom`, which is the legacy v7 shim) |
-| State/DB/charts deps | Installed now per stack decisions; code added in M3/M5+ |
-| PWA | `vite-plugin-pwa` v1.x, `registerType: 'autoUpdate'`, placeholder icons |
-| Tests | Vitest 4 with isolated `vitest.config.ts` (kept separate from Vite build config) |
-| Lint | Template's eslint flat config + oxlint (whatever the template ships — keep it) |
-| Style | Tailwind v4 via `@tailwindcss/vite`; shadcn `zinc` base color; light/dark |
+| Item                 | Decision                                                                                                                   |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Package manager      | **pnpm** (user choice; must be installed — see 1.1)                                                                        |
+| Node                 | v22.22.2 present (`node -v` verified) — satisfies Vite 8 (needs 20.19+)                                                    |
+| `@` path alias       | `@/*` → `src/*` (shadcn convention)                                                                                        |
+| Router               | React Router v8 (package `react-router`, declarative/library mode — _not_ `react-router-dom`, which is the legacy v7 shim) |
+| State/DB/charts deps | Installed now per stack decisions; code added in M3/M5+                                                                    |
+| PWA                  | `vite-plugin-pwa` v1.x, `registerType: 'autoUpdate'`, placeholder icons                                                    |
+| Tests                | Vitest 4 with isolated `vitest.config.ts` (kept separate from Vite build config)                                           |
+| Lint                 | Template's eslint flat config + oxlint (whatever the template ships — keep it)                                             |
+| Style                | Tailwind v4 via `@tailwindcss/vite`; shadcn `zinc` base color; light/dark                                                  |
 
 ### Verified current versions (npm registry, 2026-08-09)
 
@@ -74,7 +74,7 @@ rmdir .m1-tmp
 ### T2 — Template cleanup
 
 - Delete: `src/App.css`, `src/assets/react.svg`, placeholder `public/vite.svg`.
-- Rewrite `src/App.tsx` as a 10-line placeholder (see T7) — do *not* keep demo counter markup.
+- Rewrite `src/App.tsx` as a 10-line placeholder (see T7) — do _not_ keep demo counter markup.
 - Strip `src/index.css` entirely (Tailwind replaces it in T3).
 - Update `index.html`: `<title>Marquette Tracker</title>`, `lang="en"`, `theme-color` meta, description meta.
 
@@ -146,11 +146,12 @@ plugins: [
   tailwindcss(),
   VitePWA({
     registerType: "autoUpdate",
-    includeAssets: false,            // picked icons explicitly below
+    includeAssets: false, // picked icons explicitly below
     manifest: {
       name: "Marquette Tracker",
       short_name: "Marquette",
-      description: "Offline-first fertility tracker using the Marquette Method with the ClearBlue Fertility Monitor.",
+      description:
+        "Offline-first fertility tracker using the Marquette Method with the ClearBlue Fertility Monitor.",
       theme_color: "#0c0a09",
       background_color: "#fafaf9",
       display: "standalone",
@@ -166,7 +167,7 @@ plugins: [
     },
     workbox: { clientsClaim: true, skipWaiting: true },
   }),
-]
+];
 ```
 
 **Icons:** generate temporary placeholders from a simple SVG source (e.g. solid rounded square + "M" glyph) — this can be the logo refined later:
@@ -208,7 +209,7 @@ export default defineConfig({
 - `src/test/setup.ts`:
   - `import "@testing-library/jest-dom/vitest";`
 - Engine tests (Milestone 2) will use `// @vitest-environment node` per-file so the math layer runs in pure Node — jsdom default for stores/components.
-- `fake-indexeddb` dev dep is *declared now*; used in Milestone 3 for Dexie repository tests.
+- `fake-indexeddb` dev dep is _declared now_; used in Milestone 3 for Dexie repository tests.
 - Smoke test to prove the harness: `src/core/engine/__tests__/smoke.test.ts` with one trivial `expect(1+1).toBe(2)` + one node-env-marked file.
 
 ### T8 — package.json scripts & housekeeping
@@ -268,6 +269,7 @@ pnpm preview                # manual: open http://localhost:4173
 ```
 
 Manual checks (browser):
+
 1. `pnpm dev` at 5173; routes `/`, `/status`, `/history`, `/settings` all render `FeaturePlaceholder` without console errors.
 2. `pnpm build && pnpm preview`: DevTools → Application → Service Workers registered & fetched from `dist/`; Manifest valid (icons + `display: standalone`); tick "Offline" → reload → app still renders.
 3. No `react-`/proxy warnings in console.
@@ -291,15 +293,15 @@ Manual checks (browser):
 
 ## 5. Risks & mitigations
 
-| Risk | Mitigation |
-|---|---|
-| `create-vite` refuses non-empty dir | T1 temp-dir lift; `.gitignore` re-added |
-| pnpm 10 blocks esbuild postinstall | `pnpm.onlyBuiltDependencies` (1.2) |
-| shadcn CLI prompts / misreads css loc | pinned flags `-y` `--base-color zinc` per T5; fallback interactive if CLI newer changed |
-| Dual `tsconfig*.json` alias drift | single ready snippet copy-paste; T4 checklist |
-| Vitest vs Vite config conflicts | isolated `vitest.config.ts` |
-| PWA manifest icons gibberish | generator with `minimal-2023` preset; fallback SVG-only icons w/ note |
-| Template churn (create-vite 9 template shipped oxlint vs eslint) | T8: keep both, compare; no dependency change once decided |
+| Risk                                                             | Mitigation                                                                              |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `create-vite` refuses non-empty dir                              | T1 temp-dir lift; `.gitignore` re-added                                                 |
+| pnpm 10 blocks esbuild postinstall                               | `pnpm.onlyBuiltDependencies` (1.2)                                                      |
+| shadcn CLI prompts / misreads css loc                            | pinned flags `-y` `--base-color zinc` per T5; fallback interactive if CLI newer changed |
+| Dual `tsconfig*.json` alias drift                                | single ready snippet copy-paste; T4 checklist                                           |
+| Vitest vs Vite config conflicts                                  | isolated `vitest.config.ts`                                                             |
+| PWA manifest icons gibberish                                     | generator with `minimal-2023` preset; fallback SVG-only icons w/ note                   |
+| Template churn (create-vite 9 template shipped oxlint vs eslint) | T8: keep both, compare; no dependency change once decided                               |
 
 ## 6. Definition of done (this milestone)
 

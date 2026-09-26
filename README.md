@@ -10,15 +10,15 @@ Vite 8 · React 19 · TypeScript 6 (strict) · Tailwind CSS v4 · shadcn/ui (Rad
 
 ## Commands
 
-| Command | Description |
-|---|---|
-| `pnpm install` | Install dependencies |
-| `pnpm dev` | Local dev server (Vite) |
-| `pnpm test` | Run Vitest test suite (engine tests required for any `core/engine` change) |
-| `pnpm test:watch` | Vitest watch mode |
-| `pnpm build` | Type-check + production build (PWA: SW + manifest) |
-| `pnpm preview` | Preview the production build (verify offline behavior) |
-| `pnpm lint` | Oxlint |
+| Command           | Description                                                                |
+| ----------------- | -------------------------------------------------------------------------- |
+| `pnpm install`    | Install dependencies                                                       |
+| `pnpm dev`        | Local dev server (Vite)                                                    |
+| `pnpm test`       | Run Vitest test suite (engine tests required for any `core/engine` change) |
+| `pnpm test:watch` | Vitest watch mode                                                          |
+| `pnpm build`      | Type-check + production build (PWA: SW + manifest)                         |
+| `pnpm preview`    | Preview the production build (verify offline behavior)                     |
+| `pnpm lint`       | Oxlint                                                                     |
 
 Manual light/dark and mobile verification checklist: [`docs/VISUAL_QA.md`](./docs/VISUAL_QA.md).
 

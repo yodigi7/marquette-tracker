@@ -1,49 +1,57 @@
-import { useEffect, useState } from 'react'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { useEffect, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface NumberFieldProps {
-  testId: string
-  label: string
-  value: number
-  min: number
-  max: number
+  testId: string;
+  label: string;
+  value: number;
+  min: number;
+  max: number;
   /** Optional cross-field rule, e.g. band min must stay below band max. */
-  extraRule?(parsed: number): string | null
-  onCommit(value: number): void
+  extraRule?(parsed: number): string | null;
+  onCommit(value: number): void;
 }
 
-export function NumberField({ testId, label, value, min, max, extraRule, onCommit }: NumberFieldProps) {
-  const [raw, setRaw] = useState(String(value))
-  const [error, setError] = useState<string | null>(null)
+export function NumberField({
+  testId,
+  label,
+  value,
+  min,
+  max,
+  extraRule,
+  onCommit,
+}: NumberFieldProps) {
+  const [raw, setRaw] = useState(String(value));
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setRaw(String(value))
-    setError(null)
-  }, [value])
+    setRaw(String(value));
+    setError(null);
+  }, [value]);
 
   function handleChange(next: string) {
-    setRaw(next)
-    setError(null)
-    if (next !== '') {
-      const parsed = Number(next)
+    setRaw(next);
+    setError(null);
+    if (next !== "") {
+      const parsed = Number(next);
       if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
-        setError(`Must be between ${min} and ${max}`)
+        setError(`Must be between ${min} and ${max}`);
       } else if (extraRule) {
-        setError(extraRule(parsed))
+        setError(extraRule(parsed));
       }
     }
   }
 
   function commit() {
-    const parsed = Number(raw)
-    if (raw !== '' && Number.isInteger(parsed) && parsed >= min && parsed <= max) {
+    const parsed = Number(raw);
+    if (raw !== "" && Number.isInteger(parsed) && parsed >= min && parsed <= max) {
       if (!extraRule || extraRule(parsed) === null) {
-        onCommit(parsed)
+        onCommit(parsed);
       }
     }
-    setRaw(String(value))
-    setError(null)
+    setRaw(String(value));
+    setError(null);
   }
 
   return (
@@ -59,8 +67,8 @@ export function NumberField({ testId, label, value, min, max, extraRule, onCommi
         onChange={(event) => handleChange(event.target.value)}
         onBlur={commit}
         onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            commit()
+          if (event.key === "Enter") {
+            commit();
           }
         }}
       />
@@ -70,5 +78,5 @@ export function NumberField({ testId, label, value, min, max, extraRule, onCommi
         </p>
       )}
     </div>
-  )
+  );
 }

@@ -1,32 +1,32 @@
-import { addDays, diffDays } from './dateUtils'
-import { computeCycle, statusForCycleDay } from './marquette'
-import type { CycleHistory, CycleResult, DateKey, EngineSettings, FertileWindow } from './types'
+import { addDays, diffDays } from "./dateUtils";
+import { computeCycle, statusForCycleDay } from "./marquette";
+import type { CycleHistory, CycleResult, DateKey, EngineSettings, FertileWindow } from "./types";
 
 /** Minimum eligible samples before the conditioned estimate is trusted. */
-const MIN_ELIGIBLE_SAMPLES = 2
+const MIN_ELIGIBLE_SAMPLES = 2;
 
 /**
  * Cycle number at which the protocol's calendar rule replaces the cycles-1-6
  * shortcut. A projected cycle always selects the calendar rule: it has no
  * monitor Peak of its own, so no branch that requires one could ever apply.
  */
-const CALENDAR_RULE_THRESHOLD = 6
+const CALENDAR_RULE_THRESHOLD = 6;
 
 /**
  * Window used when there is no Peak history at all, so the calendar rule has
  * no edges to work from. Mirrors the next-fertile-window fallback; both
  * surfaces must agree on the same protocol default.
  */
-export const PROTOCOL_DEFAULT_WINDOW_BEGIN = 6
-export const PROTOCOL_DEFAULT_WINDOW_END = 21
+export const PROTOCOL_DEFAULT_WINDOW_BEGIN = 6;
+export const PROTOCOL_DEFAULT_WINDOW_END = 21;
 
 /** Ids for projected cycles are synthetic and must never collide with stored ones. */
-const PROJECTED_CYCLE_ID_PREFIX = 'projected-'
+const PROJECTED_CYCLE_ID_PREFIX = "projected-";
 
 function median(values: number[]): number {
-  const sorted = [...values].sort((a, b) => a - b)
-  const mid = Math.floor(sorted.length / 2)
-  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
 }
 
 /**
@@ -56,13 +56,13 @@ export function estimateProjectedLength(
   currentCycleDay: number,
   historyWindow: number,
 ): number | null {
-  const recent = closedLengths.slice(-Math.max(1, historyWindow))
+  const recent = closedLengths.slice(-Math.max(1, historyWindow));
   if (recent.length === 0) {
-    return null
+    return null;
   }
-  const eligible = recent.filter((length) => length >= currentCycleDay)
-  const sample = eligible.length >= MIN_ELIGIBLE_SAMPLES ? eligible : recent
-  return Math.round(median(sample))
+  const eligible = recent.filter((length) => length >= currentCycleDay);
+  const sample = eligible.length >= MIN_ELIGIBLE_SAMPLES ? eligible : recent;
+  return Math.round(median(sample));
 }
 
 /**
@@ -87,35 +87,39 @@ export function projectCycles(
   today: DateKey,
   untilDate: DateKey,
 ): CycleResult[] {
-  const newest = cycles[cycles.length - 1]
+  const newest = cycles[cycles.length - 1];
   if (!newest || newest.length !== null) {
-    return []
+    return [];
   }
-  const closedLengths = cycles.filter((c) => c.length !== null).map((c) => c.length!)
+  const closedLengths = cycles.filter((c) => c.length !== null).map((c) => c.length!);
   if (closedLengths.length === 0) {
-    return []
+    return [];
   }
 
   const history: CycleHistory = {
     peaksByCycle: cycles.map((c) => c.peakDay),
     cycleNos: cycles.map((c) => c.cycleNo),
-  }
+  };
 
-  const projected: CycleResult[] = []
-  let day1 = newest.day1
-  let userCycleNo = newest.cycleNo
+  const projected: CycleResult[] = [];
+  let day1 = newest.day1;
+  let userCycleNo = newest.cycleNo;
 
   while (day1 <= untilDate) {
-    const currentCycleDay = diffDays(day1, today) + 1
+    const currentCycleDay = diffDays(day1, today) + 1;
     if (currentCycleDay > settings.cycleMaxLength) {
-      break
+      break;
     }
-    const estimate = estimateProjectedLength(closedLengths, currentCycleDay, settings.historyWindow)
+    const estimate = estimateProjectedLength(
+      closedLengths,
+      currentCycleDay,
+      settings.historyWindow,
+    );
     if (estimate === null) {
-      break
+      break;
     }
     // A thin sample must not end the cycle before today.
-    const length = Math.max(estimate, currentCycleDay)
+    const length = Math.max(estimate, currentCycleDay);
 
     const result = computeCycle(
       { id: `${PROJECTED_CYCLE_ID_PREFIX}${userCycleNo}`, day1 },
@@ -125,14 +129,14 @@ export function projectCycles(
       history,
       settings,
       today,
-    )
-    projected.push(boundWindow(result))
+    );
+    projected.push(boundWindow(result));
 
-    day1 = addDays(day1, length)
-    userCycleNo += 1
+    day1 = addDays(day1, length);
+    userCycleNo += 1;
   }
 
-  return projected
+  return projected;
 }
 
 /**
@@ -145,14 +149,14 @@ export function projectCycles(
  */
 function boundWindow(result: CycleResult): CycleResult {
   if (result.fertileWindow.end !== null) {
-    return result
+    return result;
   }
   const window: FertileWindow = {
     begin: PROTOCOL_DEFAULT_WINDOW_BEGIN,
     end: PROTOCOL_DEFAULT_WINDOW_END,
-    beginRule: 'calendar-day-6',
-    endRule: 'protocol-default-band',
-  }
+    beginRule: "calendar-day-6",
+    endRule: "protocol-default-band",
+  };
   return {
     ...result,
     fertileWindow: window,
@@ -160,5 +164,5 @@ function boundWindow(result: CycleResult): CycleResult {
       ...day,
       status: statusForCycleDay(window, result.peakDay !== null, day.day),
     })),
-  }
+  };
 }

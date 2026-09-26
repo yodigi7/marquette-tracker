@@ -1,26 +1,26 @@
-import { useAppStore } from '@/core/store/useAppStore'
-import type { WeekStart } from '@/core/store/entities'
-import { Label } from '@/components/ui/label'
+import { useAppStore } from "@/core/store/useAppStore";
+import type { WeekStart } from "@/core/store/entities";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { NumberField } from './number-field'
+} from "@/components/ui/select";
+import { NumberField } from "./number-field";
 
 const WEEK_START_OPTIONS: { value: WeekStart; label: string }[] = [
-  { value: 'monday', label: 'Monday' },
-  { value: 'sunday', label: 'Sunday' },
-]
+  { value: "monday", label: "Monday" },
+  { value: "sunday", label: "Sunday" },
+];
 
-const CYCLE_BAND_MIN = 15
-const CYCLE_BAND_MAX = 60
+const CYCLE_BAND_MIN = 15;
+const CYCLE_BAND_MAX = 60;
 
 export function DisplaySection() {
-  const settings = useAppStore((state) => state.settings)
-  const updateSettings = useAppStore((state) => state.updateSettings)
+  const settings = useAppStore((state) => state.settings);
+  const updateSettings = useAppStore((state) => state.updateSettings);
 
   return (
     <div className="space-y-5">
@@ -51,7 +51,7 @@ export function DisplaySection() {
           min={CYCLE_BAND_MIN}
           max={settings.cycleMaxLength - 1}
           extraRule={(parsed) =>
-            parsed >= settings.cycleMaxLength ? 'Must be below the maximum cycle length' : null
+            parsed >= settings.cycleMaxLength ? "Must be below the maximum cycle length" : null
           }
           onCommit={(value) => updateSettings({ cycleMinLength: value })}
         />
@@ -62,11 +62,11 @@ export function DisplaySection() {
           min={settings.cycleMinLength + 1}
           max={CYCLE_BAND_MAX}
           extraRule={(parsed) =>
-            parsed <= settings.cycleMinLength ? 'Must be above the minimum cycle length' : null
+            parsed <= settings.cycleMinLength ? "Must be above the minimum cycle length" : null
           }
           onCommit={(value) => updateSettings({ cycleMaxLength: value })}
         />
       </div>
     </div>
-  )
+  );
 }

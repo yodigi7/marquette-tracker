@@ -1,4 +1,4 @@
-import type { DayStatus, FertileWindow } from '@/core/engine/types'
+import type { DayStatus, FertileWindow } from "@/core/engine/types";
 
 /**
  * Status for a single cycle day, derived from the computed window.
@@ -8,10 +8,10 @@ import type { DayStatus, FertileWindow } from '@/core/engine/types'
  */
 export function dayInfo(window: FertileWindow, peakKnown: boolean, day: number): DayStatus {
   if (day < window.begin) {
-    return 'pre-fertile'
+    return "pre-fertile";
   }
   if (window.end === null || day <= window.end) {
-    return 'fertile'
+    return "fertile";
   }
-  return peakKnown ? 'post-peak' : 'post-calendar'
+  return peakKnown ? "post-peak" : "post-calendar";
 }

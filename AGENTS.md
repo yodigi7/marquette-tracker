@@ -24,16 +24,16 @@ This is a **solo hobby project**. MVP is small and lean, but data model + algori
 
 ## Tech stack (decided)
 
-| Concern | Choice |
-|---|---|
-| Framework | Vite + React + **TypeScript** |
-| PWA | `vite-plugin-pwa` (offline cache, installable manifest, mobile-first responsive) |
-| UI | **shadcn/ui** + Tailwind CSS |
-| State | Zustand |
-| Local DB | **IndexedDB via Dexie** (UUID keys, sync-ready flags) |
-| Charts | **Recharts** (CBPM-style cycle strip + stats) |
-| Tests | Vitest — table-driven tests for the Marquette engine |
-| Backend | **None in MVP** (deferred FastAPI) |
+| Concern   | Choice                                                                           |
+| --------- | -------------------------------------------------------------------------------- |
+| Framework | Vite + React + **TypeScript**                                                    |
+| PWA       | `vite-plugin-pwa` (offline cache, installable manifest, mobile-first responsive) |
+| UI        | **shadcn/ui** + Tailwind CSS                                                     |
+| State     | Zustand                                                                          |
+| Local DB  | **IndexedDB via Dexie** (UUID keys, sync-ready flags)                            |
+| Charts    | **Recharts** (CBPM-style cycle strip + stats)                                    |
+| Tests     | Vitest — table-driven tests for the Marquette engine                             |
+| Backend   | **None in MVP** (deferred FastAPI)                                               |
 
 ## Marquette domain rules (cycling protocol — the core logic)
 
@@ -43,16 +43,16 @@ Markers: monitor reading (Low / High / Peak), optional cervical mucus (L/H/P sty
 
 Fertile-window **begin**:
 
-| | Rule |
-|---|---|
-| Cycles 1–6 | Fertility begins on **cycle day 6** (calendar rule, reflects earliest possible peak day 12 − 6) |
+|                | Rule                                                                                                                                                                                      |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cycles 1–6     | Fertility begins on **cycle day 6** (calendar rule, reflects earliest possible peak day 12 − 6)                                                                                           |
 | After 6 cycles | Earliest Peak day of the last 6 cycles **minus 6 days** — AND the first High or Peak reading of the current cycle triggers the fertile window whenever it appears (whichever comes first) |
 
 Fertile-window **end**:
 
-| | Rule |
-|---|---|
-| Cycles 1–6 | 4 full (24-h) days after the last user-entered **monitor** Peak day |
+|                | Rule                                                                                                                                   |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Cycles 1–6     | 4 full (24-h) days after the last user-entered **monitor** Peak day                                                                    |
 | After 6 cycles | "Latest monitor Peak of last 6 cycles + postPeakDays" OR "current cycle's last monitor Peak + postPeakDays" — whichever **ends first** |
 
 - Monitor-only evidence: Peak, fertile-window begin/end, and confirmation come from user-entered monitor readings. Mucus stays loggable and visible (calendar/chart overlays) but is never engine evidence.

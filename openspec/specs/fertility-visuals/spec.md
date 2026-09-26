@@ -5,6 +5,7 @@
 Defines a shared, theme-aware visual language for fertility observations, derived status, and forecasts across the Calendar, Status, Cycle chart, and History/Stats surfaces.
 
 ## Requirements
+
 ### Requirement: Fertility states use a shared theme-aware visual language
 
 The app SHALL assign a consistent visual treatment to each existing derived day status (`pre-fertile`, `fertile`, `post-peak`, and `post-calendar`) in both light and dark themes. Each treatment SHALL preserve the existing status meaning and remain distinguishable from the base surface. Surfaces that display the precise status SHALL keep all four statuses distinguishable from each other. The Calendar's default presentation MAY render the collapsed `Before`/`Fertile`/`After` phase aliases instead, in which case the phase treatments SHALL reuse the existing theme-aware status treatments and the precise status SHALL remain available in the Status view, the full-detail presentation, and accessible text.
@@ -134,4 +135,3 @@ The app SHALL visually distinguish raw observations (including monitor readings,
 - **WHEN** the shared visual vocabulary is inspected
 - **THEN** it defines no single-day ovulation estimate treatment
 - **AND** no surface renders one
-

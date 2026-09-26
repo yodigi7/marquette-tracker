@@ -25,6 +25,7 @@ Status consumes `core/cycleStatus.dayInfo` and the shared date helpers; Calendar
 **Daily entry** — tapping any date up to today opens the shared QuickEntry dialog. Calendar is the only input surface; the first eligible opening of a browser session may open today's dialog automatically when today has no record and its derived cycle has no Peak.
 
 **Per-day resolution** (`resolveDay(cycles, records, output, dateKey)`):
+
 1. `cycleForDate` → null (before first cycle): unshaded.
 2. Day beyond a closed cycle's length: unshaded (no data).
 3. Otherwise `dayInfo(result.fertileWindow, peak != null, dayInCycle)` → status + source.
@@ -32,6 +33,7 @@ Status consumes `core/cycleStatus.dayInfo` and the shared date helpers; Calendar
 5. Stored assumed Low rows remain visible with their normal Low dot and an additional "Assumed data" marker; they are not retroactively inserted into gaps when user-anchor mode is active.
 
 **Cell visuals:**
+
 - Fertile: rose bg (solid → confirmed, lighter → predicted)
 - Pre-fertile: amber bg · Post-peak: emerald bg · Post-calendar: stone bg
 - Menses: red dot under day number (record bloodFlow ≠ none, or the cycle's day 1)

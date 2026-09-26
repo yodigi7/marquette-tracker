@@ -52,6 +52,7 @@ db.version(2).stores({ ... })  // migration seam documented; none needed yet
 Index notes: `[cycleId+date]` compound unique index makes day-record upsert deterministic; `dayInCycle` indexed for cycle-day lookups.
 
 **Repository surface** (all async, all bump `version`, set `synced=false`, timestamps):
+
 - cycles: `createCycle(input): CycleEntity` (assigns `cycleNo` = max+1), `updateCycle(id, patch)`, `listCycles()` (sorted by day1).
 - day records: `getByCycle(cycleId)`, `getByDate(cycleId, date)`, `upsert(cycleId, date, patch)` (update existing or add — never two rows per `[cycleId+date]`), `remove(id)`.
 - settings: `getSettings(): SettingsEntity` (returns default row when missing), `updateSettings(patch)`.
@@ -64,28 +65,30 @@ Index notes: `[cycleId+date]` compound unique index makes day-record upsert dete
 
 ```ts
 interface AppState {
-  hydrated: boolean
-  cycles: CycleEntity[]
-  dayRecords: CycleRecordEntity[]
-  settings: SettingsEntity
-  output: EngineOutput | null            // recent computeAll() result
-  hydrate(): Promise<void>               // load all + compute; last-writer-wins for settings
-  addDayRecord(cycleId, date, patch): Promise<void>
-  removeDayRecord(id): Promise<void>
-  startNewCycle(day1): Promise<CycleEntity>   // closes open cycle, opens new one
-  updateSettings(patch): Promise<void>
-  clearAllData(): Promise<void>
+  hydrated: boolean;
+  cycles: CycleEntity[];
+  dayRecords: CycleRecordEntity[];
+  settings: SettingsEntity;
+  output: EngineOutput | null; // recent computeAll() result
+  hydrate(): Promise<void>; // load all + compute; last-writer-wins for settings
+  addDayRecord(cycleId, date, patch): Promise<void>;
+  removeDayRecord(id): Promise<void>;
+  startNewCycle(day1): Promise<CycleEntity>; // closes open cycle, opens new one
+  updateSettings(patch): Promise<void>;
+  clearAllData(): Promise<void>;
 }
 ```
 
 Store ops order: persist → `refresh()` (re-read all tables → `computeAll(cycles, dayRecords, settings)`) → `set`. All writes serial (single state graph; hobby scale — no concurrency concerns).
 
 **startNewCycle(day1)**:
+
 - no cycles yet → create cycleNo 1.
 - if the latest cycle is open and `day1 > day1(open)`: set `closedAt = day1 − 1` on the open one, create next cycle `cycleNo = last + 1`.
 - `day1 <= latest day1` → no-op (guard against double-taps).
 
 **Derived lookups** (pure helpers exported alongside the store):
+
 - `resultForCycle(output, cycleId)`
 - `openCycle(cycles)` — latest without closedAt
 - `cycleForDate(cycles, date)` — latest cycle with `day1 <= date`
@@ -103,18 +106,18 @@ Store ops order: persist → `refresh()` (re-read all tables → `computeAll(cyc
 
 ## 5. Test matrix (`store.test.ts`, jsdom + `fake-indexeddb/auto`)
 
-| # | Scenario |
-|---|---|
-| 1 | hydrate on empty DB → default settings row + no cycles |
-| 2 | addDayRecord → row persisted; second call with same date updates (no duplicates) |
-| 3 | addDayRecord with monitor `peak` recomputes window end = peak + postPeakDays (default 4) |
-| 4 | startNewCycle closes open cycle (closedAt = day1−1), bumps cycleNo |
-| 5 | startNewCycle with truncated start is a no-op for latest open cycle |
-| 6 | updateSettings persists; engine recomputes with new postPeakDays |
-| 7 | deleteDayRecord removes; output reverts |
-| 8 | clearAllData → all tables cleared |
-| 9 | hydrate after mutations returns identical rows (persistence round-trip) |
-| 10 | two days' observations across cycles land in correct cycle result |
+| #   | Scenario                                                                                 |
+| --- | ---------------------------------------------------------------------------------------- |
+| 1   | hydrate on empty DB → default settings row + no cycles                                   |
+| 2   | addDayRecord → row persisted; second call with same date updates (no duplicates)         |
+| 3   | addDayRecord with monitor `peak` recomputes window end = peak + postPeakDays (default 4) |
+| 4   | startNewCycle closes open cycle (closedAt = day1−1), bumps cycleNo                       |
+| 5   | startNewCycle with truncated start is a no-op for latest open cycle                      |
+| 6   | updateSettings persists; engine recomputes with new postPeakDays                         |
+| 7   | deleteDayRecord removes; output reverts                                                  |
+| 8   | clearAllData → all tables cleared                                                        |
+| 9   | hydrate after mutations returns identical rows (persistence round-trip)                  |
+| 10  | two days' observations across cycles land in correct cycle result                        |
 
 Before each test: `await db.delete()` + fresh store? nie create store via factory or reset via `useAppStore` re-init — simplest: create new Dexie instance per test via `resetDbForTest()`.
 

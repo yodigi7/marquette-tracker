@@ -28,6 +28,7 @@ src/test/setup.ts              # jsdom polyfills (scrollIntoView, pointer captur
 **Fertile window** — a single band across days `begin…end` filled with the day-bands' natural monitor colors, using the theme-aware `--fertility-window-fill` and `--fertility-window-border` values (solid for confirmed, dashed for predicted). Begin = first-High/Peak day → confirmed; else calendar rule → predicted. No window when the cycle has no Peak/boundary, or when Settings "Algorithm" is off. Conveyed to screen readers via an sr-only element carrying `data-begin`/`data-end`/`data-source`.
 
 **Overlays** (toggle off by default, ephemeral state only):
+
 - BBT: the shared `--fertility-overlay-bbt` line and `fill-fertility-overlay-bbt` markers on a right-side temperature axis; missing days create a gap (no interpolation).
 - Mucus: shared `fill-fertility-overlay-mucus-none` / `low` / `high` / `peak` tokens, including explicit "none" recordings.
 - Intercourse: shared `fill-fertility-overlay-intercourse` markers.

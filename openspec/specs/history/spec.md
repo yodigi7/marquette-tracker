@@ -5,6 +5,7 @@
 Defines readable, theme-aware presentation of the History/Stats forecast panel and fertility summaries while preserving their existing calculations and clearly distinguishing predictions from confirmed records.
 
 ## Requirements
+
 ### Requirement: Forecast panel is theme-aware and visibly predictive
 
 The History/Stats Forecast panel SHALL render its predicted badge, next-period estimate, next fertile-window estimate, based-on text, and any protocol warning with readable theme-appropriate treatment. Predictive information SHALL remain visibly labeled as predicted and SHALL NOT be presented as confirmed data. When cycle projection is enabled, the panel SHALL state which estimator produces the projected dates, so that the averages shown alongside it are not left for the user to reconcile against the projected dates.
@@ -115,4 +116,3 @@ The History/Stats cycle statistics SHALL report the earliest and latest monitor 
 - **WHEN** the user views the cycle statistics, the cycle chart, or the Calendar
 - **THEN** no surface marks a single predicted ovulation day
 - **AND** the fertile-window range remains the only ovulation-related output
-

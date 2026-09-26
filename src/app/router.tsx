@@ -1,10 +1,10 @@
-import { Route, Routes } from 'react-router'
-import { RootLayout } from '@/app/layout'
-import { CalendarView } from '@/features/calendar'
-import { StatusView } from '@/features/status'
-import { CycleChartView } from '@/features/cycle-chart'
-import { HistoryView } from '@/features/history'
-import { SettingsView } from '@/features/settings'
+import { Route, Routes } from "react-router";
+import { RootLayout } from "@/app/layout";
+import { CalendarView } from "@/features/calendar";
+import { StatusView } from "@/features/status";
+import { CycleChartView } from "@/features/cycle-chart";
+import { HistoryView } from "@/features/history";
+import { SettingsView } from "@/features/settings";
 
 export function AppRouter() {
   return (
@@ -17,5 +17,5 @@ export function AppRouter() {
         <Route path="settings" element={<SettingsView />} />
       </Route>
     </Routes>
-  )
+  );
 }

@@ -5,19 +5,23 @@
 The Calendar's per-day entry dialog lets the user log or view any day up to and including today, and re-derives cycle structure from logged days using a menses-run placement rule.
 
 ## Requirements
+
 ### Requirement: Day entry opens for any date up to today
 
 Clicking a date in the Calendar SHALL open the day-entry form for any date up to and including today. If a Day Record already exists for that date, the form SHALL open pre-populated with that record's values; otherwise it SHALL open as the same blank form, ready for input. In both cases the form SHALL offer the full set of daily fields (monitor reading, mucus, blood flow, BBT, intercourse, symptoms, pregnancy test, notes). Closing the dialog without saving SHALL create or modify nothing.
 
 #### Scenario: Logging the first day after a wipe
+
 - **WHEN** the app has no data and the user clicks a past date in the Calendar
 - **THEN** the day-entry form opens blank and ready for input, and saving the entry stores a Day Record for that date
 
 #### Scenario: Existing entry is pre-populated
+
 - **WHEN** the user clicks a date that already has a Day Record with readings
 - **THEN** the form opens showing those readings, and saving preserves them alongside any edits
 
 #### Scenario: Open without saving changes nothing
+
 - **WHEN** the user opens the day-entry form for a date and closes the dialog without saving
 - **THEN** nothing is created or modified for that date
 
@@ -42,6 +46,7 @@ The Calendar day-entry dialog SHALL provide daily input and edit/delete actions 
 The app MUST NOT save a Day Record for any date after today, from any entry point. Attempting to do so SHALL be rejected with a clear message and SHALL leave no record behind.
 
 #### Scenario: Future date rejected
+
 - **WHEN** the user attempts to log an entry for a date later than today (for example from the Calendar date dialog)
 - **THEN** the app shows a message that future dates cannot be logged and writes no record
 
@@ -50,14 +55,17 @@ The app MUST NOT save a Day Record for any date after today, from any entry poin
 Day Records SHALL be partitioned into cycles by the menses-run placement rule. Each logged day is Menses (M), No-menses (N), or no data (0, not logged). A new cycle SHALL begin at the first logged day, and at every M day whose previous logged day, ignoring any 0 days in between, is an N. 0 days SHALL NOT break a cycle on their own; only an explicit N day does. A leading run of N days before the first M day SHALL form its own single cycle with no menses recorded yet, its Day 1 being the first N day. N days after a Menses day SHALL continue that day's cycle. The rule SHALL be applied globally so that logging history in any order groups the days into the same cycles.
 
 #### Scenario: Consecutive menses days group as one cycle
+
 - **WHEN** the user logs a run of menses days with only no-data days around them (for example M000M0NNNNNN where 0 means no data)
 - **THEN** the whole logged range belongs to a single cycle whose Day 1 is the first M day, since no explicit No-menses day lies between the menses days
 
 #### Scenario: A logged non-menses day starts a new cycle
+
 - **WHEN** a Menses day is logged immediately after a logged No-menses day (for example the first M of NNNNNNMMMMNNNN)
 - **THEN** a new cycle begins on that M day, the preceding N run remains its own single cycle, and the trailing N days continue the new cycle
 
 #### Scenario: Random-chunk logging produces stable grouping
+
 - **WHEN** the user backfills records in scattered chunks and in different order (for example logging a later menses day first, then an earlier menses day that fills the run backward)
 - **THEN** the days are grouped into the same cycles a single forward pass would produce, with no per-day cycle created for each chunk
 
@@ -66,18 +74,22 @@ Day Records SHALL be partitioned into cycles by the menses-run placement rule. E
 Saving a Day Record SHALL re-derive the complete cycle structure from the full set of logged days in one pass. No cycle SHALL be exempt from re-derivation: records, Day 1 values, cycle boundaries, and open/closed state may all change, including for the live current cycle. The placement rule's boundaries SHALL apply, except that a date the user explicitly declared as a cycle start SHALL always begin a cycle. The last cycle in the derived order SHALL be open; every earlier cycle SHALL close on the day immediately before the next cycle begins. Cycle numbers SHALL reflect the derived order. Derived cycles SHALL appear in history, predictions, and stats like any other cycle.
 
 #### Scenario: Backfilled menses merge into a later-logged cycle
+
 - **WHEN** the user logs a menses day on 20 Mar, then later adds a menses day on 15 Mar with no logged No-menses day between them
 - **THEN** both days belong to a single cycle whose Day 1 is 15 Mar, and no separate cycle remains for 20 Mar
 
 #### Scenario: The live cycle is not protected
+
 - **WHEN** the user is tracking a current cycle and backfills a menses day that the placement rule groups with that live cycle
 - **THEN** the live cycle's Day 1 moves to the earlier menses day, its records are re-assigned accordingly, and no empty leftover cycle remains
 
 #### Scenario: Explicitly started cycles remain boundaries
+
 - **WHEN** the user starts a cycle on 1 Mar, then logs days on 1 Mar and 14 Mar
 - **THEN** both records belong to the 1 Mar cycle and the 14 Mar record is cycle day 14
 
 #### Scenario: Backfilled cycles feed history and predictions
+
 - **WHEN** backfilled days form one or more cycles
 - **THEN** those cycles appear in the cycle history, influence cycle-length stats and next-period predictions, and are labeled no differently from other cycles
 
@@ -121,12 +133,14 @@ When the Calendar becomes available on a date within a browser session, it SHALL
 The system SHALL determine the current cycle by resolving the cycle that owns today's date after placement. Before today's menses record is saved, today SHALL remain part of the previous cycle; saving a menses record for today MAY create a new cycle whose first day is today.
 
 #### Scenario: Menses starts a new cycle today
+
 - **GIVEN** the derived sequence contains a run of Menses records followed by No-menses records and today's date is the next Menses record
 - **WHEN** today's menses record is saved
 - **THEN** today is assigned to a new cycle
 - **AND** the earlier records remain in their prior cycle
 
 #### Scenario: Today is not yet logged
+
 - **GIVEN** today has no Day Record and the preceding derived cycle has no Peak
 - **WHEN** the current cycle is resolved before input
 - **THEN** today is evaluated as part of the preceding cycle
@@ -136,19 +150,23 @@ The system SHALL determine the current cycle by resolving the cycle that owns to
 The Calendar SHALL provide a compact summary above the day grid that identifies the current cycle number, cycle day, simplified fertility status, and current monitor reading when one is available. The summary SHALL remain readable at narrow mobile widths and SHALL NOT replace or prevent the day-entry interaction.
 
 #### Scenario: Summary shows the current interpreted state
+
 - **WHEN** the Calendar is displayed with interpretation enabled and a current cycle is available
 - **THEN** the summary shows the cycle number, cycle day, `Before`, `Fertile`, or `After` status, and the current monitor reading when present
 
 #### Scenario: Summary handles a missing monitor reading
+
 - **WHEN** the current cycle or day has no monitor reading
 - **THEN** the summary remains visible with a clear no-reading state rather than showing a misleading marker
 
 #### Scenario: Summary remains useful while interpretation is disabled
+
 - **WHEN** the algorithm is disabled
 - **THEN** the summary remains visible with available cycle/day and raw information
 - **AND** it clearly identifies the state as logging-only without showing a derived fertility status
 
 #### Scenario: Summary handles no derived cycle
+
 - **WHEN** no cycle has been derived for the current date
 - **THEN** the summary shows a clear no-cycle state and does not invent a cycle number or status
 
@@ -157,17 +175,20 @@ The Calendar SHALL provide a compact summary above the day grid that identifies 
 The Calendar SHALL use a simple phase-first presentation by default and SHALL provide an accessible way to reveal the richer existing indicators in a full-detail presentation. Changing presentation SHALL NOT change stored records, engine output, interpretation, day-entry behavior, or the presence or absence of projected cycles.
 
 #### Scenario: Simple presentation is the default
+
 - **WHEN** the Calendar is opened without a previously selected full-detail preference
 - **THEN** the grid emphasizes the simplified status, menses treatment, and monitor reading
 - **AND** secondary indicators do not compete with those primary cues
 
 #### Scenario: User reveals full detail
+
 - **WHEN** the user enables the full-detail presentation
 - **THEN** the richer existing indicators, including available intercourse and forecast cues, are available without changing any record
 - **AND** full detail exposes no status-source or record-provenance indicator
 - **AND** full detail exposes no single-day ovulation estimate, because the Calendar no longer produces one
 
 #### Scenario: Day details remain complete
+
 - **WHEN** the user opens a day from either presentation
 - **THEN** the existing full day-entry/detail surface remains available with all original fields and editing actions
 
@@ -176,21 +197,25 @@ The Calendar SHALL use a simple phase-first presentation by default and SHALL pr
 The Calendar SHALL represent recorded menses with a visible stripe along the bottom edge of the day cell, and SHALL use that same stripe treatment for a projected cycle's day 1 when cycle projection is enabled. It SHALL use one common monitor marker shape and SHALL encode Low, High, and Peak by color, with the exact reading available through the summary, details, and accessible text.
 
 #### Scenario: Menses is visible over a status background
+
 - **WHEN** a Calendar day is a recorded menses day
 - **THEN** the day cell shows the bottom menses stripe regardless of the cell's simplified status treatment
 
 #### Scenario: Projected day one uses the same stripe
+
 - **GIVEN** cycle projection is enabled
 - **WHEN** the Calendar renders a projected cycle's day 1
 - **THEN** the day cell shows the bottom menses stripe
 - **AND** the cell's projected treatment distinguishes it from a recorded menses day
 
 #### Scenario: Monitor reading is visible
+
 - **WHEN** a Calendar day has a user or displayed monitor reading
 - **THEN** the cell shows one monitor marker whose color identifies Low, High, or Peak
 - **AND** Low, High, and Peak do not use different marker shapes
 
 #### Scenario: Monitor value is available without decoding color
+
 - **WHEN** a user inspects a day with a monitor marker
 - **THEN** the exact Low, High, or Peak value is available in the summary, day details, or accessible label
 
@@ -199,21 +224,25 @@ The Calendar SHALL represent recorded menses with a visible stripe along the bot
 The Calendar SHALL preserve the small filled red heart treatment for recorded intercourse in the full-detail presentation and SHALL provide the same marker meaning there. The simple presentation MAY omit the heart from the day cell to reduce visual density, but the record SHALL remain available in the day-entry/detail surface.
 
 #### Scenario: Intercourse recorded on a day
+
 - **WHEN** a Calendar day has intercourse recorded and full detail is shown
 - **THEN** the day cell displays a small filled red heart
 - **AND** the former green dot is not used for intercourse
 
 #### Scenario: Intercourse legend
+
 - **WHEN** the full-detail Calendar legend is displayed
 - **THEN** the Intercourse entry displays a small filled red heart
 - **AND** the entry uses the same marker treatment as the full-detail day cell
 
 #### Scenario: Intercourse is available in the simple presentation
+
 - **WHEN** a Calendar day has intercourse recorded and the simple presentation is active
 - **THEN** the day-entry/detail surface still exposes the intercourse value
 - **AND** the simple grid is not required to show the heart
 
 #### Scenario: No intercourse recorded
+
 - **WHEN** a Calendar day has no intercourse record
 - **THEN** the day cell does not display an intercourse heart
 
@@ -222,31 +251,37 @@ The Calendar SHALL preserve the small filled red heart treatment for recorded in
 The Calendar legend SHALL match the colors, borders, line styles, and marker shapes used in the active presentation. The default legend SHALL be grouped around the three simplified status categories, the menses stripe, and the color-coded monitor readings, and SHALL explain the projected treatment whenever cycle projection is enabled. A full-detail legend SHALL additionally explain any secondary indicators that the full-detail presentation exposes.
 
 #### Scenario: Simplified legend covers the default vocabulary
+
 - **WHEN** the simple Calendar legend is displayed
 - **THEN** it explains `Before`, `Fertile`, `After`, menses, and monitor readings
 - **AND** its samples match the corresponding day-cell treatments
 
 #### Scenario: Post-calendar state is explained
+
 - **WHEN** the Calendar legend is displayed
 - **THEN** a legend entry describes the `After` treatment used for post-calendar cells
 - **AND** the entry uses the same visual treatment as the corresponding day cell
 
 #### Scenario: The projected treatment is explained when projection is on
+
 - **GIVEN** cycle projection is enabled
 - **WHEN** the Calendar legend is displayed
 - **THEN** a legend entry describes the projected treatment and matches the projected day cells
 - **AND** the entry identifies that treatment as predictive rather than recorded
 
 #### Scenario: No ovulation estimate is listed
+
 - **WHEN** the Calendar legend is displayed in either presentation
 - **THEN** it contains no entry for a predicted ovulation day
 
 #### Scenario: Full-detail legend covers extra indicators
+
 - **WHEN** the full-detail presentation is displayed
 - **THEN** the legend explains the additional visible forecast or intercourse indicators
 - **AND** it contains no status-source or record-provenance entry
 
 #### Scenario: Theme-specific legend samples remain synchronized
+
 - **WHEN** the user switches between light and dark themes
 - **THEN** legend samples and day-cell treatments change together
 - **AND** no legend sample refers to a stale light-only treatment
@@ -415,4 +450,3 @@ The Calendar SHALL keep the forecast treatment, which covers both the next ferti
 - **WHEN** the Calendar renders any date in either presentation
 - **THEN** no cell displays a confirmed or predicted source cue
 - **AND** no cell displays an assumed-data marker
-

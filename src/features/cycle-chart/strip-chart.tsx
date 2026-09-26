@@ -1,54 +1,60 @@
-import { Bar, ComposedChart, Line, ReferenceArea, ResponsiveContainer, Scatter, XAxis, YAxis } from 'recharts'
-import type { ReactElement } from 'react'
-import type { MucusLevel } from '@/core/engine/types'
 import {
-  FERTILITY_FORECAST_VISUAL,
-  FERTILITY_MONITOR_VISUALS,
-} from '@/lib/fertility-visuals'
-import { bbtSeries, intercourseSeries, mucusSeries } from './lib'
-import type { StripDay, StripModel, StripWindow } from './lib'
+  Bar,
+  ComposedChart,
+  Line,
+  ReferenceArea,
+  ResponsiveContainer,
+  Scatter,
+  XAxis,
+  YAxis,
+} from "recharts";
+import type { ReactElement } from "react";
+import type { MucusLevel } from "@/core/engine/types";
+import { FERTILITY_FORECAST_VISUAL, FERTILITY_MONITOR_VISUALS } from "@/lib/fertility-visuals";
+import { bbtSeries, intercourseSeries, mucusSeries } from "./lib";
+import type { StripDay, StripModel, StripWindow } from "./lib";
 
 const BAND_FILL: Record<string, string> = {
   none: FERTILITY_MONITOR_VISUALS.none.fill,
   low: FERTILITY_MONITOR_VISUALS.low.fill,
   high: FERTILITY_MONITOR_VISUALS.high.fill,
   peak: FERTILITY_MONITOR_VISUALS.peak.fill,
-}
+};
 
 const MUCUS_FILL: Record<MucusLevel, string> = {
-  none: 'fill-fertility-overlay-mucus-none',
-  low: 'fill-fertility-overlay-mucus-low',
-  high: 'fill-fertility-overlay-mucus-high',
-  peak: 'fill-fertility-overlay-mucus-peak',
-}
+  none: "fill-fertility-overlay-mucus-none",
+  low: "fill-fertility-overlay-mucus-low",
+  high: "fill-fertility-overlay-mucus-high",
+  peak: "fill-fertility-overlay-mucus-peak",
+};
 
-const BBT_STROKE = 'var(--fertility-overlay-bbt)'
+const BBT_STROKE = "var(--fertility-overlay-bbt)";
 
 /** Half-band pad keeps the first/last segments fully inside the plot area. */
-const X_PAD = 0.5
+const X_PAD = 0.5;
 /** Nominal pixel width of one cycle day; wide enough to read day numbers. */
-const DAY_W = 28
-const CHART_H = 240
+const DAY_W = 28;
+const CHART_H = 240;
 
 interface BandDatum {
-  day: number
-  value: 1
-  monitor?: StripDay['monitor']
-  bbt?: number
+  day: number;
+  value: 1;
+  monitor?: StripDay["monitor"];
+  bbt?: number;
 }
 
 /** Structural supertype of Recharts' BarShapeProps — only the fields we render. */
 interface DayBandShapeProps {
-  x?: number
-  y?: number
-  width?: number
-  height?: number
-  payload?: unknown
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  payload?: unknown;
 }
 
 function DayBandShape({ x, y, width, height, payload }: DayBandShapeProps): ReactElement {
-  const datum = payload as Partial<BandDatum> | null
-  const monitor = datum?.monitor ?? 'none'
+  const datum = payload as Partial<BandDatum> | null;
+  const monitor = datum?.monitor ?? "none";
   return (
     <rect
       x={x}
@@ -59,22 +65,22 @@ function DayBandShape({ x, y, width, height, payload }: DayBandShapeProps): Reac
       className={BAND_FILL[monitor] ?? BAND_FILL.none}
       data-testid="day-band"
       data-day={datum?.day}
-      data-monitor={datum?.monitor ?? ''}
+      data-monitor={datum?.monitor ?? ""}
     />
-  )
+  );
 }
 
 /** Structural supertype of Recharts' Line dot / Scatter shape props. */
 interface OverlayShapeProps {
-  cx?: number
-  cy?: number
-  payload?: unknown
+  cx?: number;
+  cy?: number;
+  payload?: unknown;
 }
 
-type BbtDatum = { day?: number; bbt?: number }
+type BbtDatum = { day?: number; bbt?: number };
 
 function BbtPoint({ cx, cy, payload }: OverlayShapeProps): ReactElement {
-  const datum = payload as BbtDatum | null
+  const datum = payload as BbtDatum | null;
   return (
     <circle
       cx={cx}
@@ -85,14 +91,14 @@ function BbtPoint({ cx, cy, payload }: OverlayShapeProps): ReactElement {
       data-day={datum?.day}
       data-bbt={datum?.bbt}
     />
-  )
+  );
 }
 
-type MucusDatum = { day?: number; level?: MucusLevel }
+type MucusDatum = { day?: number; level?: MucusLevel };
 
 function MucusPoint({ cx, cy, payload }: OverlayShapeProps): ReactElement {
-  const datum = payload as MucusDatum | null
-  const level = datum?.level ?? 'none'
+  const datum = payload as MucusDatum | null;
+  const level = datum?.level ?? "none";
   return (
     <circle
       cx={cx}
@@ -103,37 +109,59 @@ function MucusPoint({ cx, cy, payload }: OverlayShapeProps): ReactElement {
       data-day={datum?.day}
       data-level={level}
     />
-  )
+  );
 }
 
 function IntercoursePoint({ cx, cy, payload }: OverlayShapeProps): ReactElement {
-  const datum = payload as { day?: number } | null
+  const datum = payload as { day?: number } | null;
   return (
-    <circle cx={cx} cy={cy} r={3} className="fill-fertility-overlay-intercourse" data-testid="overlay-intercourse-point" data-day={datum?.day} />
-  )
+    <circle
+      cx={cx}
+      cy={cy}
+      r={3}
+      className="fill-fertility-overlay-intercourse"
+      data-testid="overlay-intercourse-point"
+      data-day={datum?.day}
+    />
+  );
 }
 
 interface StripChartProps {
-  model: StripModel
-  showMucus?: boolean
-  showBbt?: boolean
-  showIntercourse?: boolean
+  model: StripModel;
+  showMucus?: boolean;
+  showBbt?: boolean;
+  showIntercourse?: boolean;
 }
 
-export function StripChart({ model, showMucus = false, showBbt = false, showIntercourse = false }: StripChartProps): ReactElement {
-  const span = Math.max(model.span, 1)
-  const data: BandDatum[] = model.days.map((d) => ({ day: d.day, value: 1, monitor: d.monitor, bbt: d.bbt ?? undefined }))
-  const ticks = Array.from({ length: span }, (_, i) => i + 1)
-  const xMax = span + X_PAD
-  const window = model.window
-  const bbt = bbtSeries(model.days)
-  const bbtValues = bbt.map((p) => p.bbt)
+export function StripChart({
+  model,
+  showMucus = false,
+  showBbt = false,
+  showIntercourse = false,
+}: StripChartProps): ReactElement {
+  const span = Math.max(model.span, 1);
+  const data: BandDatum[] = model.days.map((d) => ({
+    day: d.day,
+    value: 1,
+    monitor: d.monitor,
+    bbt: d.bbt ?? undefined,
+  }));
+  const ticks = Array.from({ length: span }, (_, i) => i + 1);
+  const xMax = span + X_PAD;
+  const window = model.window;
+  const bbt = bbtSeries(model.days);
+  const bbtValues = bbt.map((p) => p.bbt);
   const bbtDomain: [number, number] =
-    bbtValues.length > 0 ? [Math.min(...bbtValues) - 0.2, Math.max(...bbtValues) + 0.2] : [36, 37]
+    bbtValues.length > 0 ? [Math.min(...bbtValues) - 0.2, Math.max(...bbtValues) + 0.2] : [36, 37];
   // Distinct y lanes across the hidden [0,2] axis keep the two marker types from
   // overlapping: mucus rides the strip's top edge (y=1), intercourse sits lower in the strip.
-  const mucus = mucusSeries(model.days).map((p) => ({ x: p.day, y: 1, day: p.day, level: p.level }))
-  const intercourse = intercourseSeries(model.days).map((p) => ({ x: p.day, y: 0.66, day: p.day }))
+  const mucus = mucusSeries(model.days).map((p) => ({
+    x: p.day,
+    y: 1,
+    day: p.day,
+    level: p.level,
+  }));
+  const intercourse = intercourseSeries(model.days).map((p) => ({ x: p.day, y: 0.66, day: p.day }));
 
   return (
     <div className="overflow-x-auto" data-testid="cycle-strip">
@@ -184,7 +212,12 @@ export function StripChart({ model, showMucus = false, showBbt = false, showInte
               <Scatter data={mucus} dataKey="y" isAnimationActive={false} shape={MucusPoint} />
             )}
             {showIntercourse && intercourse.length > 0 && (
-              <Scatter data={intercourse} dataKey="y" isAnimationActive={false} shape={IntercoursePoint} />
+              <Scatter
+                data={intercourse}
+                dataKey="y"
+                isAnimationActive={false}
+                shape={IntercoursePoint}
+              />
             )}
             {showBbt && (
               <YAxis
@@ -201,16 +234,21 @@ export function StripChart({ model, showMucus = false, showBbt = false, showInte
           </ComposedChart>
         </ResponsiveContainer>
         {window && (
-          <span className="sr-only" data-testid="fertile-window-band" data-begin={window.begin} data-end={window.end ?? ''}>
+          <span
+            className="sr-only"
+            data-testid="fertile-window-band"
+            data-begin={window.begin}
+            data-end={window.end ?? ""}
+          >
             {windowLabel(window)}
           </span>
         )}
       </div>
     </div>
-  )
+  );
 }
 
 function windowLabel(window: StripWindow): string {
-  const end = window.end !== null ? `day ${window.end}` : 'an unknown day (no Peak yet)'
-  return `Fertile window from day ${window.begin} to ${end}.`
+  const end = window.end !== null ? `day ${window.end}` : "an unknown day (no Peak yet)";
+  return `Fertile window from day ${window.begin} to ${end}.`;
 }

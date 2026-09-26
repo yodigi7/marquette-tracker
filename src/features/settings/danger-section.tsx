@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -7,14 +7,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
-import { useAppStore } from '@/core/store/useAppStore'
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { useAppStore } from "@/core/store/useAppStore";
 
 export function DangerSection() {
-  const clearAllData = useAppStore((state) => state.clearAllData)
-  const [open, setOpen] = useState(false)
-  const [ack, setAck] = useState(false)
+  const clearAllData = useAppStore((state) => state.clearAllData);
+  const [open, setOpen] = useState(false);
+  const [ack, setAck] = useState(false);
 
   return (
     <div className="space-y-2">
@@ -28,9 +28,9 @@ export function DangerSection() {
       <Dialog
         open={open}
         onOpenChange={(next) => {
-          setOpen(next)
+          setOpen(next);
           if (!next) {
-            setAck(false)
+            setAck(false);
           }
         }}
       >
@@ -65,9 +65,9 @@ export function DangerSection() {
               disabled={!ack}
               onClick={() => {
                 void clearAllData().then(() => {
-                  setOpen(false)
-                  setAck(false)
-                })
+                  setOpen(false);
+                  setAck(false);
+                });
               }}
             >
               Delete everything
@@ -76,5 +76,5 @@ export function DangerSection() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

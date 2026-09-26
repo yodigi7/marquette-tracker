@@ -47,6 +47,7 @@ src/
 ## Phase 2 — Marquette engine (PURE TS) + tests
 
 **Files:**
+
 - `src/core/engine/types.ts` — domain types (below)
 - `src/core/engine/marquette.ts` — fertile-window computation
 - `src/core/engine/predict.ts` — cycle-length/forecast stats
@@ -82,6 +83,7 @@ Input: ordered `DayRecord[]` of one cycle + `Settings` + reference to previous c
 6. Cycle validity: length 21–42 days; engine returns `outOfBandWarnings` when ≥2 consecutive cycles outside band.
 
 **Boundary rules to encode & test:**
+
 - High/Peak before day 6 in first 6 cycles → begin at that day (min rule).
 - Mucus peak later than monitor peak → peak day = later; end shifts.
 - No peak logged → end rule behavior.
@@ -90,6 +92,7 @@ Input: ordered `DayRecord[]` of one cycle + `Settings` + reference to previous c
 - Predictions (`predict.ts`): next period start via mean/median of last 6–12 closed cycle lengths; predicted fertile window via earliest/latest peak of last 6 cycles ± 6⁄+3 calendar rule; all returned as `predicted` (distinct in UI).
 
 **Vitest tests (table-driven):**
+
 - Hand-built per-cycle fixtures (arrays of DayRecords), assert begin/end day/status mapping.
 - Cover: cycle 1–6 day-6 rule; early High; first cycle with Peak on day 14 (end = 17); mucus peak later than monitor; no-peak cycle; cycle 7+ calendar rule with fake history; peak-on-last-day; 21-day short cycle & 43-day long cycle warnings; forecast stats. Every engine change must run `npm run test`.
 
@@ -100,6 +103,7 @@ Input: ordered `DayRecord[]` of one cycle + `Settings` + reference to previous c
 ## Phase 3 — Storage + state
 
 **Files:**
+
 - `src/core/store/db.ts` — Dexie schema:
   - `cycles` table (id PK, cycleNo, day1, closedAt, notes, version, synced, createdAt, updatedAt)
   - `dayRecords` table (id PK, cycleId indexed, date indexed, dayInCycle, all optional fields, version, synced…)
@@ -132,30 +136,35 @@ Input: ordered `DayRecord[]` of one cycle + `Settings` + reference to previous c
 ## Phase 6 — Feature views (in order)
 
 ### 6.1 Status (`features/status/`)
+
 - Date picker for inspecting a selected date's derived status.
 - Status card with `DayStatus` (fertile/safe/etc.), `confirmed` vs `predicted` source, computed fertile-window explanation, and next predicted period info.
 - Read-only view with no daily-entry or start-cycle controls.
 - **Acceptance:** selected dates show derived status or a no-cycle state without writing data.
 
 ### 6.2 Calendar view (`features/calendar/`)
+
 - Month grid (shadcn pattern): each day cell shows monitor icon/dot, menses color, fertile-window background, and raw observation markers.
 - Month nav arrows; tap day → quick-entry dialog (log that date).
 - Calendar is the sole daily-input surface; the first eligible opening of the day may open today's dialog automatically.
 - **Acceptance:** daily records save through the placement-aware store path and predicted vs confirmed windows remain visually distinct.
 
 ### 6.3 Cycle chart (`features/cycle-chart/`)
+
 - Recharts: percent-based forced-scatter of monitor readings per cycle day: bar/area band per day colored Low (subtle) / High (green) / Peak (gray), overlay optional mucus and BBT (line, right axis) plus intercourse markers.
 - Window band as background `<ReferenceArea>` shaded; predicted window dashed.
 - Cycle selector (latest cycles dropdown).
 - **Acceptance:** renders from real data; degenerates gracefully with missing data.
 
 ### 6.4 History/Stats (`features/history/`)
+
 - Cycle table: cycleNo, start date, length, peak day, fertile days count, status (open/closed).
 - Stats: avg + median cycle length (last 5/6 closed cycles), earliest/latest peak day, variability (range/Min-max), # cycles out of 21–42 band warnings.
 - Forecast panel: next expected period date(s) with range, next estimated fertile window, language marking predictions.
 - **Acceptance:** numbers match `predict.ts` fixtures.
 
 ### 6.5 Settings (`features/settings/`)
+
 - Goal: TTA / TTC / track-only (informational labels; drives copy like "avoid intimacy in fertile window" vs "best days for conception").
 - Algorithm toggle (ON default; when OFF the app logs data only, no windows/status computed; label clearly). postPeakDays stepper (default 4, allowed 0–10). historyWindow (default 6). Dark mode; clear-all-data danger zone (with confirm + IndexedDB clear).
 

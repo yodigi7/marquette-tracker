@@ -1,10 +1,12 @@
-export { createBackup, getBackupSummary, prepareBackup, prepareBackupDocument, serializeBackup } from './backup'
-export { APP_VERSION } from './version'
 export {
-  BACKUP_FORMAT,
-  BackupError,
-  CURRENT_BACKUP_VERSION,
-} from './types'
+  createBackup,
+  getBackupSummary,
+  prepareBackup,
+  prepareBackupDocument,
+  serializeBackup,
+} from "./backup";
+export { APP_VERSION } from "./version";
+export { BACKUP_FORMAT, BackupError, CURRENT_BACKUP_VERSION } from "./types";
 export type {
   BackupData,
   BackupDocument,
@@ -15,4 +17,4 @@ export type {
   BackupSummary,
   PrepareOptions,
   PreparedBackup,
-} from './types'
+} from "./types";

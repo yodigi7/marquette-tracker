@@ -1,117 +1,122 @@
-export type MonitorReading = 'none' | 'low' | 'high' | 'peak'
-export type MucusLevel = 'none' | 'low' | 'high' | 'peak'
-export type BloodFlow = 'none' | 'light' | 'medium' | 'heavy'
-export type Goal = 'avoid-pregnancy' | 'achieve-pregnancy' | 'track-only'
-export type Theme = 'light' | 'dark' | 'system'
-export type PregnancyResult = 'negative' | 'positive'
+export type MonitorReading = "none" | "low" | "high" | "peak";
+export type MucusLevel = "none" | "low" | "high" | "peak";
+export type BloodFlow = "none" | "light" | "medium" | "heavy";
+export type Goal = "avoid-pregnancy" | "achieve-pregnancy" | "track-only";
+export type Theme = "light" | "dark" | "system";
+export type PregnancyResult = "negative" | "positive";
 
 /** Calendar day key, format 'YYYY-MM-DD' (UTC). */
-export type DateKey = string
+export type DateKey = string;
 
 /** The settings the engine needs. The store's Settings row may carry more (theme, algorithmEnabled). */
 export interface EngineSettings {
   /** Days from last Peak day the fertile window extends. Monitor-only default: 4. */
-  postPeakDays: number
+  postPeakDays: number;
   /** Number of previous cycles used for the calendar rules. Marquette default: 6. */
-  historyWindow: number
+  historyWindow: number;
   /** Protocol band floor in days. Marquette default: 21. */
-  cycleMinLength: number
+  cycleMinLength: number;
   /** Protocol band ceiling in days. Marquette default: 42. */
-  cycleMaxLength: number
+  cycleMaxLength: number;
 }
 
 export interface CycleInput {
-  id: string
+  id: string;
   /** First day of menses (day 1 of the cycle). */
-  day1: DateKey
-  closedAt?: DateKey | null
-  notes?: string
+  day1: DateKey;
+  closedAt?: DateKey | null;
+  notes?: string;
 }
 
 export interface DayRecordInput {
-  id: string
-  cycleId: string
-  date: DateKey
-  dayInCycle: number
-  monitor?: MonitorReading
+  id: string;
+  cycleId: string;
+  date: DateKey;
+  dayInCycle: number;
+  monitor?: MonitorReading;
   /** Logged and displayed only; never engine evidence under the monitor-only contract. */
-  mucus?: MucusLevel
-  bloodFlow?: BloodFlow
-  intercourse?: boolean
-  intercourseTime?: string
-  bbt?: number | null
-  symptoms?: string[]
-  pregnancyTest?: PregnancyResult
-  notes?: string
+  mucus?: MucusLevel;
+  bloodFlow?: BloodFlow;
+  intercourse?: boolean;
+  intercourseTime?: string;
+  bbt?: number | null;
+  symptoms?: string[];
+  pregnancyTest?: PregnancyResult;
+  notes?: string;
 }
 
-export type DayStatus = 'pre-fertile' | 'fertile' | 'post-peak' | 'post-calendar'
+export type DayStatus = "pre-fertile" | "fertile" | "post-peak" | "post-calendar";
 
-export type BeginRule = 'calendar-day-6' | 'calendar-earliest-peak-minus-6' | 'first-high-or-peak'
-export type EndRule = 'current-peak-plus-n' | 'historic-peak-plus-n' | 'earliest-end' | 'protocol-default-band' | 'none'
+export type BeginRule = "calendar-day-6" | "calendar-earliest-peak-minus-6" | "first-high-or-peak";
+export type EndRule =
+  | "current-peak-plus-n"
+  | "historic-peak-plus-n"
+  | "earliest-end"
+  | "protocol-default-band"
+  | "none";
 
 export interface FertileWindow {
-  begin: number
+  begin: number;
   /** Inclusive last fertile day. Null when the protocol cannot determine an end. */
-  end: number | null
-  beginRule: BeginRule
-  endRule: EndRule
+  end: number | null;
+  beginRule: BeginRule;
+  endRule: EndRule;
 }
 
 export interface DayResult {
-  day: number
-  date: DateKey
-  status: DayStatus
+  day: number;
+  date: DateKey;
+  status: DayStatus;
 }
 
 /** Monitor-only contract: Peak evidence comes from a user-entered monitor Peak. */
-export type PeakSource = 'monitor' | 'none'
+export type PeakSource = "monitor" | "none";
 
 export interface CycleResult {
-  cycleId: string
-  cycleNo: number
-  day1: DateKey
+  cycleId: string;
+  cycleNo: number;
+  day1: DateKey;
   /** Days from day1 (inclusive) to the next cycle's day1. Null while open. */
-  length: number | null
-  peakDay: number | null
-  peakSource: PeakSource
-  fertileWindow: FertileWindow
-  days: DayResult[]
-  warnings: EngineWarning[]
+  length: number | null;
+  peakDay: number | null;
+  peakSource: PeakSource;
+  fertileWindow: FertileWindow;
+  days: DayResult[];
+  warnings: EngineWarning[];
 }
 
 export type EngineWarning =
-  | { kind: 'cycle-out-of-band'; cycleNo: number; length: number }
-  | { kind: 'no-peak-end'; cycleNo: number }
+  | { kind: "cycle-out-of-band"; cycleNo: number; length: number }
+  | { kind: "no-peak-end"; cycleNo: number };
 
 /** Previous-cycle peak days (oldest → newest) used by the calendar rules. */
 export interface CycleHistory {
-  peaksByCycle: (number | null)[]
-  cycleNos: number[]
+  peaksByCycle: (number | null)[];
+  cycleNos: number[];
 }
 
 export interface Forecast {
-  basedOnCycles: number
+  basedOnCycles: number;
   /**
    * Number of recent closed cycle lengths the projected dates were derived
    * from — the configured history window, capped by the cycles available.
    */
-  lookbackWindow: number
+  lookbackWindow: number;
   /** The configured history window, whether or not that many cycles exist. */
-  configuredLookbackWindow: number
+  configuredLookbackWindow: number;
   /** Considered in the protocol band 21–42 days. */
-  outOfBandCount: number
-  meanLength: number
-  medianLength: number
-  earliestLength: number
-  latestLength: number
-  peakDayEarliest: number
-  peakDayLatest: number
+  outOfBandCount: number;
+  meanLength: number;
+  medianLength: number;
+  earliestLength: number;
+  latestLength: number;
+  peakDayEarliest: number;
+  peakDayLatest: number;
   /** Date of the next expected period start (for the newest cycle's day1). Null without data. */
-  expectedPeriodStart: DateKey
+  expectedPeriodStart: DateKey;
   /** Estimated next fertile window from the calendar rule — always a prediction. */
   nextFertileWindow: {
-    begin: DateKey
-    end: DateKey
-  }
+    begin: DateKey;
+    end: DateKey;
+  };
 }

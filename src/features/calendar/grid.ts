@@ -1,72 +1,87 @@
 /** Month grid math: 6 weeks × 7 days, Monday-first, keys = local `YYYY-MM-DD`. */
 
-import { dayInfo } from '@/core/cycleStatus'
-import { dayInCycle, dateKeyLocal } from '@/core/dateKeys'
-import type { CycleResult, DayStatus } from '@/core/engine/types'
-import { cycleForDate } from '@/core/store/selectors'
-import type { CycleEntity, DayRecordEntity, WeekStart } from '@/core/store/entities'
+import { dayInfo } from "@/core/cycleStatus";
+import { dayInCycle, dateKeyLocal } from "@/core/dateKeys";
+import type { CycleResult, DayStatus } from "@/core/engine/types";
+import { cycleForDate } from "@/core/store/selectors";
+import type { CycleEntity, DayRecordEntity, WeekStart } from "@/core/store/entities";
 
 export interface MonthGrid {
   /** 42 slots; slots outside the month are empty strings. */
-  weeks: string[][]
-  year: number
-  month: number
+  weeks: string[][];
+  year: number;
+  month: number;
 }
 
-export type { WeekStart } from '@/core/store/entities'
+export type { WeekStart } from "@/core/store/entities";
 
-export function monthGrid(year: number, monthIndex: number, weekStart: WeekStart = 'monday'): MonthGrid {
-  const first = new Date(year, monthIndex, 1)
-  const offset = weekStart === 'sunday' ? first.getDay() : (first.getDay() + 6) % 7
-  const start = new Date(year, monthIndex, 1 - offset)
+export function monthGrid(
+  year: number,
+  monthIndex: number,
+  weekStart: WeekStart = "monday",
+): MonthGrid {
+  const first = new Date(year, monthIndex, 1);
+  const offset = weekStart === "sunday" ? first.getDay() : (first.getDay() + 6) % 7;
+  const start = new Date(year, monthIndex, 1 - offset);
 
-  const weeks: string[][] = []
+  const weeks: string[][] = [];
   for (let week = 0; week < 6; week++) {
-    const row: string[] = []
+    const row: string[] = [];
     for (let day = 0; day < 7; day++) {
-      const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + week * 7 + day)
-      const key = dateKeyLocal(date)
-      row.push(date.getMonth() === monthIndex ? key : '')
+      const date = new Date(
+        start.getFullYear(),
+        start.getMonth(),
+        start.getDate() + week * 7 + day,
+      );
+      const key = dateKeyLocal(date);
+      row.push(date.getMonth() === monthIndex ? key : "");
     }
-    weeks.push(row)
+    weeks.push(row);
   }
-  return { weeks, year, month: monthIndex }
+  return { weeks, year, month: monthIndex };
 }
 
 export function monthTitle(year: number, monthIndex: number): string {
-  return new Date(year, monthIndex, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  return new Date(year, monthIndex, 1).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
 }
 
-export function shiftMonth(year: number, monthIndex: number, delta: number): { year: number; month: number } {
-  const total = year * 12 + monthIndex + delta
-  return { year: Math.floor(total / 12), month: ((total % 12) + 12) % 12 }
+export function shiftMonth(
+  year: number,
+  monthIndex: number,
+  delta: number,
+): { year: number; month: number } {
+  const total = year * 12 + monthIndex + delta;
+  return { year: Math.floor(total / 12), month: ((total % 12) + 12) % 12 };
 }
 
 /** Weekday short labels, Monday-first. */
-export const WEEKDAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
+export const WEEKDAY_LABELS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 
-const WEEKDAY_LABELS_SUNDAY = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+const WEEKDAY_LABELS_SUNDAY = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
-export function weekdayLabels(weekStart: WeekStart = 'monday'): string[] {
-  return weekStart === 'sunday' ? WEEKDAY_LABELS_SUNDAY : WEEKDAY_LABELS
+export function weekdayLabels(weekStart: WeekStart = "monday"): string[] {
+  return weekStart === "sunday" ? WEEKDAY_LABELS_SUNDAY : WEEKDAY_LABELS;
 }
 
 export interface CellInfo {
-  info: DayStatus | null
-  forecast: boolean
-  menses: boolean
-  monitor: DayRecordEntity['monitor']
-  intercourse: boolean
+  info: DayStatus | null;
+  forecast: boolean;
+  menses: boolean;
+  monitor: DayRecordEntity["monitor"];
+  intercourse: boolean;
 }
 
 /** Latest projected cycle covering the date, if any. */
 function projectedCycleForDate(projected: CycleResult[], dateKey: string): CycleResult | undefined {
   for (let index = projected.length - 1; index >= 0; index--) {
     if (projected[index].day1 <= dateKey) {
-      return projected[index]
+      return projected[index];
     }
   }
-  return undefined
+  return undefined;
 }
 
 /** Per-day resolution: real cycle → projected cycle → record markers → forecast overlay.
@@ -87,15 +102,17 @@ export function resolveCell(
   today: string,
   projected: CycleResult[] = [],
 ): CellInfo {
-  const cycle = cycleForDate(cycles, dateKey)
-  const record = cycle ? dayRecords.find((r) => r.cycleId === cycle.id && r.date === dateKey) : undefined
+  const cycle = cycleForDate(cycles, dateKey);
+  const record = cycle
+    ? dayRecords.find((r) => r.cycleId === cycle.id && r.date === dateKey)
+    : undefined;
 
-  const isFuture = dateKey > today
-  const inForecast = !!forecast && dateKey >= forecast.begin && dateKey <= forecast.end
+  const isFuture = dateKey > today;
+  const inForecast = !!forecast && dateKey >= forecast.begin && dateKey <= forecast.end;
 
-  const projectedCycle = isFuture ? projectedCycleForDate(projected, dateKey) : undefined
+  const projectedCycle = isFuture ? projectedCycleForDate(projected, dateKey) : undefined;
   if (projectedCycle) {
-    const dayNo = dayInCycle(projectedCycle.day1, dateKey)
+    const dayNo = dayInCycle(projectedCycle.day1, dateKey);
     return {
       // The phase still comes from the projected window; the forecast flag is
       // what tells the cell this day has not happened yet.
@@ -104,7 +121,7 @@ export function resolveCell(
       menses: dayNo === 1,
       monitor: undefined,
       intercourse: false,
-    }
+    };
   }
 
   return {
@@ -113,37 +130,41 @@ export function resolveCell(
     info: isFuture ? null : statusForCell(cycle, results, dateKey),
     forecast: inForecast && isFuture && !record,
     menses: !isFuture && mensesFor(record, cycle ? dayInCycle(cycle.day1, dateKey) : 0),
-    monitor: record?.monitor && record.monitor !== 'none' ? record.monitor : undefined,
+    monitor: record?.monitor && record.monitor !== "none" ? record.monitor : undefined,
     intercourse: !!record?.intercourse,
-  }
+  };
 }
 
 function statusForWindow(result: CycleResult, dayNo: number): DayStatus | null {
   if (dayNo < 1 || (result.length !== null && dayNo > result.length)) {
-    return null
+    return null;
   }
-  return dayInfo(result.fertileWindow, result.peakDay !== null, dayNo)
+  return dayInfo(result.fertileWindow, result.peakDay !== null, dayNo);
 }
 
-function statusForCell(cycle: CycleEntity | undefined, results: Map<string, CycleResult>, dateKey: string): DayStatus | null {
+function statusForCell(
+  cycle: CycleEntity | undefined,
+  results: Map<string, CycleResult>,
+  dateKey: string,
+): DayStatus | null {
   if (!cycle) {
-    return null
+    return null;
   }
-  const result = results.get(cycle.id)
+  const result = results.get(cycle.id);
   if (!result) {
-    return null
+    return null;
   }
-  const dayNo = dayInCycle(cycle.day1, dateKey)
-  const beyondCycle = cycle.closedAt !== null && dateKey > cycle.closedAt
+  const dayNo = dayInCycle(cycle.day1, dateKey);
+  const beyondCycle = cycle.closedAt !== null && dateKey > cycle.closedAt;
   if (beyondCycle) {
-    return null
+    return null;
   }
-  return dayInfo(result.fertileWindow, result.peakDay !== null, dayNo)
+  return dayInfo(result.fertileWindow, result.peakDay !== null, dayNo);
 }
 
 function mensesFor(record: DayRecordEntity | undefined, dayNo: number): boolean {
-  if (record?.bloodFlow !== undefined && record.bloodFlow !== 'none') {
-    return true
+  if (record?.bloodFlow !== undefined && record.bloodFlow !== "none") {
+    return true;
   }
-  return dayNo === 1
+  return dayNo === 1;
 }

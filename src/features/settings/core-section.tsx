@@ -1,25 +1,25 @@
-import { useAppStore } from '@/core/store/useAppStore'
-import type { Goal } from '@/core/engine/types'
-import { Label } from '@/components/ui/label'
+import { useAppStore } from "@/core/store/useAppStore";
+import type { Goal } from "@/core/engine/types";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
-import { NumberField } from './number-field'
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { NumberField } from "./number-field";
 
 const GOAL_OPTIONS: { value: Goal; label: string }[] = [
-  { value: 'track-only', label: 'Track only' },
-  { value: 'avoid-pregnancy', label: 'Avoid pregnancy' },
-  { value: 'achieve-pregnancy', label: 'Achieve pregnancy' },
-]
+  { value: "track-only", label: "Track only" },
+  { value: "avoid-pregnancy", label: "Avoid pregnancy" },
+  { value: "achieve-pregnancy", label: "Achieve pregnancy" },
+];
 
 export function CoreSection() {
-  const settings = useAppStore((state) => state.settings)
-  const updateSettings = useAppStore((state) => state.updateSettings)
+  const settings = useAppStore((state) => state.settings);
+  const updateSettings = useAppStore((state) => state.updateSettings);
 
   return (
     <div className="space-y-5">
@@ -59,10 +59,12 @@ export function CoreSection() {
 
       <div className="flex items-center justify-between gap-4">
         <div className="space-y-1">
-          <Label htmlFor="settings-project-future-cycles">Project future cycles on the calendar</Label>
+          <Label htmlFor="settings-project-future-cycles">
+            Project future cycles on the calendar
+          </Label>
           <p className="text-sm text-stone-500">
-            Off = only the current cycle is shown. On = projected cycles, their expected period days, and
-            their fertile windows are drawn ahead on the calendar.
+            Off = only the current cycle is shown. On = projected cycles, their expected period
+            days, and their fertile windows are drawn ahead on the calendar.
           </p>
         </div>
         <Switch
@@ -92,5 +94,5 @@ export function CoreSection() {
         />
       </div>
     </div>
-  )
+  );
 }

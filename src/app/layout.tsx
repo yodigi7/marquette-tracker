@@ -1,36 +1,27 @@
-import { Link, Outlet, useLocation } from 'react-router'
-import { MenuIcon } from 'lucide-react'
-import { Separator } from '@/components/ui/separator'
-import { Button } from '@/components/ui/button'
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet'
-import { cn } from '@/lib/utils'
+import { Link, Outlet, useLocation } from "react-router";
+import { MenuIcon } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { to: '/', label: 'Calendar' },
-  { to: '/status', label: 'Status' },
-  { to: '/history', label: 'History' },
-  { to: '/settings', label: 'Settings' },
-]
+  { to: "/", label: "Calendar" },
+  { to: "/status", label: "Status" },
+  { to: "/history", label: "History" },
+  { to: "/settings", label: "Settings" },
+];
 
 export function RootLayout() {
-  const { pathname } = useLocation()
+  const { pathname } = useLocation();
 
-  const isActive = (to: string) =>
-    to === '/' ? pathname === '/' : pathname.startsWith(to)
+  const isActive = (to: string) => (to === "/" ? pathname === "/" : pathname.startsWith(to));
 
   const navLinkClass = (to: string) =>
     cn(
-      'hover:text-foreground transition-colors',
-      isActive(to)
-        ? 'font-medium text-foreground'
-        : 'text-muted-foreground',
-    )
+      "hover:text-foreground transition-colors",
+      isActive(to) ? "font-medium text-foreground" : "text-muted-foreground",
+    );
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -39,11 +30,7 @@ export function RootLayout() {
           <span className="font-semibold">Marquette Tracker</span>
           <Sheet>
             <SheetTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Open navigation"
-              >
+              <Button variant="ghost" size="icon" aria-label="Open navigation">
                 <MenuIcon />
               </Button>
             </SheetTrigger>
@@ -54,8 +41,8 @@ export function RootLayout() {
                   <SheetClose key={item.to} asChild>
                     <Link
                       to={item.to}
-                      aria-current={isActive(item.to) ? 'page' : undefined}
-                      className={cn(navLinkClass(item.to), 'py-3 text-base')}
+                      aria-current={isActive(item.to) ? "page" : undefined}
+                      className={cn(navLinkClass(item.to), "py-3 text-base")}
                     >
                       {item.label}
                     </Link>
@@ -73,7 +60,7 @@ export function RootLayout() {
               <Link
                 key={item.to}
                 to={item.to}
-                aria-current={isActive(item.to) ? 'page' : undefined}
+                aria-current={isActive(item.to) ? "page" : undefined}
                 className={navLinkClass(item.to)}
               >
                 {item.label}
@@ -86,5 +73,5 @@ export function RootLayout() {
         <Outlet />
       </main>
     </div>
-  )
+  );
 }

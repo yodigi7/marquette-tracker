@@ -1,106 +1,112 @@
-import { useState } from 'react'
-import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
-import { useAppStore, FutureDateError } from '@/core/store/useAppStore'
-import type { DayRecordEntity } from '@/core/store/entities'
-import { todayKey } from '@/core/dateKeys'
+import { useState } from "react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useAppStore, FutureDateError } from "@/core/store/useAppStore";
+import type { DayRecordEntity } from "@/core/store/entities";
+import { todayKey } from "@/core/dateKeys";
 
-type MonitorValue = NonNullable<DayRecordEntity['monitor']>
-type MucusValue = NonNullable<DayRecordEntity['mucus']>
-type FlowValue = NonNullable<DayRecordEntity['bloodFlow']>
+type MonitorValue = NonNullable<DayRecordEntity["monitor"]>;
+type MucusValue = NonNullable<DayRecordEntity["mucus"]>;
+type FlowValue = NonNullable<DayRecordEntity["bloodFlow"]>;
 
 const MONITOR_OPTIONS: { value: MonitorValue; label: string }[] = [
-  { value: 'none', label: '—' },
-  { value: 'low', label: 'Low' },
-  { value: 'high', label: 'High' },
-  { value: 'peak', label: 'Peak' },
-]
+  { value: "none", label: "—" },
+  { value: "low", label: "Low" },
+  { value: "high", label: "High" },
+  { value: "peak", label: "Peak" },
+];
 
 const MUCUS_OPTIONS: { value: MucusValue; label: string }[] = [
-  { value: 'none', label: 'None' },
-  { value: 'low', label: 'L' },
-  { value: 'high', label: 'H' },
-  { value: 'peak', label: 'P' },
-]
+  { value: "none", label: "None" },
+  { value: "low", label: "L" },
+  { value: "high", label: "H" },
+  { value: "peak", label: "P" },
+];
 
 const FLOW_OPTIONS: { value: FlowValue; label: string }[] = [
-  { value: 'none', label: 'None' },
-  { value: 'light', label: 'Light' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'heavy', label: 'Heavy' },
-]
+  { value: "none", label: "None" },
+  { value: "light", label: "Light" },
+  { value: "medium", label: "Medium" },
+  { value: "heavy", label: "Heavy" },
+];
 
 interface QuickEntryProps {
-  cycleId: string
-  date: string
-  dayInCycle: number
-  existing?: DayRecordEntity
-  onSaved(): void
+  cycleId: string;
+  date: string;
+  dayInCycle: number;
+  existing?: DayRecordEntity;
+  onSaved(): void;
 }
 
 export function QuickEntry({ cycleId, date, dayInCycle, existing, onSaved }: QuickEntryProps) {
-  const [monitor, setMonitor] = useState<MonitorValue>(existing?.monitor ?? 'none')
-  const [mucus, setMucus] = useState<MucusValue>(existing?.mucus ?? 'none')
-  const [flow, setFlow] = useState<FlowValue>(existing?.bloodFlow ?? 'none')
-  const [bbt, setBbt] = useState<string>(existing?.bbt != null ? String(existing.bbt) : '')
-  const [intercourse, setIntercourse] = useState<boolean>(existing?.intercourse ?? false)
-  const [intercourseTime, setIntercourseTime] = useState<string>(existing?.intercourseTime ?? '')
-  const [pregnancy, setPregnancy] = useState<string>(existing?.pregnancyTest ?? '')
-  const [notes, setNotes] = useState<string>(existing?.notes ?? '')
-  const [symptoms, setSymptoms] = useState<string[]>(existing?.symptoms ?? [])
-  const [symptomInput, setSymptomInput] = useState('')
+  const [monitor, setMonitor] = useState<MonitorValue>(existing?.monitor ?? "none");
+  const [mucus, setMucus] = useState<MucusValue>(existing?.mucus ?? "none");
+  const [flow, setFlow] = useState<FlowValue>(existing?.bloodFlow ?? "none");
+  const [bbt, setBbt] = useState<string>(existing?.bbt != null ? String(existing.bbt) : "");
+  const [intercourse, setIntercourse] = useState<boolean>(existing?.intercourse ?? false);
+  const [intercourseTime, setIntercourseTime] = useState<string>(existing?.intercourseTime ?? "");
+  const [pregnancy, setPregnancy] = useState<string>(existing?.pregnancyTest ?? "");
+  const [notes, setNotes] = useState<string>(existing?.notes ?? "");
+  const [symptoms, setSymptoms] = useState<string[]>(existing?.symptoms ?? []);
+  const [symptomInput, setSymptomInput] = useState("");
 
   function addSymptom() {
-    const value = symptomInput.trim()
+    const value = symptomInput.trim();
     if (value && !symptoms.includes(value)) {
-      setSymptoms([...symptoms, value])
+      setSymptoms([...symptoms, value]);
     }
-    setSymptomInput('')
+    setSymptomInput("");
   }
 
   async function save() {
     try {
       await useAppStore.getState().addDayRecord(cycleId, date, dayInCycle, {
-        monitor: monitor === 'none' ? undefined : monitor,
-        mucus: mucus === 'none' ? undefined : mucus,
-        bloodFlow: flow === 'none' ? undefined : flow,
-        bbt: bbt === '' ? null : parseFloat(bbt),
+        monitor: monitor === "none" ? undefined : monitor,
+        mucus: mucus === "none" ? undefined : mucus,
+        bloodFlow: flow === "none" ? undefined : flow,
+        bbt: bbt === "" ? null : parseFloat(bbt),
         intercourse,
         intercourseTime: intercourse ? intercourseTime || undefined : undefined,
         symptoms,
-        pregnancyTest: pregnancy === '' ? undefined : (pregnancy as 'negative' | 'positive'),
+        pregnancyTest: pregnancy === "" ? undefined : (pregnancy as "negative" | "positive"),
         notes: notes || undefined,
-      })
+      });
     } catch (error) {
       if (error instanceof FutureDateError) {
-        toast(error.message)
-        return
+        toast(error.message);
+        return;
       }
-      throw error
+      throw error;
     }
-    toast(`${date} saved`)
-    onSaved()
+    toast(`${date} saved`);
+    onSaved();
   }
 
   async function remove() {
     if (!existing) {
-      return
+      return;
     }
-    await useAppStore.getState().removeDayRecord(existing.id)
-    toast(`${date} deleted`)
-    onSaved()
+    await useAppStore.getState().removeDayRecord(existing.id);
+    toast(`${date} deleted`);
+    onSaved();
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Log {date === todayKey() ? 'today' : date}</CardTitle>
+        <CardTitle className="text-base">Log {date === todayKey() ? "today" : date}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
@@ -110,7 +116,7 @@ export function QuickEntry({ cycleId, date, dayInCycle, existing, onSaved }: Qui
               <Button
                 key={opt.value}
                 type="button"
-                variant={monitor === opt.value ? 'default' : 'outline'}
+                variant={monitor === opt.value ? "default" : "outline"}
                 size="sm"
                 aria-pressed={monitor === opt.value}
                 onClick={() => setMonitor(opt.value)}
@@ -129,7 +135,7 @@ export function QuickEntry({ cycleId, date, dayInCycle, existing, onSaved }: Qui
                 <Button
                   key={opt.value}
                   type="button"
-                  variant={mucus === opt.value ? 'default' : 'outline'}
+                  variant={mucus === opt.value ? "default" : "outline"}
                   size="sm"
                   aria-pressed={mucus === opt.value}
                   onClick={() => setMucus(opt.value)}
@@ -159,7 +165,13 @@ export function QuickEntry({ cycleId, date, dayInCycle, existing, onSaved }: Qui
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label className="mb-1 block">BBT (°C)</Label>
-            <Input type="number" step="0.01" placeholder="36.5" value={bbt} onChange={(e) => setBbt(e.target.value)} />
+            <Input
+              type="number"
+              step="0.01"
+              placeholder="36.5"
+              value={bbt}
+              onChange={(e) => setBbt(e.target.value)}
+            />
           </div>
           <div>
             <Label className="mb-1 block">Pregnancy test</Label>
@@ -186,7 +198,12 @@ export function QuickEntry({ cycleId, date, dayInCycle, existing, onSaved }: Qui
             />
             <Label htmlFor="intercourse">Intercourse</Label>
             {intercourse && (
-              <Input type="time" className="ml-auto w-28" value={intercourseTime} onChange={(e) => setIntercourseTime(e.target.value)} />
+              <Input
+                type="time"
+                className="ml-auto w-28"
+                value={intercourseTime}
+                onChange={(e) => setIntercourseTime(e.target.value)}
+              />
             )}
           </div>
         </div>
@@ -198,7 +215,7 @@ export function QuickEntry({ cycleId, date, dayInCycle, existing, onSaved }: Qui
               placeholder="e.g. cramps"
               value={symptomInput}
               onChange={(e) => setSymptomInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && addSymptom()}
+              onKeyDown={(e) => e.key === "Enter" && addSymptom()}
             />
             <Button type="button" variant="outline" onClick={addSymptom}>
               Add
@@ -217,7 +234,12 @@ export function QuickEntry({ cycleId, date, dayInCycle, existing, onSaved }: Qui
 
         <div>
           <Label className="mb-1 block">Notes</Label>
-          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything else…" className="resize-none" />
+          <Textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Anything else…"
+            className="resize-none"
+          />
         </div>
       </CardContent>
       <CardFooter className="justify-between">
@@ -232,12 +254,12 @@ export function QuickEntry({ cycleId, date, dayInCycle, existing, onSaved }: Qui
             Delete
           </Button>
         )}
-        <div className={cn('flex gap-2', !existing && 'ml-auto')}>
+        <div className={cn("flex gap-2", !existing && "ml-auto")}>
           <Button type="button" onClick={() => void save()}>
             Save
           </Button>
         </div>
       </CardFooter>
     </Card>
-  )
+  );
 }
