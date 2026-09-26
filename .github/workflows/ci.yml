@@ -1,25 +1,24 @@
-name: Deploy static content to Pages
+name: Quality gates
 
 on:
+  pull_request:
   push:
     branches:
       - main
-  workflow_dispatch:
 
+# Validation only. Deployment lives in deploy.yml and needs elevated
+# permissions, so keeping the two workflows separate is what guarantees a pull
+# request can never reach a deploy step.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: quality-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  check:
+    name: Format, lint, test, build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -41,15 +40,3 @@ jobs:
 
       - name: Quality gate
         run: pnpm check
-
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./dist
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
