@@ -61,45 +61,64 @@ parallel. `.oxfmtrc.json` and `.oxlintrc.json` are distinct files, so groups 1 a
 
 ## 5. Git hooks
 
-- [ ] 5.1 Create `.githooks/pre-commit` that collects staged supported files via
+- [x] 5.1 Create `.githooks/pre-commit` that collects staged supported files via
       `git diff --cached --name-only --diff-filter=ACMR`, runs `oxfmt --write` on them, re-stages them with
       `git add`, then runs full `oxlint` and `openspec validate --all`; verify the script is `sh -n` clean
-- [ ] 5.2 Create `.githooks/pre-push` that runs `pnpm check`; verify the script is `sh -n` clean
-- [ ] 5.3 `chmod +x` both hooks and verify both are tracked by git as executable, satisfying the
-      "hooks are versioned, not local-only" requirement
-- [ ] 5.4 Demonstrate a clean staged change commits successfully with the hook active
-- [ ] 5.5 Demonstrate a staged formatting deviation is auto-fixed and re-staged, with the created commit
-      containing the formatted content
-- [ ] 5.6 Demonstrate a staged lint error blocks the commit and reports the violation
-- [ ] 5.7 Demonstrate an invalid staged OpenSpec artifact blocks the commit
-- [ ] 5.8 Demonstrate a failing test blocks a pre-push attempt, and that a green tree pushes
-- [ ] 5.9 Verify `git commit --no-verify` and `git push --no-verify` bypass the hooks, so the documented
-      escape hatch actually works
+- [x] 5.2 Create `.githooks/pre-push` that runs `pnpm check`; verify the script is `sh -n` clean
+- [x] 5.3 `chmod +x` both hooks and verify both are tracked by git as executable, satisfying the
+      "hooks are versioned, not local-only" requirement. Result: both tracked at mode `100755`
+- [x] 5.4 Demonstrate a clean staged change commits successfully with the hook active. Result: the tooling
+      commit landed in 3.1s with all three gates green
+- [x] 5.5 Demonstrate a staged formatting deviation is auto-fixed and re-staged, with the created commit
+      containing the formatted content. Result: `{a:1,   b:   2}` was committed as `{ a: 1, b: 2 };` and the
+      tree was clean afterwards, proving the fix was re-staged rather than left behind
+- [x] 5.6 Demonstrate a staged lint error blocks the commit and reports the violation. Result: a conditional
+      `useState` produced a `rules-of-hooks` error, the hook exited 1, and no commit was created
+- [x] 5.7 Demonstrate an invalid staged OpenSpec artifact blocks the commit. Result: removing the scenarios
+      from one requirement produced `must include at least one scenario`, the hook exited 1, and no commit
+      was created
+- [x] 5.8 Demonstrate a failing test blocks a pre-push attempt, and that a green tree pushes. Result: against
+      a local bare remote, a failing test blocked the push (0 refs written); the green tree pushed in 21.8s,
+      matching the design's ~21s estimate. The Vite chunk-size warning surfaced as non-blocking
+- [x] 5.9 Verify `git commit --no-verify` and `git push --no-verify` bypass the hooks, so the documented
+      escape hatch actually works. Result: a commit carrying both a lint error and a failing test succeeded
+      with `--no-verify`, and pushed with `push --no-verify`. All demo scaffolding (probe files, throwaway
+      branch, local remote, and the junk probe commit) was removed afterwards
 
 ## 6. CI workflows
 
-- [ ] 6.1 [P] Add `.github/workflows/ci.yml` triggered on `pull_request` and `push` to `main`, with
+- [x] 6.1 [P] Add `.github/workflows/ci.yml` triggered on `pull_request` and `push` to `main`, with
       `permissions: contents: read`, that installs dependencies and runs `pnpm check`; verify the YAML parses
-      and the workflow contains no deploy step and no `pages: write` or `id-token: write` permission
-- [ ] 6.2 [P] Update `.github/workflows/deploy.yml` to replace its separate test, lint, and build steps with
+      and the workflow contains no deploy step and no `pages: write` or `id-token: write` permission.
+      Result: parses; triggers and `contents: read` confirmed; no deploy step, no elevated permissions
+- [x] 6.2 [P] Update `.github/workflows/deploy.yml` to replace its separate test, lint, and build steps with
       the single `pnpm check` step; verify its triggers (`push` to `main`, `workflow_dispatch`) and its
-      `pages: write` / `id-token: write` permissions are unchanged
-- [ ] 6.3 Verify both workflows invoke the identical canonical command, so local and remote validation cannot
-      drift apart
+      `pages: write` / `id-token: write` permissions are unchanged. Result: the diff is exactly the
+      three-steps-to-one consolidation; triggers, permissions, and deploy steps untouched
+- [x] 6.3 Verify both workflows invoke the identical canonical command, so local and remote validation cannot
+      drift apart. Result: both contain the single line `run: pnpm check` and nothing else as a gate
 
 ## 7. Documentation
 
-- [ ] 7.1 Update `README.md` with the new scripts (`format`, `format:check`, `typecheck`, `check`), the
+- [x] 7.1 Update `README.md` with the new scripts (`format`, `format:check`, `typecheck`, `check`), the
       install-time hook activation, the `--no-verify` bypass, and recovery steps for restoring hooks
-- [ ] 7.2 Document in `README.md` the formatter's file-type coverage, the three configuration exceptions, and
-      that archived change records and vendored tooling are deliberately excluded
-- [ ] 7.3 Update `AGENTS.md` so its command gates reference the canonical `check` command and record the
-      hook conventions contributors are expected to follow
+- [x] 7.2 Document in `README.md` the formatter's file-type coverage, the three configuration exceptions, and
+      that archived change records and vendored tooling are deliberately excluded. Also corrected the
+      Deployment section, which still described the old three-step test/lint/build gate
+- [x] 7.3 Update `AGENTS.md` so its command gates reference the canonical `check` command and record the
+      hook conventions contributors are expected to follow. Also replaced the four stale `npm run ...`
+      references with `pnpm`
 
 ## 8. Final verification
 
-- [ ] 8.1 Verify `pnpm check` exits zero, `pnpm format:check` reports no differences, and
-      `openspec validate --all --no-interactive` reports all specs passing
-- [ ] 8.2 Verify the full Vitest suite passes with no test files modified by this change
-- [ ] 8.3 Verify `git status` is clean apart from the intended commits, confirming no stray formatter
-      output or scratch artifacts were left in the tree
+- [x] 8.1 Verify `pnpm check` exits zero, `pnpm format:check` reports no differences, and
+      `openspec validate --all --no-interactive` reports all specs passing. Result: `pnpm check` exits 0 in
+      21.8s, running the four gates in order with `tsc -b` invoked exactly once; 369/369 tests; lint 0/0;
+      `openspec validate --all` reports 12/12 items passing
+- [x] 8.2 Verify the full Vitest suite passes with no test files modified by this change. Result: 369/369
+      pass, and all 34 test files are AST-identical to their pre-change state at `3b3da88`, so the reformat
+      changed no test logic
+- [x] 8.3 Verify `git status` is clean apart from the intended commits, confirming no stray formatter
+      output or scratch artifacts were left in the tree. Result: only `tasks.md` (progress tracking) and the
+      pre-existing untracked `opencode.json` remain; no probe files, scratch scripts, or throwaway branches
+      or remotes survive anywhere in the repo
