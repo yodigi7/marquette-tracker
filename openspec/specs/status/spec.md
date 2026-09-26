@@ -22,13 +22,22 @@ The app SHALL provide a Status view at `/status` with a date picker and a derive
 
 ### Requirement: Status reflects the algorithm setting
 
-When interpretation is enabled, Status SHALL show the selected date's status, cycle day, confirmed or predicted source, fertile-window explanation, and next-period estimate when available. When interpretation is disabled, Status SHALL explain that data is logged without interpretation and SHALL NOT show computed fertile-window status.
+When interpretation is enabled, Status SHALL show the selected date's status, cycle day, fertile-window explanation, and next-period estimate when available. The status SHALL be derived for any date inside a cycle, whether or not a Day Record exists for that date. When interpretation is disabled, Status SHALL explain that data is logged without interpretation and SHALL NOT show computed fertile-window status.
 
 #### Scenario: Interpretation enabled
-- **WHEN** the user opens Status for a date with a derived cycle and interpretation is enabled
-- **THEN** the view shows the status, cycle day, source, window explanation, and next-period estimate when available
+
+- **WHEN** the user opens Status for a date inside a cycle and interpretation is enabled
+- **THEN** the view shows the status, cycle day, window explanation, and next-period estimate when available
+- **AND** it shows no status source
+
+#### Scenario: An unlogged date inside a cycle still reports a status
+
+- **GIVEN** a date inside a cycle's fertile window that has no Day Record
+- **WHEN** the user opens Status for that date
+- **THEN** the view shows the derived `fertile` status for that cycle day
 
 #### Scenario: Interpretation disabled
+
 - **WHEN** the user opens Status while the algorithm is disabled
 - **THEN** the view explains that readings are logged without interpretation
 - **AND** no computed fertile-window status is shown
@@ -43,7 +52,7 @@ The Status view SHALL NOT render a medical disclaimer.
 
 ### Requirement: Status summaries are readable in both themes
 
-The Status view SHALL render each existing status label, its source indicator, the fertile-window explanation, and any next-period estimate with theme-appropriate colors and text contrast. The view SHALL preserve the existing status labels and SHALL not introduce a new status category.
+The Status view SHALL render each status label, the fertile-window explanation, and any next-period estimate with theme-appropriate colors and text contrast. The view SHALL preserve the existing status labels and SHALL not introduce a new status category.
 
 #### Scenario: Status badge is readable in dark mode
 
@@ -57,24 +66,24 @@ The Status view SHALL render each existing status label, its source indicator, t
 - **THEN** the text remains readable in both light and dark themes
 - **AND** no information is conveyed only by a light-only text color
 
-### Requirement: Status preserves source and predictive meaning
+### Requirement: Status presents one treatment per status and keeps estimates predictive
 
-The Status view SHALL visually distinguish confirmed from predicted status source and SHALL make the next-period estimate visibly predictive rather than presenting it as confirmed data. These cues SHALL use the shared fertility visual language and SHALL retain the existing source and forecast semantics.
+The Status view SHALL present each derived status with a single visual treatment and SHALL NOT report a confirmed or predicted status source. A next-period estimate SHALL remain visibly predictive rather than being presented as confirmed data. Any predictive cue SHALL use the shared fertility visual language.
 
-#### Scenario: Confirmed and predicted source are distinguishable
+#### Scenario: Status shows no source badge
 
-- **WHEN** the selected date has a confirmed or predicted status source
-- **THEN** the source badge or cue is readable and distinct
-- **AND** the status label and explanation remain unchanged
+- **WHEN** the user views Status for a date with a derived status
+- **THEN** the view shows the status, cycle day, window explanation, and next-period estimate when available
+- **AND** it shows no confirmed or predicted source badge or cue
+
+#### Scenario: A status has one consistent treatment
+
+- **WHEN** two dates have the same derived status
+- **THEN** their status badges use the same visual treatment
+- **AND** the view distinguishes them only by the status itself, not by an evidence-strength variant
 
 #### Scenario: Estimated period is visibly predictive
 
 - **WHEN** a next-period estimate is available
 - **THEN** its predictive nature is communicated by a label, cue, or styling
 - **AND** it cannot be confused with a confirmed period record
-
-#### Scenario: Algorithm-disabled Status remains logging-only
-
-- **WHEN** the algorithm is disabled
-- **THEN** Status shows its logging-only explanation
-- **AND** it does not show a computed status badge, source, or fertile-window interpretation

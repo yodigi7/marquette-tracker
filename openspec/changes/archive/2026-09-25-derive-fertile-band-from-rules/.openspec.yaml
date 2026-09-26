@@ -1,0 +1,5 @@
+schema: spec-driven
+created: 2026-09-25
+# Every requirement in this capability is removed by the change, so the spec
+# file retires rather than being left with an empty Requirements section.
+retire_capabilities: true
