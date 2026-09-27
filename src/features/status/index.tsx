@@ -37,6 +37,9 @@ export function StatusView() {
   const peakReadings = cycle
     ? dayRecords.filter((r) => r.cycleId === cycle.id && r.monitor === "peak").length
     : 0;
+  // A count may not assert that days have elapsed when they have not, and the picker offers
+  // future dates, so the count is bounded by today rather than by the selection.
+  const todayCycleDay = cycle ? dayInCycle(cycle.day1, todayKey()) : null;
 
   return (
     <div className="mx-auto w-full max-w-md space-y-4">
@@ -57,7 +60,16 @@ export function StatusView() {
             }
             // Passed unconditionally, like the warning and the next-period estimate: the card
             // returns early when interpretation is off, and that is what suppresses them.
-            peakLine={result ? peakCountLine(result.peakDay, cycleDay, peakReadings) : null}
+            peakLine={
+              result && todayCycleDay !== null
+                ? peakCountLine({
+                    peakDay: result.peakDay,
+                    cycleDay,
+                    todayCycleDay,
+                    peaks: peakReadings,
+                  })
+                : null
+            }
             rangeLine={expectedPeakRangeLine(output?.forecast ?? null)}
             nextPeriod={output?.forecast?.expectedPeriodStart ?? null}
             algorithmEnabled={algorithmEnabled}

@@ -107,3 +107,32 @@ question is half-deferred. Both are recorded in the PR.
 - [x] 5.4 Comment on #29 recording the Decision 7 outcome: the reporting anchor is settled in
       `marquette-engine` and the method-sourced justification for preferring the latest reading over
       the first is explicitly deferred, per this change's acceptance criteria.
+
+## 6. Follow-up from the browser verification pass
+
+The first browser pass found a real overclaim the automated tests could not: the Status date picker has
+no future cut-off, so a date that has not happened yet can be selected, and the count read "13 days
+since" for a date eight days out. The difference of cycle days is a true number that the word "since"
+then makes false. Fixed before the PR was opened, and recorded as a fourth state in Decision 1 rather
+than patched quietly.
+
+- [x] 6.1 Add the failing cases to `src/features/status/__tests__/lib.test.ts`: a selected cycle day
+      past today's cycle day names the Peak's day and states the date has not happened yet, with no
+      count; today's cycle day still counts normally; the boundary is exclusive in the right
+      direction; and the multiple-Peak tally survives the future state. Run `pnpm test` and confirm
+      they fail.
+- [x] 6.2 Change `peakCountLine` in `src/features/status/lib.ts` to take a `PeakCountInput` object
+      carrying `todayCycleDay`, and check the future state before the elapsed arithmetic — a Peak can
+      only be logged on a day that has happened, so a future date is always ahead of it and would
+      otherwise fall into the count branch. Run `pnpm test`.
+- [x] 6.3 In `src/features/status/index.tsx`, compute the selected cycle's day for `todayKey()` and
+      pass it through. Do not clamp to the selection, and do not restrict the picker: both were
+      considered and rejected in Decision 1, and restricting the picker is a change to a shipped
+      behaviour belonging in its own issue.
+- [x] 6.4 Add the case to `src/features/status/__tests__/status.test.tsx`: a cycle with a Peak on day
+      11 and today on day 15 counts "4 days" normally, and selecting cycle day 20 then shows the
+      Peak's day and no count.
+- [x] 6.5 Add the corresponding requirement text and scenario to `specs/status/spec.md`, and the
+      fourth state plus the two rejected alternatives to `design.md` Decision 1. Run
+      `openspec validate --all`.
+- [x] 6.6 Re-run `pnpm check` and confirm format, lint, test, and build are green.

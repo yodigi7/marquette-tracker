@@ -75,25 +75,48 @@ source cue.
 
 The awkward case is a date selected _earlier_ in the cycle than the Peak. `cycleDay - peakDay` is
 negative there, and every way of presenting a negative number is either a countdown, an error, or a
-lie about the sign's meaning. So the readout has three states, not one number:
+lie about the sign's meaning. So the readout has four states, not one number:
 
 ```
-+-------------------------------------------------------+
-|  selected date >= Peak day                             |
-|    n > 0 -> "n days since your Peak reading on         |
-|              cycle day P."                             |
-|    n = 0 -> "Your Peak reading is on cycle day P       |
-|               - the same day."                         |
-|                                                       |
-|  selected date <  Peak day                             |
-|    -> "Your Peak reading is on cycle day P             |
-|         - this date is before it."                    |
-|        (no number in either direction)                |
-|                                                       |
-|  no monitor Peak reading in the cycle                 |
-|    -> "No Peak reading logged for this cycle yet."     |
-+-------------------------------------------------------+
++-----------------------------------------------------------+
+|  no monitor Peak reading in the cycle                     |
+|    -> "No Peak reading logged for this cycle yet."       |
+|                                                          |
+|  selected date not yet reached                           |
+|    -> "Your Peak reading is on cycle day P               |
+|         - this date has not happened yet."               |
+|        (no number -- those days have not elapsed)        |
+|                                                          |
+|  selected date >= Peak day                               |
+|    n = 0 -> "Your Peak reading is on cycle day P         |
+|               - the same day."                           |
+|    n > 0 -> "n days since your Peak reading on           |
+|               cycle day P."                              |
+|                                                          |
+|  selected date <  Peak day                                |
+|    -> "Your Peak reading is on cycle day P               |
+|         - this date is before it."                       |
+|        (no number in either direction)                   |
++-----------------------------------------------------------+
 ```
+
+The future-date state was added during verification, after a browser pass found the count asserting
+"13 days since" for a date eight days out. The picker has no future cut-off, so a user can select a
+day that has not happened, and a difference of cycle days is a true number that the word "since" then
+makes false. It is the same class of overclaim as the rest of an in-progress cycle presenting as
+settled, which the engine already reports as a warning — so a future date names the Peak day and counts
+nothing.
+
+**Alternative considered: clamp the count to today.** Rejected. The header would read "cycle day 24"
+while the count reflected day 15, and a number that disagrees with the line above it is worse than no
+number.
+
+**Alternative considered: block future dates in the picker.** It would remove the whole class, and it
+is defensible on the same grounds as the warning. Rejected as out of scope: the Status view is
+date-selectable for a reason, "what is my status on the 20th" has a real answer from the window, and
+this is a change to a shipped behaviour rather than to a new readout. It also affects the status badge,
+which already reports "Fertile" for days that have not arrived — a pre-existing question this change
+neither causes nor fixes. Worth its own issue if it is a problem.
 
 **Alternative considered: show "3 days until your Peak" on a pre-Peak date.** Rejected — it is
 precisely the thing the method is defined against, and it is the hardest kind of claim to label
@@ -195,6 +218,7 @@ badge → window → where you are relative to the Peak → what the next period
 | Counted        | `2 days since your Peak reading on cycle day 15.`                                      |
 | Same day       | `Your Peak reading is on cycle day 15 — the same day.`                                 |
 | Pre-Peak date  | `Your Peak reading is on cycle day 15 — this date is before it.`                       |
+| Future date    | `Your Peak reading is on cycle day 15 — this date has not happened yet.`               |
 | No Peak        | `No Peak reading logged for this cycle yet.`                                           |
 | Multiple       | append ` Last of 2 Peak readings this cycle.`                                          |
 | Range          | `Based on your last 6 completed cycles, your expected Peak day is cycle day 12 to 17.` |

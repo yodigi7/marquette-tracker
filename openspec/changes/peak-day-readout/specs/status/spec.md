@@ -14,7 +14,9 @@ implies a cycle can hold only one.
 
 When the selected cycle holds no monitor Peak reading, the view SHALL show an empty state naming that
 absence and SHALL NOT show a number. When the selected date falls earlier in the cycle than the Peak
-reading, the view SHALL name the Peak's cycle day and SHALL NOT show a count in either direction.
+reading, the view SHALL name the Peak's cycle day and SHALL NOT show a count in either direction. When
+the selected date has not yet arrived, the view SHALL name the Peak's cycle day and SHALL NOT show a
+count, because a count states that days have elapsed and a date still to come has none.
 
 The view SHALL NOT present a countdown to a Peak day, an expected single Peak day, or any single-day
 ovulation estimate. The view SHALL report the range of the earliest and latest monitor Peak days
@@ -57,6 +59,14 @@ and the range, because both are derived output.
 - **WHEN** the user opens Status for cycle day 8 of that cycle
 - **THEN** the view names cycle day 12 as that cycle's Peak reading
 - **AND** it displays no count of days in either direction
+
+#### Scenario: A date that has not happened yet shows no count
+
+- **GIVEN** a cycle with a monitor Peak reading on cycle day 11 and today on cycle day 15
+- **WHEN** the user selects a date in that cycle that is still in the future, such as cycle day 20
+- **THEN** the view names cycle day 11 as that cycle's Peak reading
+- **AND** it states that the selected date has not happened yet
+- **AND** it displays no count of elapsed days, because none of those days have elapsed
 
 #### Scenario: The expected Peak-day range is reported
 

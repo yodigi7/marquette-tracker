@@ -377,6 +377,33 @@ describe("StatusView: days since the Peak reading", () => {
     expect(screen.getByText(/until day 18 \(current monitor Peak \+ 3 days\)/)).toBeInTheDocument();
   });
 
+  it("refuses to count elapsed days for a date that has not happened yet", async () => {
+    // The picker has no future cut-off, so a user can select a date still to come. Counting to
+    // it would assert that days have elapsed which have not: with a Peak on day 11 and today on
+    // day 15, selecting day 20 must not read "9 days since".
+    const start = addDays(todayKey(), -14);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+    await store().addDayRecord(cycle.id, addDays(start, 10), 11, { monitor: "peak" });
+
+    const user = userEvent.setup();
+    render(<StatusView />);
+    // Today is cycle day 15, so the line counts normally before the date moves.
+    expect(await screen.findByTestId("status-peak-count")).toHaveTextContent(/^4 days since/);
+
+    await user.click(screen.getByTestId("date-trigger"));
+    const later = await pickDateButton(user, addDays(todayKey(), 5));
+    expect(later).not.toBeNull();
+    await user.click(later!);
+
+    expect(await screen.findByText(/cycle 1 · day 20/i)).toBeInTheDocument();
+    const line = screen.getByTestId("status-peak-count");
+    expect(line).toHaveTextContent(/cycle day 11/);
+    expect(line).toHaveTextContent(/has not happened yet/i);
+    expect(line.textContent).not.toMatch(/\d+ days? since/);
+    expect(line.textContent).not.toMatch(COUNTDOWN);
+  });
+
   it("names the Peak day and shows no count on a date before it", async () => {
     const start = addDays(todayKey(), -16);
     const cycle = await store().setNewCycle(start);

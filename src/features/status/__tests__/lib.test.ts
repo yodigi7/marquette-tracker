@@ -170,21 +170,28 @@ const COUNTDOWN =
   /\d+ days? (until|to|before)|until (your |the )?peak|days? to (your |the )?peak|next peak|coming peak|countdown|days? remaining/i;
 
 describe("peakCountLine", () => {
+  /**
+   * `todayCycleDay` defaults high so an ordinary case is not accidentally in the future; the
+   * future-date cases pass 16 explicitly, which is today's cycle day in them.
+   */
+  const at = (peakDay: number | null, cycleDay: number, peaks = 1, todayCycleDay = 99) =>
+    peakCountLine({ peakDay, cycleDay, todayCycleDay, peaks });
+
   it("counts the cycle days since the Peak and names the day it falls on", () => {
-    const line = peakCountLine(12, 15, 1)!;
+    const line = at(12, 15)!;
 
     expect(line).toContain("3 days");
     expect(line).toContain("cycle day 12");
   });
 
   it("is singular for a single day", () => {
-    expect(peakCountLine(12, 13, 1)).toContain("1 day since");
-    expect(peakCountLine(12, 13, 1)).not.toContain("1 days");
+    expect(at(12, 13)).toContain("1 day since");
+    expect(at(12, 13)).not.toContain("1 days");
   });
 
   it("phrases the same day without printing a zero count", () => {
     // "0 days since" reads as a measurement failure rather than as a fact.
-    const line = peakCountLine(12, 12, 1)!;
+    const line = at(12, 12)!;
 
     expect(line).toMatch(/same day/i);
     expect(line).toContain("cycle day 12");
@@ -194,12 +201,12 @@ describe("peakCountLine", () => {
   it("counts in cycle days, so an unlogged stretch does not move the number", () => {
     // Nothing between the two days is an input: a 3-day gap and a 10-day gap are both
     // just the difference of the two cycle days, whether or not the days hold records.
-    expect(peakCountLine(10, 13, 1)).toContain("3 days");
-    expect(peakCountLine(10, 20, 1)).toContain("10 days");
+    expect(at(10, 13)).toContain("3 days");
+    expect(at(10, 20)).toContain("10 days");
   });
 
   it("shows an empty state and no number when no Peak is logged", () => {
-    const line = peakCountLine(null, 15, 0)!;
+    const line = at(null, 15, 0)!;
 
     expect(line).toMatch(/no peak reading logged/i);
     expect(line).not.toMatch(/\d/);
@@ -207,7 +214,7 @@ describe("peakCountLine", () => {
 
   it("names the Peak day and shows no count on a date before it", () => {
     // A negative difference is a countdown in all but name, so nothing numeric renders here.
-    const line = peakCountLine(12, 8, 1)!;
+    const line = at(12, 8)!;
 
     expect(line).toContain("cycle day 12");
     expect(line).toMatch(/before it/i);
@@ -215,7 +222,7 @@ describe("peakCountLine", () => {
   });
 
   it("says how many Peak readings the cycle holds when there is more than one", () => {
-    const line = peakCountLine(15, 17, 2)!;
+    const line = at(15, 17, 2)!;
 
     expect(line).toContain("2 days");
     expect(line).toContain("cycle day 15");
@@ -223,17 +230,41 @@ describe("peakCountLine", () => {
   });
 
   it("adds no tally clause for a single Peak reading", () => {
-    expect(peakCountLine(12, 15, 1)).not.toMatch(/last of/i);
+    expect(at(12, 15)).not.toMatch(/last of/i);
+  });
+
+  it("refuses to count days that have not happened yet", () => {
+    // The picker lets a date be selected that is still in the future. "13 days since" would
+    // assert that thirteen days have elapsed when some of them have not, so a future date gets
+    // the Peak's day and no count. Today is cycle day 16; this is cycle day 24.
+    const line = at(11, 24, 1, 16)!;
+
+    expect(line).toContain("cycle day 11");
+    expect(line).toMatch(/has not happened yet/i);
+    expect(line).not.toMatch(/\d+ days? since/);
+    expect(line).not.toMatch(COUNTDOWN);
+  });
+
+  it("treats today itself as having happened", () => {
+    // The boundary matters: today is the last date the count may speak about.
+    expect(at(11, 16, 1, 16)).toContain("5 days since");
+    expect(at(11, 17, 1, 16)).toMatch(/has not happened yet/i);
+  });
+
+  it("keeps the multiple-Peak tally on a future date", () => {
+    expect(at(15, 30, 3, 16)).toMatch(/last of 3 peak readings/i);
   });
 
   it("never renders a countdown, a safety claim, or a disclaimer", () => {
     const lines = [
-      peakCountLine(12, 13, 1),
-      peakCountLine(12, 15, 1),
-      peakCountLine(15, 17, 2),
-      peakCountLine(12, 12, 1),
-      peakCountLine(12, 8, 1),
-      peakCountLine(null, 15, 0),
+      at(12, 13),
+      at(12, 15),
+      at(15, 17, 2),
+      at(12, 12),
+      at(12, 8),
+      at(11, 24, 2, 16),
+      at(null, 15, 0),
+      at(null, 24, 0, 16),
     ];
 
     for (const line of lines) {

@@ -89,6 +89,18 @@ export function windowDescription(window: FertileWindow, peakKnown: boolean): st
   return `${begin}; until day ${window.end} (${endRuleLabel(window.endRule)}).`;
 }
 
+/** The cycle and selection a Peak count is reported against. */
+export interface PeakCountInput {
+  /** The cycle's anchoring monitor Peak day, or null when none is logged. */
+  peakDay: number | null;
+  /** The selected date's cycle day. */
+  cycleDay: number;
+  /** Today's cycle day. A count may not speak about days beyond it. */
+  todayCycleDay: number;
+  /** Monitor Peak readings logged in this cycle. */
+  peaks: number;
+}
+
 /**
  * Where the selected cycle day sits relative to the cycle's Peak reading.
  *
@@ -97,22 +109,27 @@ export function windowDescription(window: FertileWindow, peakKnown: boolean): st
  * user did not log cannot move the number. A date earlier than the Peak has a negative difference,
  * and every way of rendering that is a countdown, so it names the day instead.
  *
+ * The Status view's picker has no future cut-off, so a date that has not happened yet can be
+ * selected. Counting to it would assert that days have elapsed which have not — the same class of
+ * overclaim as presenting the rest of an in-progress cycle as settled, which the engine already
+ * reports as a warning. So a future date names the Peak's day and counts nothing.
+ *
  * `peaks` is how many monitor Peak readings the cycle holds. A cycle can hold more than one, and a
  * count that does not say so reads as though it could only hold one. The clause states which reading
  * was used and how many exist, and deliberately does not claim which one set the window end: after
  * six cycles the historical rule can finish the window before the current one does.
- *
- * @param peakDay  the cycle's anchoring monitor Peak day, or null when none is logged
- * @param cycleDay the selected date's cycle day
- * @param peaks    monitor Peak readings logged in this cycle
  */
-export function peakCountLine(peakDay: number | null, cycleDay: number, peaks: number): string {
+export function peakCountLine({ peakDay, cycleDay, todayCycleDay, peaks }: PeakCountInput): string {
   if (peakDay === null) {
     return "No Peak reading logged for this cycle yet.";
   }
+  // Checked before the elapsed arithmetic: a Peak can only ever be logged on a day that has
+  // happened, so a future date is always ahead of it and would otherwise land in the count branch.
+  const future = cycleDay > todayCycleDay;
   const elapsed = cycleDay - peakDay;
-  const base =
-    elapsed === 0
+  const base = future
+    ? `Your Peak reading is on cycle day ${peakDay} — this date has not happened yet.`
+    : elapsed === 0
       ? `Your Peak reading is on cycle day ${peakDay} — the same day.`
       : elapsed < 0
         ? `Your Peak reading is on cycle day ${peakDay} — this date is before it.`
