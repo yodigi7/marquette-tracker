@@ -5,7 +5,7 @@ description: >-
   `--agent issues`; never launched on its own.
 mode: primary
 hidden: true
-steps: 120
+steps: 200
 permissions:
   - action: question
     resource: "*"
