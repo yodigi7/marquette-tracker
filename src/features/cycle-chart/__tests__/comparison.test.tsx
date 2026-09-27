@@ -37,9 +37,9 @@ describe("CycleComparisonView", () => {
     const bands = screen.getAllByTestId("comparison-day-band");
     // Cycle A: 28 days, Cycle B: 6 days (open) — both should have bands
     expect(bands.length).toBeGreaterThan(0);
-    // Both cycles should appear in the legend
-    expect(screen.getByText(/Cycle 1/)).toBeInTheDocument();
-    expect(screen.getByText(/Cycle 2/)).toBeInTheDocument();
+    // Both cycles should appear, each with a row label and a legend toggle
+    expect(screen.getAllByText(/Cycle 1/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Cycle 2/).length).toBeGreaterThan(0);
   });
 
   it("changes the number of recent cycles when N is updated", async () => {
@@ -59,7 +59,7 @@ describe("CycleComparisonView", () => {
       expect(screen.getAllByTestId("comparison-legend-item")).toHaveLength(1);
     });
     legendItems = screen.getAllByTestId("comparison-legend-item");
-    expect(legendItems[0].textContent).toContain("C2");
+    expect(legendItems[0].textContent).toContain("Cycle 2");
   });
 
   it("respects the algorithm toggle — no window bands when disabled", async () => {

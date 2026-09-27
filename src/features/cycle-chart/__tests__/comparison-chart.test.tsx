@@ -57,6 +57,20 @@ describe("CycleComparisonChart", () => {
     render(<CycleComparisonChart models={models} />);
     const bands = screen.getAllByTestId("comparison-day-band");
     expect(bands.length).toBe(20);
+
+    // Same cycle day must land at the same x in every row, whatever the calendar date.
+    const xByCycleAndDay = new Map<string, string>();
+    for (const band of bands) {
+      const key = `${band.getAttribute("data-day")}`;
+      const x = band.getAttribute("x");
+      const existing = xByCycleAndDay.get(key);
+      if (existing === undefined) {
+        xByCycleAndDay.set(key, x ?? "");
+      } else {
+        expect(x).toBe(existing);
+      }
+    }
+    expect(xByCycleAndDay.size).toBe(10);
   });
 
   it("pads shorter cycles to the longest cycle in the set", () => {
@@ -67,6 +81,14 @@ describe("CycleComparisonChart", () => {
     render(<CycleComparisonChart models={models} />);
     const rows = screen.getAllByTestId("comparison-legend-item");
     expect(rows).toHaveLength(2);
+
+    // The shorter cycle must not truncate the shared axis: the longer cycle still
+    // reaches its final day.
+    const bands = screen.getAllByTestId("comparison-day-band");
+    const days = bands.map((b) => Number(b.getAttribute("data-day")));
+    expect(Math.max(...days)).toBe(28);
+    // Day 22..28 exist only for the longer cycle, so it is padded, not truncated.
+    expect(bands.filter((b) => Number(b.getAttribute("data-day")) === 28)).toHaveLength(1);
   });
 
   it("renders per-cycle window bands when interpretation is enabled", () => {

@@ -5,8 +5,13 @@ import { CYCLE_COLORS, maxSpanOf, MONITOR_OPACITIES, type StripModel } from "./l
 
 /** Half-band pad keeps the first/last segments fully inside the plot area. */
 const X_PAD = 0.5;
-const ROW_H = 36;
-const LABEL_W = 80;
+/** Band height inside each row. Identical for every row so days line up. */
+const PLOT_H = 30;
+/** Top breathing room inside each row's chart. */
+const PAD_TOP = 2;
+/** Height reserved for the shared day axis, drawn once under the last row. */
+const AXIS_H = 16;
+const LABEL_W = 90;
 
 interface CycleComparisonChartProps {
   models: StripModel[];
@@ -19,13 +24,20 @@ interface BandShapeProps {
   width?: number;
   height?: number;
   payload?: unknown;
-  color?: string;
 }
 
-function RowBandShape({ x, y, width, height, payload, color }: BandShapeProps): ReactElement {
-  const datum = payload as { monitor?: StripModel["days"][number]["monitor"] } | null;
+interface BandDatum {
+  day: number;
+  value: number;
+  monitor?: StripModel["days"][number]["monitor"];
+  cycleIndex: number;
+}
+
+function RowBandShape({ x, y, width, height, payload }: BandShapeProps): ReactElement {
+  const datum = payload as BandDatum | null;
   const monitor = datum?.monitor ?? "none";
   const opacity = MONITOR_OPACITIES[monitor] ?? MONITOR_OPACITIES.none;
+  const color = CYCLE_COLORS[(datum?.cycleIndex ?? 0) % CYCLE_COLORS.length];
   return (
     <rect
       x={x}
@@ -33,9 +45,10 @@ function RowBandShape({ x, y, width, height, payload, color }: BandShapeProps): 
       width={width}
       height={height}
       rx={2}
-      fill={color ?? "#94a3b8"}
+      fill={color}
       fillOpacity={opacity}
       data-testid="comparison-day-band"
+      data-day={datum?.day}
       data-monitor={monitor}
     />
   );
@@ -71,36 +84,61 @@ export function CycleComparisonChart({ models }: CycleComparisonChartProps): Rea
 
   return (
     <div className="space-y-1" data-testid="cycle-comparison-chart">
-      {visibleModels.map((model) => {
+      {visibleModels.map((model, cycleIdx) => {
         const color = CYCLE_COLORS[models.indexOf(model) % CYCLE_COLORS.length];
-        const data = model.days.map((d) => ({ day: d.day, value: 1, monitor: d.monitor }));
+        const isLast = cycleIdx === visibleModels.length - 1;
+        const data: BandDatum[] = model.days.map((d) => ({
+          day: d.day,
+          value: 1,
+          monitor: d.monitor,
+          cycleIndex: cycleIdx,
+        }));
         return (
           <div key={model.cycleId} className="flex items-center gap-2">
             <button
               type="button"
               className="flex shrink-0 items-center gap-1 rounded px-1 py-0.5 text-left text-[11px] text-muted-foreground hover:bg-muted"
+              style={{ width: `${LABEL_W}px` }}
               onClick={() => toggleCycle(model.cycleId)}
               data-testid="comparison-legend-item"
               data-cycle-id={model.cycleId}
-              data-disabled={false}
+              data-disabled="false"
               title="Click to hide this cycle"
             >
               <span className="h-2 w-2 rounded" style={{ backgroundColor: color }} />
               <span>
-                C{model.cycleNo} ({model.span}d)
+                Cycle {model.cycleNo} ({model.span}d)
               </span>
             </button>
             <div className="min-w-0 flex-1">
-              <ResponsiveContainer width="100%" height={ROW_H}>
-                <ComposedChart data={data} margin={{ top: 2, right: 0, left: 0, bottom: 2 }}>
-                  <XAxis
-                    type="number"
-                    dataKey="day"
-                    domain={[X_PAD, maxSpan + X_PAD]}
-                    ticks={[]}
-                    tickLine={false}
-                    axisLine={false}
-                  />
+              {/* The axis is charged twice on the last row: once as bottom margin and
+                  once as the axis's own height, so PLOT_H stays identical to the rows
+                  above it and the day columns line up across every cycle. */}
+              <ResponsiveContainer
+                width="100%"
+                height={isLast ? PLOT_H + PAD_TOP + AXIS_H * 2 : PLOT_H + PAD_TOP}
+              >
+                <ComposedChart
+                  data={data}
+                  margin={{ top: PAD_TOP, right: 0, left: 0, bottom: isLast ? AXIS_H : 0 }}
+                >
+                  {/* Day numbers appear once, under the bottom row; every row shares the
+                      same domain so the day columns line up across cycles. */}
+                  {isLast ? (
+                    <XAxis
+                      type="number"
+                      dataKey="day"
+                      domain={[X_PAD, maxSpan + X_PAD]}
+                      ticks={Array.from({ length: maxSpan }, (_, i) => i + 1)}
+                      interval={0}
+                      height={AXIS_H}
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fontSize: 9 }}
+                    />
+                  ) : (
+                    <XAxis hide type="number" dataKey="day" domain={[X_PAD, maxSpan + X_PAD]} />
+                  )}
                   <YAxis hide domain={[0, 1]} />
                   {model.window && (
                     <ReferenceArea
@@ -108,10 +146,10 @@ export function CycleComparisonChart({ models }: CycleComparisonChartProps): Rea
                       x2={(model.window.end ?? maxSpan) + X_PAD}
                       y1={0}
                       y2={1}
-                      fill={color}
-                      fillOpacity={0.18}
-                      stroke={color}
-                      strokeOpacity={0.35}
+                      fill="#64748b"
+                      fillOpacity={0.14}
+                      stroke="#64748b"
+                      strokeOpacity={0.3}
                       strokeWidth={1}
                       data-testid="comparison-window-band"
                       data-cycle-id={model.cycleId}
@@ -119,32 +157,13 @@ export function CycleComparisonChart({ models }: CycleComparisonChartProps): Rea
                       data-end={model.window.end ?? ""}
                     />
                   )}
-                  <Bar
-                    dataKey="value"
-                    isAnimationActive={false}
-                    shape={(props: BandShapeProps) => <RowBandShape {...props} color={color} />}
-                  />
+                  <Bar dataKey="value" isAnimationActive={false} shape={RowBandShape} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
           </div>
         );
       })}
-      <div className="flex items-center gap-2 pt-1">
-        <div className="shrink-0" style={{ width: `${LABEL_W}px` }} />
-        <div className="flex-1">
-          <XAxis
-            type="number"
-            dataKey="day"
-            domain={[X_PAD, maxSpan + X_PAD]}
-            ticks={Array.from({ length: maxSpan }, (_, i) => i + 1)}
-            interval={0}
-            tickLine={false}
-            axisLine={false}
-            tick={{ fontSize: 10 }}
-          />
-        </div>
-      </div>
       <ComparisonLegend
         models={models}
         disabledCycleIds={disabledCycleIds}
