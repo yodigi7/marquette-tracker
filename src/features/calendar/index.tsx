@@ -2,13 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Heart } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import {
-  FERTILITY_FORECAST_VISUAL,
-  FERTILITY_CALENDAR_PHASE_VISUALS,
-  FERTILITY_MARKER_VISUALS,
-  FERTILITY_MONITOR_VISUALS,
-  FERTILITY_TEXT_VISUALS,
-} from "@/lib/fertility-visuals";
+import { FERTILITY_TEXT_VISUALS } from "@/lib/fertility-visuals";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,12 +20,25 @@ import {
   projectedCyclesThrough,
 } from "@/core/store/selectors";
 import { useAppStore } from "@/core/store/useAppStore";
-import type { CycleEntity, DayRecordEntity } from "@/core/store/entities";
+import type { CalendarLayerId, CycleEntity, DayRecordEntity } from "@/core/store/entities";
 import { DayCell } from "./day-cell";
 import { CalendarSummary } from "./summary";
 import { autoOpenStorageKey, shouldAutoOpenToday } from "./auto-open";
 import { monthGrid, monthTitle, resolveCell, shiftMonth, weekdayLabels } from "./grid";
 import { QuickEntry } from "./quick-entry";
+import {
+  hasHiddenOnScreen,
+  HOLLOW_SWATCH,
+  hiddenOutsideOffered,
+  LAYER_PAINT,
+  isLayerShown,
+  LAYER_GROUP_LABELS,
+  LAYER_GROUPS,
+  offeredLayers,
+  swatchSample,
+  toggleLayer,
+  type CalendarLayer,
+} from "./layers";
 
 export function CalendarView() {
   const cycles = useAppStore((s) => s.cycles);
@@ -40,7 +47,11 @@ export function CalendarView() {
   const interpreted = useAppStore((s) => s.settings.algorithmEnabled);
   const settings = useAppStore((s) => s.settings);
   const detailMode = useAppStore((s) => s.settings.calendarDetailMode);
+  const hiddenLayers = useAppStore((s) => s.settings.hiddenCalendarLayers);
   const updateSettings = useAppStore((s) => s.updateSettings);
+  // The keys the legend can offer right now. `Show all` is scoped to these, so a
+  // stored choice for a key that is not on screen is left alone.
+  const offered = offeredLayers({ interpreted, detailMode });
   const weekStart = useAppStore((s) => s.settings.weekStart);
 
   const now = new Date();
@@ -170,10 +181,12 @@ export function CalendarView() {
                 info={interpreted ? cell.info : null}
                 forecast={interpreted ? cell.forecast : false}
                 menses={cell.menses}
+                cycleStart={cell.cycleStart}
                 monitor={cell.monitor}
                 intercourse={cell.intercourse}
                 isToday={dateKey === today}
                 detailMode={detailMode}
+                hiddenLayers={hiddenLayers}
                 onSelect={onSelectDate}
               />
             );
@@ -184,9 +197,15 @@ export function CalendarView() {
       <Legend
         interpreted={interpreted}
         detailMode={detailMode}
-        projecting={projected.length > 0}
+        hidden={hiddenLayers}
         onToggleDetail={() =>
           updateSettings({ calendarDetailMode: detailMode === "simple" ? "full" : "simple" })
+        }
+        onToggleLayer={(id) =>
+          updateSettings({ hiddenCalendarLayers: toggleLayer(hiddenLayers, id) })
+        }
+        onShowAll={() =>
+          updateSettings({ hiddenCalendarLayers: hiddenOutsideOffered(hiddenLayers, offered) })
         }
       />
 
@@ -250,18 +269,36 @@ function pendingPlacement(
 function Legend({
   interpreted,
   detailMode,
-  projecting,
+  hidden,
   onToggleDetail,
+  onToggleLayer,
+  onShowAll,
 }: {
   interpreted: boolean;
   detailMode: "simple" | "full";
-  projecting: boolean;
+  hidden: readonly CalendarLayerId[];
   onToggleDetail(): void;
+  onToggleLayer(id: CalendarLayerId): void;
+  onShowAll(): void;
 }) {
   const fullDetail = detailMode === "full";
+  const offered = offeredLayers({ interpreted, detailMode });
+  // A control only changes what it can show you: the reset is scoped to the keys
+  // actually on screen, so an absent key's stored choice survives untouched.
+  const canRestore = hasHiddenOnScreen(hidden, offered);
+  const rows = LAYER_GROUPS.map((group) => ({
+    group,
+    layers: offered.filter((layer) => layer.group === group),
+  })).filter((row) => row.layers.length > 0);
+
   return (
     <div className="space-y-2" data-testid="calendar-legend">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-1">
+        {canRestore && (
+          <Button variant="ghost" size="sm" onClick={onShowAll} aria-label="Show all layers">
+            Show all
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"
@@ -272,99 +309,56 @@ function Legend({
         </Button>
       </div>
       <div className={cn("space-y-1 text-[11px]", FERTILITY_TEXT_VISUALS.muted)}>
-        {interpreted && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="font-medium">Status</span>
-            <LegendItem
-              className={cn("rounded", FERTILITY_CALENDAR_PHASE_VISUALS.before.fill)}
-              label="Before"
-            />
-            <LegendItem
-              className={cn("rounded", FERTILITY_CALENDAR_PHASE_VISUALS.fertile.fill)}
-              label="Fertile"
-            />
-            <LegendItem
-              className={cn("rounded", FERTILITY_CALENDAR_PHASE_VISUALS.after.fill)}
-              label="After"
-            />
-            <LegendItem
-              className={cn(
-                "rounded border",
-                FERTILITY_FORECAST_VISUAL.cellBorder,
-                FERTILITY_FORECAST_VISUAL.fill,
-              )}
-              label="Predicted window"
-            />
-            {projecting && (
-              // A projected day keeps its phase fill; the dashed border is the
-              // cue, so the sample shows a phase fill with that border.
-              <LegendItem
-                className={cn(
-                  "rounded border",
-                  FERTILITY_FORECAST_VISUAL.cellBorder,
-                  FERTILITY_CALENDAR_PHASE_VISUALS.fertile.fill,
-                )}
-                label="Projected"
+        {rows.map(({ group, layers }) => (
+          <div key={group} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="font-medium">{LAYER_GROUP_LABELS[group]}</span>
+            {layers.map((layer) => (
+              <LayerKey
+                key={layer.id}
+                layer={layer}
+                shown={isLayerShown(hidden, layer.id)}
+                onToggle={() => onToggleLayer(layer.id)}
               />
-            )}
+            ))}
           </div>
-        )}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="font-medium">Data</span>
-          <LegendStripe className={FERTILITY_MARKER_VISUALS.menses.stripe} label="Menses" />
-          <LegendMonitorKey />
-        </div>
-        {fullDetail && interpreted && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="font-medium">Details</span>
-            <span className="flex items-center gap-1">
-              <Heart
-                aria-hidden="true"
-                className={cn("size-2", FERTILITY_MARKER_VISUALS.intercourse.icon)}
-              />
-              Intercourse
-            </span>
-          </div>
-        )}
+        ))}
       </div>
     </div>
   );
 }
 
-function LegendItem({ className, label }: { className: string; label: string }) {
+/**
+ * One legend key per layer, doubling as that layer's visibility control. A hidden
+ * key keeps its label and shows the shape without the colour, so it stays
+ * readable — reading it is the only route to putting the layer back.
+ */
+function LayerKey({
+  layer,
+  shown,
+  onToggle,
+}: {
+  layer: CalendarLayer;
+  shown: boolean;
+  onToggle(): void;
+}) {
   return (
-    <span className="flex items-center gap-1" data-legend-label={label}>
-      <span className={cn("h-2.5 w-2.5", className)} />
-      {label}
-    </span>
-  );
-}
-
-function LegendDot({ className, label }: { className: string; label: string }) {
-  return (
-    <span className="flex items-center gap-1" data-legend-label={label}>
-      <span className={cn("h-1.5 w-1.5 rounded-full", className)} />
-      {label}
-    </span>
-  );
-}
-
-function LegendStripe({ className, label }: { className: string; label: string }) {
-  return (
-    <span className="flex items-center gap-1" data-legend-label={label}>
-      <span className={cn("h-1 w-4 rounded-full", className)} />
-      {label}
-    </span>
-  );
-}
-
-function LegendMonitorKey() {
-  return (
-    <span className="flex items-center gap-1" data-legend-label="Monitor">
-      <span>Monitor</span>
-      <LegendDot className={FERTILITY_MONITOR_VISUALS.low.dot} label="Low" />
-      <LegendDot className={FERTILITY_MONITOR_VISUALS.high.dot} label="High" />
-      <LegendDot className={FERTILITY_MONITOR_VISUALS.peak.dot} label="Peak" />
-    </span>
+    <button
+      type="button"
+      aria-pressed={shown}
+      aria-label={layer.label}
+      onClick={onToggle}
+      data-legend-label={layer.label}
+      className="-my-1 flex items-center gap-1 rounded px-1 py-1 text-left transition-colors hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-foreground/70 focus-visible:outline-none"
+    >
+      <span
+        aria-hidden="true"
+        className={cn(layer.footprint, shown ? swatchSample(layer) : HOLLOW_SWATCH)}
+      >
+        {shown && layer.glyph === "intercourse" ? (
+          <Heart className={cn("size-2", LAYER_PAINT[layer.id].marker)} />
+        ) : null}
+      </span>
+      {layer.label}
+    </button>
   );
 }

@@ -69,7 +69,14 @@ export function weekdayLabels(weekStart: WeekStart = "monday"): string[] {
 export interface CellInfo {
   info: DayStatus | null;
   forecast: boolean;
+  /** Menses the user recorded, or a real cycle's day 1, which is menses by construction. */
   menses: boolean;
+  /**
+   * The first day of a projected cycle. A prediction rather than a logged
+   * observation, so it is a separate flag: one control that governs the
+   * raw-menses layer must not also remove a forecast cue.
+   */
+  cycleStart: boolean;
   monitor: DayRecordEntity["monitor"];
   intercourse: boolean;
 }
@@ -91,7 +98,9 @@ function projectedCycleForDate(projected: CycleResult[], dateKey: string): Cycle
  *
  * A date covered by a projected cycle resolves its status from that cycle's window
  * and is marked as forecast. Projected cycles are only consulted for dates after
- * today, so a real cycle's derived days keep their own treatment.
+ * today, so a real cycle's derived days keep their own treatment. A projected
+ * cycle's day 1 is reported as `cycleStart` rather than `menses`, because the app
+ * is predicting that period rather than reporting one the user logged.
  */
 export function resolveCell(
   cycles: CycleEntity[],
@@ -118,7 +127,8 @@ export function resolveCell(
       // what tells the cell this day has not happened yet.
       info: statusForWindow(projectedCycle, dayNo),
       forecast: true,
-      menses: dayNo === 1,
+      menses: false,
+      cycleStart: dayNo === 1,
       monitor: undefined,
       intercourse: false,
     };
@@ -130,6 +140,7 @@ export function resolveCell(
     info: isFuture ? null : statusForCell(cycle, results, dateKey),
     forecast: inForecast && isFuture && !record,
     menses: !isFuture && mensesFor(record, cycle ? dayInCycle(cycle.day1, dateKey) : 0),
+    cycleStart: false,
     monitor: record?.monitor && record.monitor !== "none" ? record.monitor : undefined,
     intercourse: !!record?.intercourse,
   };

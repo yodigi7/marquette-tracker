@@ -5,9 +5,12 @@ import userEvent from "@testing-library/user-event";
 import { addDays } from "@/core/engine/dateUtils";
 import { dateKeyLocal, parseDateKey, todayKey } from "@/core/dateKeys";
 import { useAppStore } from "@/core/store/useAppStore";
+import type { CalendarLayerId } from "@/core/store/entities";
 import { Toaster } from "@/components/ui/sonner";
 import { CalendarView } from "../index";
 import { DayCell } from "../day-cell";
+import type { DayCellProps } from "../day-cell";
+import { CALENDAR_LAYERS, LAYER_PAINT } from "../layers";
 import { autoOpenStorageKey } from "../auto-open";
 
 const store = () => useAppStore.getState();
@@ -624,7 +627,6 @@ describe("CalendarView", () => {
     expect(screen.getByText("Fertile")).toBeInTheDocument();
     expect(screen.getByText("After")).toBeInTheDocument();
     expect(screen.getByText("Menses")).toBeInTheDocument();
-    expect(screen.getByText("Monitor")).toBeInTheDocument();
     expect(screen.getByText("Low")).toBeInTheDocument();
     expect(screen.getByText("High")).toBeInTheDocument();
     expect(screen.getByText("Peak")).toBeInTheDocument();
@@ -642,10 +644,12 @@ describe("CalendarView", () => {
     await user.click(screen.getByRole("button", { name: /show full detail/i }));
 
     expect(await screen.findByText("Intercourse")).toBeInTheDocument();
-    expect(screen.getByText("Predicted window")).toBeInTheDocument();
+    expect(screen.getByText("Predicted")).toBeInTheDocument();
     // the single-day ovulation estimate is gone from the vocabulary
     expect(screen.queryByText("Predicted ovulation")).not.toBeInTheDocument();
-    // the projected entry appears only once projection is actually painting days
+    // one predictive key covers both the forecast window and projected days
+    expect(screen.getAllByText("Predicted")).toHaveLength(1);
+    expect(screen.queryByText("Predicted window")).not.toBeInTheDocument();
     expect(screen.queryByText("Projected")).not.toBeInTheDocument();
     expect(screen.queryByText("Confirmed source")).not.toBeInTheDocument();
     expect(screen.queryByText("Predicted status")).not.toBeInTheDocument();
@@ -868,20 +872,28 @@ describe("CalendarView with cycle projection", () => {
       .getAllByTestId("day-cell")
       .filter((el) => el.getAttribute("data-forecast") === "true");
     expect(projected).toHaveLength(0);
-    // the legend's projected entry goes with it
-    expect(screen.queryByText("Projected")).not.toBeInTheDocument();
+    // with interpretation off there is no predictive treatment to explain, so
+    // its key is withdrawn along with the other derived ones
+    expect(screen.queryByText("Predicted")).not.toBeInTheDocument();
+    expect(screen.getByText("Menses")).toBeInTheDocument();
   });
 
-  it("lists a Projected legend entry only while projection is painting days", async () => {
+  it("describes the predictive treatment with one key, projection on or off", async () => {
+    render(<CalendarView />);
+    const offSample = document.querySelector('[data-legend-label="Predicted"]')?.firstElementChild;
+    // the sample carries the dashed cue projected and forecast cells both use
+    expect(offSample?.className).toContain("border-dashed");
+    expect(offSample?.className).toContain("bg-fertility-forecast-bg");
+
+    cleanup();
     await seedHistory();
     await store().updateSettings({ projectFutureCycles: true });
     render(<CalendarView />);
 
-    expect(await screen.findByText("Projected")).toBeInTheDocument();
-    // the sample matches the cells: a phase fill with the dashed forecast border
-    const swatch = document.querySelector('[data-legend-label="Projected"]')?.firstElementChild;
-    expect(swatch?.className).toContain("border-dashed");
-    expect(swatch?.className).toContain("bg-fertility-status-fertile");
+    expect(await screen.findByText("Predicted")).toBeInTheDocument();
+    expect(screen.getAllByText("Predicted")).toHaveLength(1);
+    const onSample = document.querySelector('[data-legend-label="Predicted"]')?.firstElementChild;
+    expect(onSample?.className).toContain("border-dashed");
   });
 
   it("refuses to log a projected day", async () => {
@@ -907,5 +919,462 @@ describe("CalendarView with cycle projection", () => {
     });
     // nothing was written
     expect(store().dayRecords.every((r) => r.date <= todayKey())).toBe(true);
+  });
+});
+
+describe("day cell layer visibility", () => {
+  /** A cell carrying every layer at once, so hiding one can be shown to be surgical. */
+  const loaded: DayCellProps = {
+    dateKey: "2026-01-14",
+    dayNumber: 14,
+    info: "fertile",
+    forecast: false,
+    menses: true,
+    monitor: "peak",
+    intercourse: true,
+    isToday: true,
+    detailMode: "full",
+    onSelect: () => {},
+  };
+
+  function renderCell(overrides: Partial<DayCellProps> = {}, hidden: string[] = []) {
+    const { unmount } = render(
+      <DayCell
+        {...loaded}
+        {...overrides}
+        hiddenLayers={hidden as never}
+        key={hidden.join(",") + JSON.stringify(overrides)}
+      />,
+    );
+    const cell = screen.getByTestId("day-cell");
+    return { cell, unmount };
+  }
+
+  const stripe = '[data-testid="calendar-menses-stripe"]';
+  const marker = '[data-testid="calendar-monitor-marker"]';
+
+  // Phase and forecast classes sit on the cell itself; monitor, menses and
+  // intercourse classes sit on descendants, so both places are checked.
+  const hasClass =
+    (cls: string) =>
+    (cell: HTMLElement): boolean =>
+      cell.classList.contains(cls) || cell.querySelector(`.${cls}`) !== null;
+  const has = (selector: string) => (cell: HTMLElement) => cell.querySelector(selector) !== null;
+
+  it.each([
+    ["before", { info: "pre-fertile" as const }, hasClass("bg-fertility-status-pre")],
+    ["fertile", { info: "fertile" as const }, hasClass("bg-fertility-status-fertile")],
+    ["after", { info: "post-peak" as const }, hasClass("bg-fertility-status-post-peak")],
+    ["predicted", { info: null, forecast: true }, hasClass("bg-fertility-forecast-bg")],
+    ["menses", {}, has(stripe)],
+    ["low", { monitor: "low" as const }, hasClass("bg-fertility-monitor-low")],
+    ["high", { monitor: "high" as const }, hasClass("bg-fertility-monitor-high")],
+    ["peak", { monitor: "peak" as const }, hasClass("bg-fertility-monitor-peak")],
+    ["intercourse", {}, has('[title="Intercourse"]')],
+  ] as const)("hiding %s removes that layer from the cell", (id, overrides, painted) => {
+    const shown = renderCell(overrides);
+    expect(painted(shown.cell), `${id} is painted while shown`).toBe(true);
+    shown.unmount();
+
+    const hidden = renderCell(overrides, [id]);
+    expect(painted(hidden.cell), `${id} is still painted while hidden`).toBe(false);
+  });
+
+  it("hiding the predictive layer removes the dashed cue as well as the forecast fill", () => {
+    const { cell } = renderCell({ info: null, forecast: true }, ["predicted"]);
+    expect(cell.className).not.toContain("border-fertility-forecast-border");
+  });
+
+  it("hiding one layer leaves every other layer painted", () => {
+    const { cell } = renderCell({}, ["menses"]);
+    expect(cell.querySelector(stripe)).toBeNull();
+    expect(cell.className).toContain("bg-fertility-status-fertile");
+    expect(cell.querySelector(marker)?.className).toContain("bg-fertility-monitor-peak");
+    expect(cell.querySelector('[title="Intercourse"]')).not.toBeNull();
+  });
+
+  it("keeps the day number, the today ring, and the click target when every layer is hidden", async () => {
+    const user = userEvent.setup();
+    let selected: string | null = null;
+    const { cell } = renderCell({ onSelect: (date: string) => (selected = date) }, [
+      "before",
+      "fertile",
+      "after",
+      "predicted",
+      "menses",
+      "low",
+      "high",
+      "peak",
+      "intercourse",
+    ]);
+    expect(cell.textContent).toBe("14");
+    expect(cell.className).toContain("ring-2");
+    await user.click(cell);
+    expect(selected).toBe("2026-01-14");
+  });
+
+  it("leaves the accessible description identical when layers are hidden", () => {
+    const shown = renderCell();
+    const shownLabel = shown.cell.getAttribute("aria-label");
+    shown.unmount();
+
+    const hidden = renderCell({}, ["before", "menses", "peak", "intercourse"]);
+    expect(hidden.cell.getAttribute("aria-label")).toBe(shownLabel);
+    expect(shownLabel).toContain("monitor peak");
+    expect(shownLabel).toContain("Fertile");
+    expect(shownLabel).toContain("menses");
+    expect(shownLabel).toContain("intercourse");
+  });
+
+  it("still reports a projected day as projected once the cue is hidden", () => {
+    // The opt-out removes the visual cue only. A day the app is predicting is
+    // still announced as one, so the relaxation never becomes a silent one.
+    const { cell } = renderCell({ info: "fertile", forecast: true }, ["predicted"]);
+    expect(cell.className).not.toContain("border-fertility-forecast-border");
+    expect(cell.getAttribute("aria-label")).toContain("projected");
+  });
+});
+
+describe("the key sample and the cell paint agree", () => {
+  /** The legend label for a layer id. */
+  function keyFor(id: string): string {
+    return CALENDAR_LAYERS.find((layer) => layer.id === id)!.label;
+  }
+
+  /** The classes the declaration says this layer paints. */
+  function paintClassesFor(id: string): string[] {
+    const paint = LAYER_PAINT[id as CalendarLayerId];
+    return [paint.fill, paint.border, paint.marker].filter((cls) => cls !== "");
+  }
+
+  const cellFor: Record<string, Partial<DayCellProps>> = {
+    before: { info: "pre-fertile" },
+    fertile: { info: "fertile" },
+    after: { info: "post-peak" },
+    predicted: { info: null, forecast: true },
+    menses: { info: null, menses: true },
+    low: { info: null, monitor: "low" },
+    high: { info: null, monitor: "high" },
+    peak: { info: null, monitor: "peak" },
+    intercourse: { info: null, intercourse: true },
+  };
+
+  it.each(Object.keys(cellFor))("the %s key shows the class the day cell paints", async (id) => {
+    await store().updateSettings({ calendarDetailMode: "full" });
+    const { unmount } = render(
+      <DayCell
+        dateKey="2026-01-14"
+        dayNumber={14}
+        info={null}
+        forecast={false}
+        menses={false}
+        monitor={undefined}
+        intercourse={false}
+        isToday={false}
+        detailMode="full"
+        onSelect={() => {}}
+        {...cellFor[id]}
+      />,
+    );
+    // outerHTML, because a fill or border sits on the cell's own class
+    // attribute while a marker sits on a descendant.
+    const painted = screen.getByTestId("day-cell").outerHTML;
+    unmount();
+
+    render(<CalendarView />);
+    const label = keyFor(id);
+    const swatch = screen.getByRole("button", { name: new RegExp(`^${label}`, "i") });
+    const sample = swatch.outerHTML;
+
+    for (const cls of paintClassesFor(id)) {
+      expect(painted, `${id} is painted on the cell`).toContain(cls);
+      expect(sample, `${id} key shows the same class`).toContain(cls);
+    }
+  });
+});
+
+describe("the predicted cycle-start stripe", () => {
+  const stripe = '[data-testid="calendar-menses-stripe"]';
+
+  function renderProjected(hidden: string[] = []) {
+    render(
+      <DayCell
+        dateKey="2026-02-01"
+        dayNumber={1}
+        info="pre-fertile"
+        forecast
+        menses={false}
+        cycleStart
+        monitor={undefined}
+        intercourse={false}
+        isToday={false}
+        detailMode="simple"
+        hiddenLayers={hidden as never}
+        onSelect={() => {}}
+      />,
+    );
+    return screen.getByTestId("day-cell");
+  }
+
+  it("paints the stripe for a predicted cycle start without any logged menses", () => {
+    expect(renderProjected().querySelector(stripe)).not.toBeNull();
+  });
+
+  it("is governed by the predictive layer, so hiding Menses leaves it", () => {
+    expect(renderProjected(["menses"]).querySelector(stripe)).not.toBeNull();
+  });
+
+  it("is removed by hiding the predictive layer", () => {
+    expect(renderProjected(["predicted"]).querySelector(stripe)).toBeNull();
+  });
+});
+
+describe("legend layer controls", () => {
+  /** A cycle with a Peak, so the month paints every derived layer at once. */
+  async function seedLayeredMonth() {
+    const today = todayKey();
+    const day1 = addDays(today, -20);
+    const cycle = await store().setNewCycle(day1);
+    await store().addDayRecord(cycle.id, day1, 1, { bloodFlow: "medium" });
+    await store().addDayRecord(cycle.id, addDays(day1, 11), 12, { monitor: "peak" });
+    await store().addDayRecord(cycle.id, addDays(day1, 13), 14, {
+      monitor: "low",
+      intercourse: true,
+    });
+  }
+
+  function key(label: string): HTMLElement {
+    return screen.getByRole("button", { name: new RegExp(`^${label}`, "i") });
+  }
+
+  function queryKey(label: string): HTMLElement | null {
+    return screen.queryByRole("button", { name: new RegExp(`^${label}`, "i") });
+  }
+
+  /**
+   * The store write is asynchronous, so the assertion waits for it to land. The
+   * stored order is click order and carries no meaning, so it is compared sorted.
+   */
+  async function expectHidden(expected: string[]) {
+    await waitFor(() =>
+      expect([...store().settings.hiddenCalendarLayers].sort()).toEqual([...expected].sort()),
+    );
+  }
+
+  it("offers every layer as a control that reports itself pressed", async () => {
+    await seedLayeredMonth();
+    await store().updateSettings({ calendarDetailMode: "full" });
+    render(<CalendarView />);
+
+    for (const label of [
+      "Before",
+      "Fertile",
+      "After",
+      "Predicted",
+      "Menses",
+      "Low",
+      "High",
+      "Peak",
+      "Intercourse",
+    ]) {
+      expect(key(label), label).toHaveAttribute("aria-pressed", "true");
+    }
+  });
+
+  it("hides and restores a layer from its own key", async () => {
+    const user = userEvent.setup();
+    await seedLayeredMonth();
+    render(<CalendarView />);
+
+    await user.click(key("Menses"));
+    await expectHidden(["menses"]);
+    await waitFor(() => expect(key("Menses")).toHaveAttribute("aria-pressed", "false"));
+
+    await user.click(key("Menses"));
+    await expectHidden([]);
+    await waitFor(() => expect(key("Menses")).toHaveAttribute("aria-pressed", "true"));
+  });
+
+  it("keeps a hidden key readable while showing it as hollow", async () => {
+    const user = userEvent.setup();
+    await seedLayeredMonth();
+    render(<CalendarView />);
+
+    // React reuses the node, so the class is captured rather than the element.
+    const before = key("Fertile").querySelector("span")?.className;
+    await user.click(key("Fertile"));
+    await expectHidden(["fertile"]);
+    const after = key("Fertile").querySelector("span")?.className;
+
+    expect(key("Fertile")).toHaveTextContent("Fertile");
+    expect(before).toContain("bg-fertility-status-fertile");
+    expect(after).not.toContain("bg-fertility-status-fertile");
+    expect(after).toContain("border");
+  });
+
+  it("removes the menses stripe from day cells without touching the record", async () => {
+    const user = userEvent.setup();
+    const today = todayKey();
+    const day1 = addDays(today, -20);
+    const cycle = await store().setNewCycle(day1);
+    await store().addDayRecord(cycle.id, day1, 1, { bloodFlow: "medium" });
+    render(<CalendarView />);
+
+    const stripe = () => cellByDate(day1)?.querySelector('[data-testid="calendar-menses-stripe"]');
+    expect(stripe()).not.toBeNull();
+
+    await user.click(key("Menses"));
+    await expectHidden(["menses"]);
+    await waitFor(() => expect(stripe()).toBeNull());
+
+    // The record itself is untouched and still editable.
+    expect(store().dayRecords.find((r) => r.date === day1)?.bloodFlow).toBe("medium");
+  });
+
+  it("withdraws the derived keys with the algorithm off and keeps the raw ones", async () => {
+    await seedLayeredMonth();
+    await store().updateSettings({ algorithmEnabled: false });
+    render(<CalendarView />);
+
+    for (const label of ["Before", "Fertile", "After", "Predicted"]) {
+      expect(queryKey(label), label).toBeNull();
+    }
+    for (const label of ["Menses", "Low", "High", "Peak"]) {
+      expect(key(label), label).toBeInTheDocument();
+    }
+  });
+
+  it("offers the intercourse key only in the full-detail presentation", async () => {
+    const user = userEvent.setup();
+    await seedLayeredMonth();
+    render(<CalendarView />);
+    expect(queryKey("Intercourse")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /show full detail/i }));
+    expect(await screen.findByRole("button", { name: /^Intercourse/i })).toBeInTheDocument();
+  });
+
+  it("keeps a hidden layer hidden while paging months and back", async () => {
+    const user = userEvent.setup();
+    render(<CalendarView />);
+
+    await user.click(key("Menses"));
+    await expectHidden(["menses"]);
+
+    const current = monthTitleFor(parseDateKey(todayKey()));
+    await user.click(screen.getByRole("button", { name: /next month/i }));
+    await screen.findByText(shiftedMonth(current, 1));
+    expect(key("Menses")).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(screen.getByRole("button", { name: /previous month/i }));
+    await screen.findByText(current);
+    expect(key("Menses")).toHaveAttribute("aria-pressed", "false");
+    expect(cellByDate(todayKey())?.querySelector('[data-testid="calendar-menses-stripe"]')).toBe(
+      null,
+    );
+  });
+
+  it("keeps a stored intercourse choice across a change of presentation", async () => {
+    const user = userEvent.setup();
+    await store().updateSettings({ calendarDetailMode: "full" });
+    render(<CalendarView />);
+
+    await user.click(key("Intercourse"));
+    await expectHidden(["intercourse"]);
+
+    // The key is withdrawn in the simple presentation, so the choice has to
+    // survive without a way to see or change it.
+    await user.click(screen.getByRole("button", { name: /show simple view/i }));
+    await waitFor(() => expect(queryKey("Intercourse")).toBeNull());
+    expect(store().settings.hiddenCalendarLayers).toEqual(["intercourse"]);
+
+    await user.click(screen.getByRole("button", { name: /show full detail/i }));
+    expect(await screen.findByRole("button", { name: /^Intercourse/i })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
+  it("keeps a stored choice for a withdrawn key and restores it when the key returns", async () => {
+    const user = userEvent.setup();
+    await seedLayeredMonth();
+    render(<CalendarView />);
+
+    await user.click(key("Fertile"));
+    await expectHidden(["fertile"]);
+
+    await store().updateSettings({ algorithmEnabled: false });
+    await waitFor(() => expect(queryKey("Fertile")).toBeNull());
+    expect(store().settings.hiddenCalendarLayers).toEqual(["fertile"]);
+
+    await store().updateSettings({ algorithmEnabled: true });
+    expect(await screen.findByRole("button", { name: /^Fertile/i })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+});
+
+describe("Show all", () => {
+  /** Sorted, because the stored order is click order and carries no meaning. */
+  async function expectHidden(expected: string[]) {
+    await waitFor(() =>
+      expect([...store().settings.hiddenCalendarLayers].sort()).toEqual([...expected].sort()),
+    );
+  }
+
+  it("is absent while nothing is hidden", () => {
+    render(<CalendarView />);
+    expect(screen.queryByRole("button", { name: /show all/i })).toBeNull();
+  });
+
+  it("restores every key currently on screen", async () => {
+    const user = userEvent.setup();
+    render(<CalendarView />);
+
+    await user.click(screen.getByRole("button", { name: /^Menses/i }));
+    await user.click(screen.getByRole("button", { name: /^Fertile/i }));
+    await expectHidden(["menses", "fertile"]);
+
+    await user.click(await screen.findByRole("button", { name: /show all/i }));
+    await expectHidden([]);
+    await waitFor(() => expect(screen.queryByRole("button", { name: /show all/i })).toBeNull());
+  });
+
+  it("leaves a stored choice for a key it is not showing", async () => {
+    const user = userEvent.setup();
+    render(<CalendarView />);
+
+    await user.click(screen.getByRole("button", { name: /^Fertile/i }));
+    await user.click(screen.getByRole("button", { name: /^Menses/i }));
+    await expectHidden(["menses", "fertile"]);
+
+    await store().updateSettings({ algorithmEnabled: false });
+    await waitFor(() => expect(screen.queryByRole("button", { name: /^Fertile/i })).toBeNull());
+
+    await user.click(await screen.findByRole("button", { name: /show all/i }));
+    await expectHidden(["fertile"]);
+
+    await store().updateSettings({ algorithmEnabled: true });
+    expect(await screen.findByRole("button", { name: /^Fertile/i })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
+  it("changes no stored record", async () => {
+    const user = userEvent.setup();
+    const today = todayKey();
+    const cycle = await store().setNewCycle(addDays(today, -3));
+    await store().addDayRecord(cycle.id, today, 4, { monitor: "high", bloodFlow: "light" });
+    const before = structuredClone(store().dayRecords);
+    render(<CalendarView />);
+
+    await user.click(screen.getByRole("button", { name: /^Menses/i }));
+    await expectHidden(["menses"]);
+    await user.click(await screen.findByRole("button", { name: /show all/i }));
+    await expectHidden([]);
+
+    expect(store().dayRecords).toEqual(before);
   });
 });

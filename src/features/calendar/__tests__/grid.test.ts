@@ -277,6 +277,38 @@ describe("resolveCell", () => {
     expect(noRecord.intercourse).toBe(false);
   });
 
+  it("separates logged menses from a predicted cycle start", () => {
+    // A real cycle's day 1 is menses by construction, so it stays in the
+    // raw-menses layer; only a projected cycle's day 1 is a prediction.
+    const realDay1 = resolveCell(
+      [CYCLE],
+      NO_RECORDS,
+      results,
+      undefined,
+      "2026-08-03",
+      "2026-08-12",
+    );
+    expect(realDay1.menses).toBe(true);
+    expect(realDay1.cycleStart).toBe(false);
+
+    const logged: DayRecordEntity[] = [
+      {
+        id: "r1",
+        cycleId: "c1",
+        date: "2026-08-06",
+        dayInCycle: 4,
+        bloodFlow: "medium",
+        version: 1,
+        synced: false,
+        createdAt: "",
+        updatedAt: "",
+      },
+    ];
+    const recorded = resolveCell([CYCLE], logged, results, undefined, "2026-08-06", "2026-08-12");
+    expect(recorded.menses).toBe(true);
+    expect(recorded.cycleStart).toBe(false);
+  });
+
   it("reports no single-day ovulation estimate", () => {
     // The protocol's calendar rule yields a range, not a single ovulatory day,
     // so CellInfo carries no ovulation marker at all.
@@ -288,6 +320,8 @@ describe("resolveCell", () => {
 
 const TODAY = "2026-08-20";
 const PROJECTED_DAY1 = "2026-08-03";
+/** A projected cycle that begins after today, so its day 1 resolves as projected. */
+const FUTURE_PROJECTED_DAY1 = "2026-08-25";
 
 /** A projected 28-day cycle beginning on the same day as CYCLE. */
 const PROJECTED: CycleResult = {
@@ -353,18 +387,37 @@ describe("resolveCell with projected cycles", () => {
     expect(cell.info).toBe("post-peak");
   });
 
-  it("marks a projected day 1 as menses", () => {
+  it("marks a projected day 1 as a predicted cycle start, not as logged menses", () => {
+    const future: CycleResult = { ...PROJECTED, day1: FUTURE_PROJECTED_DAY1 };
+    const cell = resolveCell(
+      [CYCLE],
+      NO_RECORDS,
+      RESULTS,
+      NO_FORECAST,
+      FUTURE_PROJECTED_DAY1,
+      TODAY,
+      [future],
+    );
+    expect(cell.cycleStart).toBe(true);
+    expect(cell.menses).toBe(false);
+  });
+
+  it("keeps a real cycle's day 1 in the raw-menses layer even with a projection present", () => {
+    // PROJECTED_DAY1 is on or before today, so the real cycle owns it and day 1
+    // is menses by construction rather than a prediction.
     const cell = resolveCell([CYCLE], NO_RECORDS, RESULTS, NO_FORECAST, PROJECTED_DAY1, TODAY, [
       PROJECTED,
     ]);
     expect(cell.menses).toBe(true);
+    expect(cell.cycleStart).toBe(false);
   });
 
-  it("does not mark other projected days as menses", () => {
+  it("does not mark other projected days as menses or as a cycle start", () => {
     const cell = resolveCell([CYCLE], NO_RECORDS, RESULTS, NO_FORECAST, "2026-08-25", TODAY, [
       PROJECTED,
     ]);
     expect(cell.menses).toBe(false);
+    expect(cell.cycleStart).toBe(false);
   });
 
   it("does not treat a projected past date as projected", () => {
