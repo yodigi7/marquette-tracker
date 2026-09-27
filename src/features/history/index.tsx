@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -22,6 +23,12 @@ export function HistoryView() {
 
   return (
     <div className="mx-auto w-full max-w-lg space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">History</h2>
+        <Button asChild variant="outline" size="sm">
+          <Link to="/cycle-compare">Compare cycles</Link>
+        </Button>
+      </div>
       {algorithmEnabled ? (
         <>
           <ForecastPanel forecast={forecast} cycles={cycleRows} />

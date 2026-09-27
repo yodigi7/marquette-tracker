@@ -170,3 +170,83 @@ export function resolveSelectedCycle(
   }
   return cycles.length > 0 ? cycles[cycles.length - 1] : undefined;
 }
+
+// --- Cycle comparison overlay ---
+
+/**
+ * Per-cycle color palette for the comparison chart. 8 distinguishable hues
+ * that work in both light and dark themes. Cycles beyond 8 wrap around.
+ */
+export const CYCLE_COLORS = [
+  "#3b82f6", // blue
+  "#22c55e", // green
+  "#f97316", // orange
+  "#ec4899", // pink
+  "#14b8a6", // teal
+  "#6366f1", // indigo
+  "#f43f5e", // rose
+  "#f59e0b", // amber
+] as const;
+
+/** Opacity per monitor level within a cycle's color. */
+export const MONITOR_OPACITIES: Record<string, number> = {
+  none: 0.15,
+  low: 0.35,
+  high: 0.65,
+  peak: 1.0,
+};
+
+/** One cycle's band at a given cycle day. */
+export interface ComparisonBand {
+  cycleId: string;
+  cycleIndex: number;
+  monitor?: MonitorReading;
+}
+
+/** One cycle day's worth of bands across all overlaid cycles. */
+export interface ComparisonDayDatum {
+  day: number;
+  value: number;
+  bands: ComparisonBand[];
+}
+
+/**
+ * Builds the combined data array for the comparison chart from multiple
+ * StripModels. Each entry holds one cycle day and the bands for every cycle
+ * that has a reading on that day. Shorter cycles simply have no band on days
+ * beyond their span, so the shared axis is never truncated.
+ */
+export function buildComparisonData(models: StripModel[]): ComparisonDayDatum[] {
+  if (models.length === 0) {
+    return [];
+  }
+  const maxSpan = maxSpanOf(models);
+  const data: ComparisonDayDatum[] = [];
+  for (let day = 1; day <= maxSpan; day++) {
+    const bands: ComparisonBand[] = [];
+    for (let i = 0; i < models.length; i++) {
+      const model = models[i];
+      const stripDay = model.days[day - 1];
+      if (stripDay) {
+        bands.push({
+          cycleId: model.cycleId,
+          cycleIndex: i,
+          monitor: stripDay.monitor,
+        });
+      }
+    }
+    data.push({ day, value: 1, bands });
+  }
+  return data;
+}
+
+/** The longest cycle span in the set, or 0 when empty. */
+export function maxSpanOf(models: StripModel[]): number {
+  let max = 0;
+  for (const model of models) {
+    if (model.span > max) {
+      max = model.span;
+    }
+  }
+  return max;
+}

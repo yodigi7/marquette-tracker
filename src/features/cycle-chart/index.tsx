@@ -83,6 +83,9 @@ export function CycleChartView() {
           showIntercourse={settings.overlayIntercourse}
           onIntercourseChange={(next) => updateSettings({ overlayIntercourse: next })}
         />
+        <Button asChild variant="ghost" size="sm">
+          <Link to="/cycle-compare">Compare cycles</Link>
+        </Button>
       </div>
       <Legend algorithmEnabled={settings.algorithmEnabled} />
       <div aria-label="Cycle chart">
