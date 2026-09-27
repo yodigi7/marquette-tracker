@@ -1,11 +1,13 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import type { EndRule } from "@/core/engine/types";
+import type { EndRule, Forecast } from "@/core/engine/types";
 import {
   END_RULE_LABELS,
   STATUS_LABELS,
   WARNING_LABELS,
   endRuleLabel,
+  expectedPeakRangeLine,
+  peakCountLine,
   windowDescription,
   warningBanner,
 } from "../lib";
@@ -156,5 +158,165 @@ describe("warningBanner", () => {
     expect(WARNING_LABELS["monitor-evidence-outside-window"]).not.toBe(
       WARNING_LABELS["open-cycle-past-window-end"],
     );
+  });
+});
+
+/**
+ * A countdown is the one thing this method is defined against, and it is also the easiest thing to
+ * reintroduce by accident: a negative `cycleDay - peakDay` is a countdown if it is rendered, and so is
+ * a "you are on day N of your window" style line. Every line below is checked against it.
+ */
+const COUNTDOWN =
+  /\d+ days? (until|to|before)|until (your |the )?peak|days? to (your |the )?peak|next peak|coming peak|countdown|days? remaining/i;
+
+describe("peakCountLine", () => {
+  it("counts the cycle days since the Peak and names the day it falls on", () => {
+    const line = peakCountLine(12, 15, 1)!;
+
+    expect(line).toContain("3 days");
+    expect(line).toContain("cycle day 12");
+  });
+
+  it("is singular for a single day", () => {
+    expect(peakCountLine(12, 13, 1)).toContain("1 day since");
+    expect(peakCountLine(12, 13, 1)).not.toContain("1 days");
+  });
+
+  it("phrases the same day without printing a zero count", () => {
+    // "0 days since" reads as a measurement failure rather than as a fact.
+    const line = peakCountLine(12, 12, 1)!;
+
+    expect(line).toMatch(/same day/i);
+    expect(line).toContain("cycle day 12");
+    expect(line).not.toContain("0");
+  });
+
+  it("counts in cycle days, so an unlogged stretch does not move the number", () => {
+    // Nothing between the two days is an input: a 3-day gap and a 10-day gap are both
+    // just the difference of the two cycle days, whether or not the days hold records.
+    expect(peakCountLine(10, 13, 1)).toContain("3 days");
+    expect(peakCountLine(10, 20, 1)).toContain("10 days");
+  });
+
+  it("shows an empty state and no number when no Peak is logged", () => {
+    const line = peakCountLine(null, 15, 0)!;
+
+    expect(line).toMatch(/no peak reading logged/i);
+    expect(line).not.toMatch(/\d/);
+  });
+
+  it("names the Peak day and shows no count on a date before it", () => {
+    // A negative difference is a countdown in all but name, so nothing numeric renders here.
+    const line = peakCountLine(12, 8, 1)!;
+
+    expect(line).toContain("cycle day 12");
+    expect(line).toMatch(/before it/i);
+    expect(line).not.toMatch(/-?\d+ days? since/);
+  });
+
+  it("says how many Peak readings the cycle holds when there is more than one", () => {
+    const line = peakCountLine(15, 17, 2)!;
+
+    expect(line).toContain("2 days");
+    expect(line).toContain("cycle day 15");
+    expect(line).toMatch(/last of 2 peak readings/i);
+  });
+
+  it("adds no tally clause for a single Peak reading", () => {
+    expect(peakCountLine(12, 15, 1)).not.toMatch(/last of/i);
+  });
+
+  it("never renders a countdown, a safety claim, or a disclaimer", () => {
+    const lines = [
+      peakCountLine(12, 13, 1),
+      peakCountLine(12, 15, 1),
+      peakCountLine(15, 17, 2),
+      peakCountLine(12, 12, 1),
+      peakCountLine(12, 8, 1),
+      peakCountLine(null, 15, 0),
+    ];
+
+    for (const line of lines) {
+      expect(line).not.toMatch(COUNTDOWN);
+      expect(line).not.toMatch(/safe|infertil/i);
+      expect(line).not.toMatch(/disclaimer|medical advice|consult (a|your)/i);
+    }
+  });
+});
+
+describe("expectedPeakRangeLine", () => {
+  function forecastWith(range: Forecast["peakDayRangeInWindow"], lookbackWindow = 6): Forecast {
+    return {
+      basedOnCycles: lookbackWindow,
+      lookbackWindow,
+      configuredLookbackWindow: lookbackWindow,
+      outOfBandCount: 0,
+      meanLength: 28,
+      medianLength: 28,
+      earliestLength: 26,
+      latestLength: 30,
+      peakDayEarliest: range?.earliest ?? 0,
+      peakDayLatest: range?.latest ?? 0,
+      peakDayRangeInWindow: range,
+      expectedPeriodStart: "2026-03-01",
+      nextFertileWindow: { begin: "2026-01-08", end: "2026-01-20" },
+    };
+  }
+
+  it("reports the range and says it comes from past cycles", () => {
+    const line = expectedPeakRangeLine(forecastWith({ earliest: 12, latest: 17, cycles: 6 }))!;
+
+    expect(line).toContain("12");
+    expect(line).toContain("17");
+    expect(line).toMatch(/based on your last 6 completed cycles/i);
+    expect(line).toMatch(/past cycles|last 6 completed/i);
+  });
+
+  it("is pluralised for one completed cycle", () => {
+    const line = expectedPeakRangeLine(forecastWith({ earliest: 14, latest: 15, cycles: 1 }, 1))!;
+
+    expect(line).toMatch(/last 1 completed cycle\b/);
+    expect(line).not.toMatch(/cycles/);
+  });
+
+  it("says how many of the window's cycles actually carried a Peak", () => {
+    // The window is six cycles wide; only four of them had a Peak, and claiming
+    // otherwise would overstate the evidence behind the range.
+    const line = expectedPeakRangeLine(forecastWith({ earliest: 14, latest: 15, cycles: 2 }))!;
+
+    expect(line).toMatch(/last 6 completed cycles/);
+    expect(line).toMatch(/2 of those cycles have a peak reading/i);
+  });
+
+  it("omits that sentence when every cycle in the window carried a Peak", () => {
+    const line = expectedPeakRangeLine(forecastWith({ earliest: 12, latest: 17, cycles: 6 }))!;
+
+    expect(line).not.toMatch(/of those cycles/);
+  });
+
+  it("shows nothing when there is no forecast or no range in it", () => {
+    expect(expectedPeakRangeLine(null)).toBeNull();
+    expect(expectedPeakRangeLine(forecastWith(null))).toBeNull();
+  });
+
+  it("reports a single day when the window's Peaks all fall on one day", () => {
+    const line = expectedPeakRangeLine(forecastWith({ earliest: 15, latest: 15, cycles: 6 }))!;
+
+    expect(line).toContain("15");
+    expect(line).not.toMatch(/15 (to|-|–) 15/);
+  });
+
+  it("never presents a specific day, a countdown, or a source cue", () => {
+    const lines = [
+      expectedPeakRangeLine(forecastWith({ earliest: 12, latest: 17, cycles: 6 })),
+      expectedPeakRangeLine(forecastWith({ earliest: 14, latest: 15, cycles: 2 })),
+      expectedPeakRangeLine(forecastWith({ earliest: 15, latest: 15, cycles: 1 }, 1)),
+    ];
+
+    for (const line of lines) {
+      expect(line).not.toMatch(COUNTDOWN);
+      expect(line).not.toMatch(/predicted|confirmed|ovulation/i);
+      expect(line).not.toMatch(/disclaimer|medical advice|consult (a|your)/i);
+    }
   });
 });

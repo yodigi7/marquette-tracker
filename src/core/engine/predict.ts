@@ -5,7 +5,7 @@ import {
   PROTOCOL_DEFAULT_WINDOW_BEGIN,
   PROTOCOL_DEFAULT_WINDOW_END,
 } from "./projection";
-import type { CycleResult, DateKey, EngineSettings, Forecast } from "./types";
+import type { CycleResult, DateKey, EngineSettings, Forecast, PeakDayRange } from "./types";
 
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
@@ -61,6 +61,7 @@ export function computePredictions(
     return null;
   }
   const nextStart = addDays(newest.day1, projectedLength);
+  const calendar = predictFertileWindow(newest.day1, peaks, settings);
   const forecast: Forecast = {
     basedOnCycles: closed.length,
     lookbackWindow: Math.min(settings.historyWindow, closed.length),
@@ -72,29 +73,49 @@ export function computePredictions(
     latestLength: Math.max(...lengths),
     peakDayEarliest: peaks.length > 0 ? Math.min(...peaks) : 0,
     peakDayLatest: peaks.length > 0 ? Math.max(...peaks) : 0,
+    peakDayRangeInWindow: calendar.peakDayRange,
     expectedPeriodStart: nextStart,
-    nextFertileWindow: predictFertileWindow(newest.day1, peaks, settings),
+    nextFertileWindow: { begin: calendar.begin, end: calendar.end },
   };
   return forecast;
 }
 
+/**
+ * The next cycle's window from the calendar rule, plus the Peak days that rule was derived from.
+ *
+ * The range is returned rather than discarded because a surface reporting "your expected Peak day is
+ * X to Y" has to report the same days that produced this window. The all-cycles pair on the forecast
+ * is a different statistic, and reporting it here would put a wider range on screen beside a begin and
+ * end computed from these days.
+ */
 function predictFertileWindow(
   day1: string,
   peaks: number[],
   settings: EngineSettings,
-): { begin: string; end: string } {
+): { begin: string; end: string; peakDayRange: PeakDayRange | null } {
   const lastWindow = peaks.slice(-settings.historyWindow);
   let beginDay: number;
   let endDay: number;
+  let peakDayRange: PeakDayRange | null;
   if (lastWindow.length === 0) {
     // Shared with the projection's bounded fallback: one protocol default, not
     // two literals that happen to agree. The `- 6` below is a different rule
     // (earliest Peak minus six) that coincidentally shares the value.
     beginDay = PROTOCOL_DEFAULT_WINDOW_BEGIN;
     endDay = PROTOCOL_DEFAULT_WINDOW_END;
+    // The default band is a protocol constant, not a value read off the user's
+    // own history, so it implies no Peak range.
+    peakDayRange = null;
   } else {
-    beginDay = Math.min(...lastWindow) - 6;
-    endDay = Math.max(...lastWindow) + DEFAULT_POST_PEAK_DAYS;
+    const earliest = Math.min(...lastWindow);
+    const latest = Math.max(...lastWindow);
+    beginDay = earliest - 6;
+    endDay = latest + DEFAULT_POST_PEAK_DAYS;
+    peakDayRange = { earliest, latest, cycles: lastWindow.length };
   }
-  return { begin: addDays(day1, beginDay - 1), end: addDays(day1, endDay - 1) };
+  return {
+    begin: addDays(day1, beginDay - 1),
+    end: addDays(day1, endDay - 1),
+    peakDayRange,
+  };
 }

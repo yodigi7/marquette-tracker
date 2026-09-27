@@ -90,7 +90,8 @@ describe("StatusView", () => {
     const user = userEvent.setup();
     await user.click(screen.getByTestId("date-trigger"));
     const early = await pickDateButton(user, addDays(start, 2));
-    if (early) await user.click(early);
+    expect(early).not.toBeNull();
+    await user.click(early!);
 
     expect(screen.getByTestId("status-warning")).toHaveTextContent(/cycle day 15/i);
   });
@@ -187,7 +188,8 @@ describe("StatusView", () => {
     const inWindow = new Date();
     inWindow.setDate(inWindow.getDate() - 1);
     const dayButton = await pickDayButton(user, inWindow.getDate());
-    if (dayButton) await user.click(dayButton);
+    expect(dayButton).not.toBeNull();
+    await user.click(dayButton!);
 
     expect(await screen.findByText("Fertile")).toBeInTheDocument();
     expect(cycle.id).toBeTruthy();
@@ -217,7 +219,8 @@ describe("StatusView", () => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const dayButton = await pickDayButton(user, yesterday.getDate());
-    if (dayButton) await user.click(dayButton);
+    expect(dayButton).not.toBeNull();
+    await user.click(dayButton!);
 
     expect(await screen.findByText(/no cycle/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /set day 1/i })).toBeNull();
@@ -307,15 +310,234 @@ describe("StatusView", () => {
 });
 
 /**
+ * Where the selected day sits relative to the Peak reading, and the Peak-day range derived from
+ * past cycles. Both lines are retrospective: a count off the user's own readings, and a range read
+ * off previous cycles. Neither may become a countdown, because a countdown is the one claim this
+ * method is defined against.
+ */
+const COUNTDOWN =
+  /\d+ days? (until|to|before)|until (your |the )?peak|days? to (your |the )?peak|next peak|coming peak|countdown|days? remaining/i;
+
+describe("StatusView: days since the Peak reading", () => {
+  it("counts the cycle days since the Peak and names the day it falls on", async () => {
+    // Day 1 fifteen days back, so today is cycle day 15 and the Peak sits on day 12.
+    const start = addDays(todayKey(), -14);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+    await store().addDayRecord(cycle.id, addDays(start, 11), 12, { monitor: "peak" });
+
+    render(<StatusView />);
+
+    expect(screen.getByText(/cycle 1 · day 15/i)).toBeInTheDocument();
+    const line = await screen.findByTestId("status-peak-count");
+    expect(line).toHaveTextContent(/3 days since your Peak reading on cycle day 12/);
+  });
+
+  it("does not move the count for days the user did not log", async () => {
+    // Day 13 carries a Low and day 14 carries nothing. Both are cycle days, and the count is the
+    // difference of two cycle days — so the gap is invisible to it and the answer is still 3.
+    const start = addDays(todayKey(), -14);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+    await store().addDayRecord(cycle.id, addDays(start, 11), 12, { monitor: "peak" });
+    await store().addDayRecord(cycle.id, addDays(start, 12), 13, { monitor: "low" });
+
+    render(<StatusView />);
+
+    expect(await screen.findByTestId("status-peak-count")).toHaveTextContent(/^3 days/);
+    expect(store().dayRecords.some((r) => r.dayInCycle === 14)).toBe(false);
+  });
+
+  it("shows an empty state and no number when no Peak reading is logged", async () => {
+    const start = addDays(todayKey(), -14);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+    await store().addDayRecord(cycle.id, addDays(start, 7), 8, { monitor: "high" });
+
+    render(<StatusView />);
+
+    const line = await screen.findByTestId("status-peak-count");
+    expect(line).toHaveTextContent(/no peak reading logged for this cycle yet/i);
+    expect(line.textContent).not.toMatch(/\d/);
+  });
+
+  it("counts from the latest of several Peak readings and says how many there are", async () => {
+    const start = addDays(todayKey(), -16);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+    await store().addDayRecord(cycle.id, addDays(start, 11), 12, { monitor: "peak" });
+    await store().addDayRecord(cycle.id, addDays(start, 14), 15, { monitor: "peak" });
+
+    render(<StatusView />);
+
+    const line = await screen.findByTestId("status-peak-count");
+    // Measured from day 15, not day 12 -- the same reading the window end is measured from.
+    expect(line).toHaveTextContent(/2 days since your Peak reading on cycle day 15/);
+    expect(line).toHaveTextContent(/last of 2 peak readings this cycle/i);
+    expect(screen.getByText(/until day 18 \(current monitor Peak \+ 3 days\)/)).toBeInTheDocument();
+  });
+
+  it("names the Peak day and shows no count on a date before it", async () => {
+    const start = addDays(todayKey(), -16);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+    await store().addDayRecord(cycle.id, addDays(start, 14), 15, { monitor: "peak" });
+
+    const user = userEvent.setup();
+    render(<StatusView />);
+    await user.click(screen.getByTestId("date-trigger"));
+    // Cycle day 8, seven days after Day 1 and well before the day-15 Peak.
+    const earlier = await pickDateButton(user, addDays(start, 7));
+    expect(earlier).not.toBeNull();
+    await user.click(earlier!);
+
+    expect(await screen.findByText(/cycle 1 · day 8/i)).toBeInTheDocument();
+    const line = await screen.findByTestId("status-peak-count");
+    expect(line).toHaveTextContent(/cycle day 15/);
+    expect(line).toHaveTextContent(/before it/i);
+    // No negative count, and nothing pointing forward at the Peak.
+    expect(line.textContent).not.toMatch(/-/);
+    expect(line.textContent).not.toMatch(COUNTDOWN);
+  });
+
+  it("shows neither the count nor the range when interpretation is disabled", async () => {
+    const previousStart = addDays(todayKey(), -60);
+    const previous = await store().setNewCycle(previousStart);
+    await store().addDayRecord(previous.id, addDays(previousStart, 13), 14, { monitor: "peak" });
+    const currentStart = addDays(todayKey(), -30);
+    const current = await store().setNewCycle(currentStart);
+    await store().addDayRecord(current.id, addDays(currentStart, 13), 14, { monitor: "peak" });
+
+    await store().updateSettings({ algorithmEnabled: false });
+    render(<StatusView />);
+
+    expect(await screen.findByText(/algorithm is off/i)).toBeInTheDocument();
+    expect(screen.queryByTestId("status-peak-count")).toBeNull();
+    expect(screen.queryByTestId("status-peak-range")).toBeNull();
+  });
+});
+
+describe("StatusView: expected Peak-day range", () => {
+  async function logClosedCycle(startOffset: number, cycleLength: number, peakDay: number) {
+    const start = addDays(todayKey(), startOffset);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+    await store().addDayRecord(cycle.id, addDays(start, peakDay - 1), peakDay, {
+      monitor: "peak",
+    });
+    // Close it so it counts towards the history, by starting the next cycle after it.
+    await store().setNewCycle(addDays(start, cycleLength));
+    return cycle;
+  }
+
+  it("reports the range from past cycles and labels it as such", async () => {
+    for (const [offset, length, peak] of [
+      [-90, 28, 12],
+      [-62, 28, 16],
+      [-34, 28, 17],
+    ] as const) {
+      await logClosedCycle(offset, length, peak);
+    }
+    const currentStart = addDays(todayKey(), -6);
+    const current = await store().setNewCycle(currentStart);
+    await store().addDayRecord(current.id, currentStart, 1, { bloodFlow: "medium" });
+
+    render(<StatusView />);
+
+    const line = await screen.findByTestId("status-peak-range");
+    expect(line).toHaveTextContent(/based on your last 3 completed cycles/i);
+    expect(line).toHaveTextContent(/cycle day 12 to 17/);
+    // A retrospective statement about history, never a forecast of one day.
+    expect(line.textContent).not.toMatch(/predicted|confirmed|ovulation/i);
+  });
+
+  it("takes the range from the configured history window, not from every recorded cycle", async () => {
+    // Nine closed cycles peaking in a rising run: only the most recent `historyWindow` of them
+    // feed the calendar rule, so an all-cycles range would start at day 11 while the window the
+    // same card describes begins at day 19 - 6.
+    await store().updateSettings({ historyWindow: 3 });
+    for (let index = 0; index < 9; index++) {
+      const start = addDays(todayKey(), -(9 - index) * 30);
+      const peak = 11 + index;
+      const cycle = await store().setNewCycle(start);
+      await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+      await store().addDayRecord(cycle.id, addDays(start, peak - 1), peak, { monitor: "peak" });
+      await store().setNewCycle(addDays(start, 30));
+    }
+    const currentStart = addDays(todayKey(), -3);
+    const current = await store().setNewCycle(currentStart);
+    await store().addDayRecord(current.id, currentStart, 1, { bloodFlow: "medium" });
+
+    render(<StatusView />);
+
+    const line = await screen.findByTestId("status-peak-range");
+    expect(line).toHaveTextContent(/cycle day 17 to 19/);
+    expect(line.textContent).not.toContain("cycle day 11");
+    // And it agrees with the window rule quoted on the same card.
+    expect(screen.getByText(/earliest Peak − 6 days/)).toBeInTheDocument();
+  });
+
+  it("shows no range when no cycle in the window carries a Peak", async () => {
+    const previousStart = addDays(todayKey(), -40);
+    const previous = await store().setNewCycle(previousStart);
+    await store().addDayRecord(previous.id, previousStart, 1, { bloodFlow: "medium" });
+    await store().addDayRecord(previous.id, addDays(previousStart, 7), 8, { monitor: "high" });
+    const currentStart = addDays(todayKey(), -10);
+    const current = await store().setNewCycle(currentStart);
+    await store().addDayRecord(current.id, currentStart, 1, { bloodFlow: "medium" });
+
+    render(<StatusView />);
+
+    await screen.findByTestId("status-peak-count");
+    expect(screen.queryByTestId("status-peak-range")).toBeNull();
+  });
+
+  it("uses the existing body and muted text tokens, not a forecast treatment", async () => {
+    const previousStart = addDays(todayKey(), -60);
+    const previous = await store().setNewCycle(previousStart);
+    await store().addDayRecord(previous.id, addDays(previousStart, 13), 14, { monitor: "peak" });
+    const currentStart = addDays(todayKey(), -30);
+    const current = await store().setNewCycle(currentStart);
+    await store().addDayRecord(current.id, addDays(currentStart, 13), 14, { monitor: "peak" });
+
+    render(<StatusView />);
+
+    expect(await screen.findByTestId("status-peak-count")).toHaveClass("text-fertility-body");
+    const range = screen.getByTestId("status-peak-range");
+    expect(range).toHaveClass("text-fertility-muted");
+    // The forecast token means "projected date" in this app; the range is not one.
+    expect(range.className).not.toContain("fertility-forecast");
+  });
+
+  it("renders no countdown anywhere in the new lines", async () => {
+    const previousStart = addDays(todayKey(), -60);
+    const previous = await store().setNewCycle(previousStart);
+    await store().addDayRecord(previous.id, addDays(previousStart, 13), 14, { monitor: "peak" });
+    const currentStart = addDays(todayKey(), -30);
+    const current = await store().setNewCycle(currentStart);
+    await store().addDayRecord(current.id, addDays(currentStart, 13), 14, { monitor: "peak" });
+
+    render(<StatusView />);
+
+    const count = await screen.findByTestId("status-peak-count");
+    const range = screen.getByTestId("status-peak-range");
+    expect(count.textContent).not.toMatch(COUNTDOWN);
+    expect(range.textContent).not.toMatch(COUNTDOWN);
+    // And the whole card stays disclaimer-free and safety-free.
+    expect(document.body.textContent ?? "").not.toMatch(COUNTDOWN);
+  });
+});
+
+/**
  * Day button for an exact `YYYY-MM-DD` date. The picker can render the same day number in two
- * months at once, so a day-number query is ambiguous; `data-day` is not.
+ * months at once, so a day-number query is ambiguous; `data-day` is not. The Calendar writes `data-day`
+ * as the ISO key alongside a locale-formatted twin, so the ISO form is the one to match.
  */
 async function pickDateButton(
   user: ReturnType<typeof userEvent.setup>,
   iso: string,
 ): Promise<HTMLElement | null> {
-  const [year, month, day] = iso.split("-").map(Number);
-  const selector = `[data-day="${month}/${day}/${year}"]`;
+  const selector = `[data-day="${iso}"]`;
 
   for (let tries = 0; tries < 3; tries++) {
     const cell = document.querySelector(selector);

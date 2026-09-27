@@ -13,6 +13,10 @@ interface StatusCardProps {
   status: DayStatus | null;
   cycleDay: number;
   windowLine: string;
+  /** Cycle days elapsed since the anchoring Peak reading, or null when interpretation is off. */
+  peakLine: string | null;
+  /** Expected Peak-day range derived from past cycles, or null when there is none to report. */
+  rangeLine: string | null;
   nextPeriod: string | null;
   algorithmEnabled: boolean;
   /** Warnings for the selected cycle; only the reconciliation kinds are rendered. */
@@ -25,6 +29,8 @@ export function StatusCard({
   status,
   cycleDay,
   windowLine: description,
+  peakLine,
+  rangeLine,
   nextPeriod,
   algorithmEnabled,
   warnings,
@@ -78,6 +84,19 @@ export function StatusCard({
           )}
         </div>
         <p className={cn("text-sm", FERTILITY_TEXT_VISUALS.body)}>{description}</p>
+        {peakLine && (
+          <p data-testid="status-peak-count" className={cn("text-sm", FERTILITY_TEXT_VISUALS.body)}>
+            {peakLine}
+          </p>
+        )}
+        {rangeLine && (
+          <p
+            data-testid="status-peak-range"
+            className={cn("text-sm", FERTILITY_TEXT_VISUALS.muted)}
+          >
+            {rangeLine}
+          </p>
+        )}
         {nextPeriod && (
           <p className={cn("text-sm", FERTILITY_TEXT_VISUALS.body)}>
             <span data-testid="status-forecast" className={FERTILITY_FORECAST_VISUAL.text}>

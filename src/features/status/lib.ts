@@ -1,4 +1,4 @@
-import type { DayStatus, EngineWarning, FertileWindow } from "@/core/engine/types";
+import type { DayStatus, EngineWarning, FertileWindow, Forecast } from "@/core/engine/types";
 import { FERTILITY_STATUS_VISUALS } from "@/lib/fertility-visuals";
 import { dayInCycle, dateKeyLocal, parseDateKey, todayKey } from "@/core/dateKeys";
 
@@ -87,4 +87,61 @@ export function windowDescription(window: FertileWindow, peakKnown: boolean): st
       : `${begin}; end unknown until a Peak is read.`;
   }
   return `${begin}; until day ${window.end} (${endRuleLabel(window.endRule)}).`;
+}
+
+/**
+ * Where the selected cycle day sits relative to the cycle's Peak reading.
+ *
+ * A retrospective count and nothing more. `peakDay` is the same reading the window end is measured
+ * from, so the two cannot disagree; and both terms are cycle days off the same Day 1, so a day the
+ * user did not log cannot move the number. A date earlier than the Peak has a negative difference,
+ * and every way of rendering that is a countdown, so it names the day instead.
+ *
+ * `peaks` is how many monitor Peak readings the cycle holds. A cycle can hold more than one, and a
+ * count that does not say so reads as though it could only hold one. The clause states which reading
+ * was used and how many exist, and deliberately does not claim which one set the window end: after
+ * six cycles the historical rule can finish the window before the current one does.
+ *
+ * @param peakDay  the cycle's anchoring monitor Peak day, or null when none is logged
+ * @param cycleDay the selected date's cycle day
+ * @param peaks    monitor Peak readings logged in this cycle
+ */
+export function peakCountLine(peakDay: number | null, cycleDay: number, peaks: number): string {
+  if (peakDay === null) {
+    return "No Peak reading logged for this cycle yet.";
+  }
+  const elapsed = cycleDay - peakDay;
+  const base =
+    elapsed === 0
+      ? `Your Peak reading is on cycle day ${peakDay} — the same day.`
+      : elapsed < 0
+        ? `Your Peak reading is on cycle day ${peakDay} — this date is before it.`
+        : `${elapsed} ${elapsed === 1 ? "day" : "days"} since your Peak reading on cycle day ${peakDay}.`;
+  return peaks > 1 ? `${base} Last of ${peaks} Peak readings this cycle.` : base;
+}
+
+/**
+ * The expected Peak-day range, labelled as coming from past cycles.
+ *
+ * Reports the monitor Peak days inside the configured history window, which is the range the app's
+ * own calendar rule derived the current cycle's window from. A retrospective statement about history,
+ * not a forecast: it is always a range, never a day, and it carries no source cue. Returns null when
+ * there is nothing to derive, so the caller renders no line at all rather than an empty one.
+ */
+export function expectedPeakRangeLine(forecast: Forecast | null): string | null {
+  const range = forecast?.peakDayRangeInWindow;
+  if (!forecast || range === null || range === undefined) {
+    return null;
+  }
+  const cycles = forecast.lookbackWindow;
+  const span =
+    range.earliest === range.latest
+      ? `cycle day ${range.earliest}`
+      : `cycle day ${range.earliest} to ${range.latest}`;
+  const basis = `Based on your last ${cycles} completed cycle${cycles === 1 ? "" : "s"}, your expected Peak day is ${span}.`;
+  // The window is `cycles` wide but only the cycles carrying a Peak contribute, so say so rather than
+  // letting the range imply more evidence than it rests on.
+  const coverage =
+    range.cycles < cycles ? ` ${range.cycles} of those cycles have a Peak reading.` : "";
+  return `${basis}${coverage}`;
 }

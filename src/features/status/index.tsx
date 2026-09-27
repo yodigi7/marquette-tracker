@@ -7,11 +7,20 @@ import { cycleForDate, cycleResultsByCycleId } from "@/core/store/selectors";
 import { useAppStore } from "@/core/store/useAppStore";
 import { FERTILITY_TEXT_VISUALS } from "@/lib/fertility-visuals";
 import { cn } from "@/lib/utils";
-import { dateKeyLocal, dayInCycle, parseDateKey, todayKey, windowDescription } from "./lib";
+import {
+  dateKeyLocal,
+  dayInCycle,
+  expectedPeakRangeLine,
+  parseDateKey,
+  peakCountLine,
+  todayKey,
+  windowDescription,
+} from "./lib";
 import { StatusCard } from "./status-card";
 
 export function StatusView() {
   const cycles = useAppStore((state) => state.cycles);
+  const dayRecords = useAppStore((state) => state.dayRecords);
   const output = useAppStore((state) => state.output);
   const algorithmEnabled = useAppStore((state) => state.settings.algorithmEnabled);
   const [selected, setSelected] = useState(todayKey());
@@ -23,6 +32,11 @@ export function StatusView() {
     result && cycleDay !== null
       ? dayInfo(result.fertileWindow, result.peakDay !== null, cycleDay)
       : null;
+  // How many monitor Peak readings this cycle holds. The engine reports only the one it
+  // anchors on, and a count that does not mention the others reads as though one is all there is.
+  const peakReadings = cycle
+    ? dayRecords.filter((r) => r.cycleId === cycle.id && r.monitor === "peak").length
+    : 0;
 
   return (
     <div className="mx-auto w-full max-w-md space-y-4">
@@ -41,6 +55,10 @@ export function StatusView() {
             windowLine={
               result ? windowDescription(result.fertileWindow, result.peakDay !== null) : ""
             }
+            // Passed unconditionally, like the warning and the next-period estimate: the card
+            // returns early when interpretation is off, and that is what suppresses them.
+            peakLine={result ? peakCountLine(result.peakDay, cycleDay, peakReadings) : null}
+            rangeLine={expectedPeakRangeLine(output?.forecast ?? null)}
             nextPeriod={output?.forecast?.expectedPeriodStart ?? null}
             algorithmEnabled={algorithmEnabled}
             warnings={result?.warnings ?? []}

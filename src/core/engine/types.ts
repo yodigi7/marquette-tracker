@@ -105,6 +105,21 @@ export interface CycleHistory {
   cycleNos: number[];
 }
 
+/**
+ * The monitor Peak days a cycle's calendar rule was derived from: the earliest and latest Peak inside
+ * the configured history window, and how many cycles in that window carried one.
+ *
+ * Distinct from the all-cycles `Forecast.peakDayEarliest`/`peakDayLatest` pair, which describes the
+ * user's whole record. A window that holds no monitor Peak has no range, so the field is nullable
+ * rather than a `0` sentinel — `0` is not a cycle day.
+ */
+export interface PeakDayRange {
+  earliest: number;
+  latest: number;
+  /** Cycles inside the window that carried a monitor Peak. */
+  cycles: number;
+}
+
 export interface Forecast {
   basedOnCycles: number;
   /**
@@ -122,6 +137,13 @@ export interface Forecast {
   latestLength: number;
   peakDayEarliest: number;
   peakDayLatest: number;
+  /**
+   * The monitor Peak days inside the configured history window — the ones `nextFertileWindow` was
+   * actually derived from. Null when that window holds no monitor Peak. A surface showing an expected
+   * Peak-day range must show this, not the all-cycles pair above, or it will contradict the window it
+   * is displayed beside.
+   */
+  peakDayRangeInWindow: PeakDayRange | null;
   /** Date of the next expected period start (for the newest cycle's day1). Null without data. */
   expectedPeriodStart: DateKey;
   /** Estimated next fertile window from the calendar rule — always a prediction. */
