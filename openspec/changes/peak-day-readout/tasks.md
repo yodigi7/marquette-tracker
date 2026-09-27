@@ -104,6 +104,6 @@ question is half-deferred. Both are recorded in the PR.
 - [x] 5.3 Confirm the readout uses no new visual treatment: both new lines resolve to existing
       `FERTILITY_TEXT_VISUALS` classes, verified by asserting the class names on the rendered elements
       in the tests from group 4.
-- [ ] 5.4 Comment on #29 recording the Decision 7 outcome: the reporting anchor is settled in
+- [x] 5.4 Comment on #29 recording the Decision 7 outcome: the reporting anchor is settled in
       `marquette-engine` and the method-sourced justification for preferring the latest reading over
       the first is explicitly deferred, per this change's acceptance criteria.
