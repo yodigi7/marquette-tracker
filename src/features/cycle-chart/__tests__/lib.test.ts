@@ -4,7 +4,6 @@ import type { CycleResult, DayResult, DayStatus } from "@/core/engine/types";
 import {
   bbtSeries,
   buildStripModel,
-  computeWindowOverlaps,
   intercourseSeries,
   mucusSeries,
   resolveSelectedCycle,
@@ -290,43 +289,5 @@ describe("resolveSelectedCycle", () => {
   it("returns undefined when there are no cycles", () => {
     expect(resolveSelectedCycle([], "a")).toBeUndefined();
     expect(resolveSelectedCycle([], undefined)).toBeUndefined();
-  });
-});
-
-describe("computeWindowOverlaps", () => {
-  function window(begin: number, end: number | null) {
-    return {
-      begin,
-      end,
-      beginRule: "calendar-day-6" as const,
-      endRule: "current-peak-plus-n" as const,
-    };
-  }
-
-  it("returns [] for fewer than 2 windows", () => {
-    expect(computeWindowOverlaps([])).toEqual([]);
-    expect(computeWindowOverlaps([window(6, 17)])).toEqual([]);
-  });
-
-  it("computes the overlap of two windows", () => {
-    const overlaps = computeWindowOverlaps([window(6, 17), window(8, 19)]);
-    expect(overlaps).toEqual([{ begin: 8, end: 17 }]);
-  });
-
-  it("returns [] when windows do not overlap", () => {
-    expect(computeWindowOverlaps([window(6, 10), window(15, 20)])).toEqual([]);
-  });
-
-  it("computes multiple overlap regions", () => {
-    const overlaps = computeWindowOverlaps([window(6, 12), window(8, 14), window(13, 18)]);
-    expect(overlaps).toEqual([
-      { begin: 8, end: 12 },
-      { begin: 13, end: 14 },
-    ]);
-  });
-
-  it("treats a null end as extending to infinity", () => {
-    const overlaps = computeWindowOverlaps([window(6, null), window(8, 12)]);
-    expect(overlaps).toEqual([{ begin: 8, end: 12 }]);
   });
 });

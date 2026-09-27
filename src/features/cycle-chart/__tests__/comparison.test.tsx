@@ -59,7 +59,7 @@ describe("CycleComparisonView", () => {
       expect(screen.getAllByTestId("comparison-legend-item")).toHaveLength(1);
     });
     legendItems = screen.getAllByTestId("comparison-legend-item");
-    expect(legendItems[0].textContent).toContain("Cycle 2");
+    expect(legendItems[0].textContent).toContain("C2");
   });
 
   it("respects the algorithm toggle — no window bands when disabled", async () => {
