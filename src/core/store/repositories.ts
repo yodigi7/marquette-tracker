@@ -1,7 +1,7 @@
 import type { BackupSnapshot } from "@/core/backup/types";
 import type { DateKey } from "@/core/engine/types";
 import type { CycleEntity, DayRecordEntity, SettingsEntity, SyncMeta } from "./entities";
-import { DEFAULT_SETTINGS, SETTINGS_KEY } from "./entities";
+import { DEFAULT_SETTINGS, SETTINGS_KEY, normalizeCalendarLayerIds } from "./entities";
 import type { AppDb } from "./db";
 
 function nowIso(): string {
@@ -163,7 +163,14 @@ export function createRepositories(db: AppDb): Repositories {
           /** Present only on rows written before it became a protocol constant. */
           postPeakDays?: number;
         };
-        return { ...DEFAULT_SETTINGS, ...supported };
+        // A stored layer id this build does not recognise is dropped rather than
+        // carried, so a preference written by another version cannot leave the
+        // app holding a layer it cannot render.
+        return {
+          ...DEFAULT_SETTINGS,
+          ...supported,
+          hiddenCalendarLayers: normalizeCalendarLayerIds(supported.hiddenCalendarLayers),
+        };
       }
       const defaults = defaultSettings();
       await db.settings.add(defaults);

@@ -37,6 +37,43 @@ export interface DayRecordEntity extends SyncMeta {
 export type WeekStart = "monday" | "sunday";
 export type CalendarDetailMode = "simple" | "full";
 
+/**
+ * The Calendar's hideable visual layers, in legend order. The union is derived
+ * from the tuple so the recognised set has exactly one source of truth: the
+ * settings row stores ids from this list, and a stored id that is no longer in
+ * it is discarded rather than treated as an error.
+ */
+export const CALENDAR_LAYER_IDS = [
+  "before",
+  "fertile",
+  "after",
+  "predicted",
+  "menses",
+  "low",
+  "high",
+  "peak",
+  "intercourse",
+] as const;
+
+export type CalendarLayerId = (typeof CALENDAR_LAYER_IDS)[number];
+
+/** True when `value` names a layer this build recognises. */
+export function isCalendarLayerId(value: unknown): value is CalendarLayerId {
+  return CALENDAR_LAYER_IDS.includes(value as CalendarLayerId);
+}
+
+/**
+ * Keeps only recognised ids, so a preference written by another version cannot
+ * leave the app holding a layer it cannot render. A display preference must
+ * never be the reason a stored record cannot be read.
+ */
+export function normalizeCalendarLayerIds(value: unknown): CalendarLayerId[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter(isCalendarLayerId);
+}
+
 export interface SettingsEntity extends SyncMeta {
   key: "main";
   goal: Goal;
@@ -50,6 +87,8 @@ export interface SettingsEntity extends SyncMeta {
   overlayBbt: boolean;
   overlayIntercourse: boolean;
   calendarDetailMode: CalendarDetailMode;
+  /** Calendar visual layers the user has hidden. Absent means nothing is hidden. */
+  hiddenCalendarLayers: CalendarLayerId[];
   /** Project future cycles on the Calendar. Off by default; see cycle-projection. */
   projectFutureCycles: boolean;
   /** TEMPORARY: one-shot marker so demo data is loaded only on first startup. */
@@ -71,6 +110,7 @@ export const DEFAULT_SETTINGS: Omit<SettingsEntity, keyof SyncMeta> = {
   overlayBbt: false,
   overlayIntercourse: false,
   calendarDetailMode: "simple",
+  hiddenCalendarLayers: [],
   projectFutureCycles: false,
   demoSeeded: false,
 };

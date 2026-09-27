@@ -8,6 +8,7 @@ import {
   createBackup,
   getBackupSummary,
   prepareBackup,
+  prepareBackupDocument,
   serializeBackup,
 } from "../index";
 
@@ -347,5 +348,63 @@ describe("backup migrations and strict validation", () => {
       expect(error).toBeInstanceOf(BackupError);
       expect((error as BackupError).code).toBe("invalid-json");
     }
+  });
+});
+
+describe("calendar layer visibility in a backup", () => {
+  it("round-trips a hidden layer through export and restore", () => {
+    const document = createBackup(
+      snapshot({ settings: settings({ hiddenCalendarLayers: ["menses", "fertile"] }) }),
+      { appVersion: "1.0.0", exportedAt: createdAt },
+    );
+    expect(document.data.settings.hiddenCalendarLayers).toEqual(["menses", "fertile"]);
+
+    const prepared = prepareBackupDocument(document, { today: "2026-01-15" });
+    expect(prepared.document.data.settings.hiddenCalendarLayers).toEqual(["menses", "fertile"]);
+  });
+
+  it("restores nothing hidden when the backup carries no preference", () => {
+    const document = createBackup(snapshot(), { appVersion: "1.0.0", exportedAt: createdAt });
+    const prepared = prepareBackupDocument(document, { today: "2026-01-15" });
+    expect(prepared.document.data.settings.hiddenCalendarLayers).toEqual([]);
+  });
+
+  it("discards an unrecognised layer id instead of failing the restore", () => {
+    // A display preference must never be the reason a stored record cannot be
+    // read back, so an id this build does not know is dropped, not rejected.
+    const document = createBackup(
+      snapshot({
+        settings: settings({
+          hiddenCalendarLayers: ["menses", "a-layer-from-another-version"] as never,
+        }),
+      }),
+      { appVersion: "1.0.0", exportedAt: createdAt },
+    );
+    const prepared = prepareBackupDocument(document, { today: "2026-01-15" });
+    expect(prepared.document.data.settings.hiddenCalendarLayers).toEqual(["menses"]);
+  });
+
+  it("discards a stored value that is not a list of layer ids", () => {
+    const document = createBackup(
+      snapshot({ settings: settings({ hiddenCalendarLayers: "menses" as never }) }),
+      { appVersion: "1.0.0", exportedAt: createdAt },
+    );
+    const prepared = prepareBackupDocument(document, { today: "2026-01-15" });
+    expect(prepared.document.data.settings.hiddenCalendarLayers).toEqual([]);
+  });
+
+  it("keeps a backup with an unusable layer value restorable rather than rejecting it", () => {
+    const input = JSON.parse(
+      JSON.stringify(
+        createBackup(snapshot({ settings: settings() }), {
+          appVersion: "1.0.0",
+          exportedAt: createdAt,
+        }),
+      ),
+    );
+    input.data.settings.hiddenCalendarLayers = { nope: true };
+
+    const prepared = prepareBackupDocument(input, { today: "2026-01-15" });
+    expect(prepared.document.data.settings.hiddenCalendarLayers).toEqual([]);
   });
 });

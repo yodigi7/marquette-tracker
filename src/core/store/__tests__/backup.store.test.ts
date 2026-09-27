@@ -122,6 +122,18 @@ describe("backup snapshot and restore", () => {
     expect(state(store).dayRecords.map((record) => record.id)).toContain("user-low");
   });
 
+  it("replaces a hidden calendar layer with the backup's choice", async () => {
+    const { store } = setup();
+    await state(store).hydrate();
+    await state(store).updateSettings({ hiddenCalendarLayers: ["peak"] });
+
+    const incoming = fullSnapshot();
+    incoming.settings = { ...incoming.settings, hiddenCalendarLayers: ["menses", "fertile"] };
+    await state(store).restoreBackup(preparedSnapshot(incoming));
+
+    expect(state(store).settings.hiddenCalendarLayers).toEqual(["menses", "fertile"]);
+  });
+
   it("restores an empty dataset and its settings", async () => {
     const { store } = setup();
     await state(store).hydrate();

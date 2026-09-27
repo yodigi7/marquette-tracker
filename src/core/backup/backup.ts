@@ -1,7 +1,12 @@
 import { todayKey } from "@/core/dateKeys";
 import { isDateKey, dateKeyToEpochDays, epochDaysToDateKey } from "@/core/engine/dateUtils";
 import type { CycleEntity, DayRecordEntity, SettingsEntity } from "@/core/store/entities";
-import { DEFAULT_SETTINGS, SETTINGS_KEY } from "@/core/store/entities";
+import {
+  DEFAULT_SETTINGS,
+  isCalendarLayerId,
+  normalizeCalendarLayerIds,
+  SETTINGS_KEY,
+} from "@/core/store/entities";
 import { APP_VERSION } from "./version";
 import {
   BACKUP_FORMAT,
@@ -121,6 +126,10 @@ function normalizeSettings(value: unknown): SettingsEntity {
   return {
     ...DEFAULT_SETTINGS,
     ...supported,
+    // Lenient on purpose: an unrecognised or malformed layer value is dropped
+    // rather than rejected, because a display preference must never be the
+    // reason a stored record cannot be restored.
+    hiddenCalendarLayers: normalizeCalendarLayerIds(supported.hiddenCalendarLayers),
     key: SETTINGS_KEY,
     ...normalizeMeta(value),
   } as SettingsEntity;
@@ -335,6 +344,15 @@ function validateSettings(settings: SettingsEntity): void {
   }
   if (typeof settings.projectFutureCycles !== "boolean") {
     fail("invalid-settings", "Cycle projection setting is invalid");
+  }
+  // normalizeSettings has already reduced this to recognised ids, so validating
+  // the shape is enough; rejecting an unknown id here would make a newer backup
+  // unreadable by an older build for the sake of a colour swatch.
+  if (
+    !Array.isArray(settings.hiddenCalendarLayers) ||
+    settings.hiddenCalendarLayers.some((id) => !isCalendarLayerId(id))
+  ) {
+    fail("invalid-settings", "Calendar layer visibility setting is invalid");
   }
   if (typeof settings.demoSeeded !== "boolean") {
     fail("invalid-settings", "Demo marker is invalid");

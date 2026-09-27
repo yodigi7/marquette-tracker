@@ -57,6 +57,62 @@ describe("store hydration", () => {
     expect(state(second).settings.calendarDetailMode).toBe("simple");
   });
 
+  it("shows every calendar layer by default", async () => {
+    const { store } = setup();
+    expect(state(store).settings.hiddenCalendarLayers).toEqual([]);
+  });
+
+  it("persists hidden calendar layers across a restart", async () => {
+    const db = createDb();
+    const first = createAppStore(db);
+    await first.getState().hydrate();
+    await first.getState().updateSettings({ hiddenCalendarLayers: ["menses", "fertile"] });
+
+    const second = createAppStore(db);
+    await second.getState().hydrate();
+    expect(state(second).settings.hiddenCalendarLayers).toEqual(["menses", "fertile"]);
+  });
+
+  it("fills a missing hidden-layer list from defaults for legacy settings", async () => {
+    const db = createDb();
+    const first = createAppStore(db);
+    await first.getState().hydrate();
+    const row = (await db.settings.get("main"))! as Partial<SettingsEntity>;
+    const { hiddenCalendarLayers: _dropped, ...legacy } = row;
+    await db.settings.put(legacy as SettingsEntity);
+
+    const second = createAppStore(db);
+    await second.getState().hydrate();
+    expect(state(second).settings.hiddenCalendarLayers).toEqual([]);
+  });
+
+  it("discards a stored calendar layer id it does not recognise", async () => {
+    const db = createDb();
+    const first = createAppStore(db);
+    await first.getState().hydrate();
+    const row = (await db.settings.get("main"))! as Partial<SettingsEntity>;
+    await db.settings.put({
+      ...row,
+      hiddenCalendarLayers: ["menses", "a-layer-from-another-version"],
+    } as SettingsEntity);
+
+    const second = createAppStore(db);
+    await second.getState().hydrate();
+    expect(state(second).settings.hiddenCalendarLayers).toEqual(["menses"]);
+  });
+
+  it("discards a stored hidden-layer value that is not a list", async () => {
+    const db = createDb();
+    const first = createAppStore(db);
+    await first.getState().hydrate();
+    const row = (await db.settings.get("main"))! as Partial<SettingsEntity>;
+    await db.settings.put({ ...row, hiddenCalendarLayers: "menses" } as unknown as SettingsEntity);
+
+    const second = createAppStore(db);
+    await second.getState().hydrate();
+    expect(state(second).settings.hiddenCalendarLayers).toEqual([]);
+  });
+
   it("defaults cycle projection to off", async () => {
     const { store } = setup();
     expect(state(store).settings.projectFutureCycles).toBe(false);
