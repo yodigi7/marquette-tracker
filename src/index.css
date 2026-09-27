@@ -127,9 +127,12 @@
     --fertility-marker-menses: #ef4444;
     --fertility-marker-intercourse: #be123c;
     --fertility-monitor-none: #a8a29e;
-    --fertility-monitor-low: #0284c7;
-    --fertility-monitor-high: #b45309;
-    --fertility-monitor-peak: #7c3aed;
+    /* Cool -> warm -> hot, so the three readings read apart at 10px. Each value is a Tailwind
+       step and clears 3:1 against every Calendar fill; see fertility-palette.test.ts, which
+       guards both properties so the palette cannot drift back. */
+    --fertility-monitor-low: #115e59; /* teal-800 */
+    --fertility-monitor-high: #c2410c; /* orange-700 */
+    --fertility-monitor-peak: #c026d3; /* fuchsia-600 */
     --fertility-forecast-bg: #ede9fe;
     --fertility-forecast-border: #7c3aed;
     --fertility-forecast-fg: #4c1d95;
@@ -194,9 +197,11 @@
     --fertility-marker-menses: #f87171;
     --fertility-marker-intercourse: #fb7185;
     --fertility-monitor-none: #44403c;
-    --fertility-monitor-low: #38bdf8;
-    --fertility-monitor-high: #fbbf24;
-    --fertility-monitor-peak: #a78bfa;
+    /* Dark mode has the contrast headroom to carry the progression on lightness as well as hue:
+       Low recedes, Peak is the brightest mark. */
+    --fertility-monitor-low: #0d9488; /* teal-600 */
+    --fertility-monitor-high: #fb923c; /* orange-400 */
+    --fertility-monitor-peak: #e879f9; /* fuchsia-400 */
     --fertility-forecast-bg: #2e1065;
     --fertility-forecast-border: #c4b5fd;
     --fertility-forecast-fg: #ede9fe;
