@@ -13,6 +13,22 @@ const PAD_TOP = 2;
 const AXIS_H = 16;
 const LABEL_W = 90;
 
+/**
+ * Monitor level as a fraction of the row height. Height is the primary channel for
+ * the reading, so the chart stays readable without relying on colour perception;
+ * opacity is only a redundant second cue. An unlogged day keeps a thin empty track
+ * so "no reading" is visibly different from "a short reading".
+ */
+const MONITOR_LEVEL_HEIGHTS: Record<string, number> = {
+  none: 0.14,
+  low: 0.4,
+  high: 0.72,
+  peak: 1,
+};
+
+/** Keeps the empty track visible even in a very short row. */
+const MIN_BAND_PX = 2;
+
 interface CycleComparisonChartProps {
   models: StripModel[];
 }
@@ -38,12 +54,16 @@ function RowBandShape({ x, y, width, height, payload }: BandShapeProps): ReactEl
   const monitor = datum?.monitor ?? "none";
   const opacity = MONITOR_OPACITIES[monitor] ?? MONITOR_OPACITIES.none;
   const color = CYCLE_COLORS[(datum?.cycleIndex ?? 0) % CYCLE_COLORS.length];
+  // Blocks are bottom-aligned so every reading rises from a shared baseline.
+  const full = height ?? 0;
+  const blockH = Math.max(MIN_BAND_PX, full * (MONITOR_LEVEL_HEIGHTS[monitor] ?? 0));
+  const top = (y ?? 0) + (full - blockH);
   return (
     <rect
       x={x}
-      y={y}
+      y={top}
       width={width}
-      height={height}
+      height={blockH}
       rx={2}
       fill={color}
       fillOpacity={opacity}

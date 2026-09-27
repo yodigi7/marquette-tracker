@@ -37,6 +37,52 @@ function makeModel(over: Partial<StripModel> & { cycleId: string; cycleNo: numbe
 describe("CycleComparisonChart", () => {
   afterEach(() => cleanup());
 
+  it("encodes the monitor reading as block height, not just opacity", () => {
+    const days = Array.from({ length: 10 }, (_, i) => makeDay(i + 1));
+    days[0].monitor = "peak"; // tallest
+    days[1].monitor = "high"; // medium
+    days[2].monitor = "low"; // shortest real reading
+    days[3].monitor = undefined; // unlogged -> thin empty track
+    const model = makeModel({ cycleId: "c1", cycleNo: 1, days, span: 10 });
+    render(<CycleComparisonChart models={[model]} />);
+
+    const h = (day: number) =>
+      Number(
+        screen
+          .getAllByTestId("comparison-day-band")
+          .find((el) => el.getAttribute("data-day") === String(day))
+          ?.getAttribute("height"),
+      );
+
+    // day 1 = peak, day 2 = high, day 3 = low, day 4 = unlogged
+    expect(h(1)).toBeGreaterThan(h(2)); // peak > high
+    expect(h(2)).toBeGreaterThan(h(3)); // high > low
+    expect(h(3)).toBeGreaterThan(h(4)); // low > unlogged
+
+    // Unlogged days keep a visible track rather than vanishing, so "no reading"
+    // never looks like "a very short reading".
+    expect(h(4)).toBeGreaterThan(0);
+  });
+
+  it("bottom-aligns blocks so readings share a baseline", () => {
+    const days = Array.from({ length: 10 }, (_, i) => makeDay(i + 1));
+    days[0].monitor = "low";
+    days[1].monitor = "peak";
+    const model = makeModel({ cycleId: "c1", cycleNo: 1, days, span: 10 });
+    render(<CycleComparisonChart models={[model]} />);
+
+    const geom = (day: number) => {
+      const el = screen
+        .getAllByTestId("comparison-day-band")
+        .find((e) => e.getAttribute("data-day") === String(day));
+      return { y: Number(el?.getAttribute("y")), h: Number(el?.getAttribute("height")) };
+    };
+    const low = geom(1);
+    const peak = geom(2);
+    // Same bottom edge, different top edge.
+    expect(low.y + low.h).toBeCloseTo(peak.y + peak.h, 1);
+  });
+
   it("renders one row per cycle, aligned by cycle day", () => {
     const models = [
       makeModel({ cycleId: "c1", cycleNo: 1, span: 10 }),
