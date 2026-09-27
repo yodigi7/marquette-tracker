@@ -13,6 +13,7 @@
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "typecheck": "tsc -b",
+    "icons": "node scripts/generate-icons.mjs",
     "check": "pnpm format:check && pnpm lint && pnpm test && pnpm build",
     "prepare": "git config core.hooksPath .githooks"
   },

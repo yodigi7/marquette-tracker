@@ -12,6 +12,10 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
+      // The manifest's own icons are cached automatically. The tab icon and
+      // favicon are not declared there, so name them explicitly to keep the
+      // rule simple: every file `pnpm icons` produces is available offline.
+      includeAssets: ["favicon.ico", "icon.svg"],
       manifest: {
         name: "Marquette Tracker",
         short_name: "Marquette",
