@@ -89,6 +89,27 @@ against every Calendar fill per theme. This is the only thing that stops the pal
 out of compliance, which is how the current 2.90:1 violation survived. It asserts the _rule_, so
 the palette stays editable; it does not pin the exact hex values.
 
+### D7 — No second, non-colour channel on the Calendar
+
+The comparison chart encodes readings by block height because it must be _scanned_ — you cannot
+hover thirty bands to read each one. The Calendar answers a different question ("what did I read on
+the 14th") and is hover-to-read, so it does not need the same affordance. The single-cycle strip
+chart, which is the Calendar's closest sibling, also uses flat colour bands and no height encoding;
+adding height to the Calendar alone would make it the odd one out.
+
+The palette is therefore colour-dependent by design, and the `fertility-visuals` requirement is
+already satisfied on its "non-colour cue **or** equivalent textual/legend cue" branch: the hover
+tooltip names the reading, the day-detail surface shows it, the legend labels every entry, and the
+day cell carries it in accessible text. A user who cannot separate the hues is slowed, not blocked.
+
+Considered and rejected: varying dot size (shrinks Low, the most common reading and already the
+tightest contrast in dark mode); a ring on Peak alone (makes Peak a different kind of mark rather
+than more of the same); varying shape (fights the dot metaphor and the fixed legend footprint);
+opacity (already rejected for the comparison chart, which found it degrades further for low vision
+and in greyscale).
+
+Owner decision, 2026-09-27: confirmed no.
+
 ## Assumptions
 
 Load-bearing, in the order they were made. Each is reversible by editing six lines in
@@ -147,8 +168,11 @@ on next load. Rollback is reverting the six values.
 
 ## Open Questions
 
-- Should the Calendar adopt a non-colour cue for readings, the way the comparison chart encodes
-  height? Deferrable: it is additive, touches `day-cell.tsx` and the legend, and does not change
-  the palette or these specs.
-- Is the mucus/intercourse/BBT-on-band legibility problem worth its own issue? Deferrable and out of
-  scope here, but it is a real accessibility gap that this change neither causes nor fixes.
+None. Both candidates were resolved by the owner on 2026-09-27:
+
+- The non-colour cue question became **D7** (no second channel on the Calendar).
+- The mucus/intercourse/BBT-on-band legibility gap was **explicitly deferred**, not overlooked. The
+  owner chose to leave it alone for now, so it is recorded here as a deliberate deferral rather than
+  an oversight should it resurface. It remains a pre-existing gap: the overlays sit on the monitor
+  bands at roughly 1.05:1–1.89:1 for every colour, and in light mode no band colour clears 3:1
+  against all of them, so it cannot be addressed by recolouring.
