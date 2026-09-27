@@ -154,5 +154,5 @@ whose job is to be believed.
 - [x] 7.4 Confirm no new string produced for the document matches a countdown, a safety claim, or a
       disclaimer, and that the only place the string "confirmed" or "predicted" may appear beside the
       window is the line stating they are not used.
-- [ ] 7.5 Comment on issue #26 with the assumption list, so the record is visible from the issue thread as
+- [x] 7.5 Comment on issue #26 with the assumption list, so the record is visible from the issue thread as
       well as the pull request.
