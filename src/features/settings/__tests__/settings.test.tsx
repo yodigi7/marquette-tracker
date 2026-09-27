@@ -117,3 +117,25 @@ describe("Settings core preferences (US1)", () => {
     expect(document.documentElement.classList.contains("dark")).toBe(true);
   });
 });
+
+describe("Calendar layer visibility has no second home", () => {
+  it("offers no layer control in Settings", () => {
+    renderSettings();
+
+    // The legend is the only surface. A copy here would be a second control the
+    // user has to learn, and one that could drift from the legend.
+    for (const label of ["Before", "Fertile", "After", "Predicted", "Menses", "Intercourse"]) {
+      expect(screen.queryByRole("button", { name: new RegExp(`^${label}`, "i") })).toBeNull();
+    }
+    expect(screen.queryByRole("button", { name: /show all/i })).toBeNull();
+  });
+
+  it("keeps no layer key in any settings section", () => {
+    renderSettings();
+
+    for (const section of screen.getAllByRole("heading", { level: 2 })) {
+      expect(section.textContent).not.toMatch(/layer/i);
+    }
+    expect(screen.getByTestId("display-settings").textContent).not.toMatch(/layer/i);
+  });
+});

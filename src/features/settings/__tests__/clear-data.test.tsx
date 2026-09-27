@@ -77,6 +77,18 @@ describe("Clear all data (US3)", () => {
     );
   });
 
+  it("returns a hidden calendar layer to visible", async () => {
+    const user = userEvent.setup();
+    await store().updateSettings({ hiddenCalendarLayers: ["menses", "fertile"] });
+    renderSettings();
+
+    await user.click(screen.getByTestId("settings-clear-data"));
+    await user.click(screen.getByTestId("settings-clear-ack"));
+    await user.click(screen.getByTestId("settings-clear-execute"));
+
+    await waitFor(() => expect(store().settings.hiddenCalendarLayers).toEqual([]));
+  });
+
   it("is a no-op when the app is already empty", async () => {
     const user = userEvent.setup();
     await store().clearAllData();
