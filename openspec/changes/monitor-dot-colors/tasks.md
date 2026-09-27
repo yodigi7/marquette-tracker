@@ -37,8 +37,8 @@
 
 ## 4. Record the outcome
 
-- [ ] 4.1 Post a comment on issue #24 with the before/after contrast and separation figures and the
+- [x] 4.1 Post a comment on issue #24 with the before/after contrast and separation figures and the
       two load-bearing assumptions, so the decision is visible from the issue thread.
-- [ ] 4.2 Note in the PR that the cycle-chart overlay legibility gap (mucus/intercourse/BBT drawn on
+- [x] 4.2 Note in the PR that the cycle-chart overlay legibility gap (mucus/intercourse/BBT drawn on
       the bands at ~1.05:1–1.89:1, unfixable by recolouring in light mode) is pre-existing and
       untouched, so it is not mistaken for a regression from this change.
