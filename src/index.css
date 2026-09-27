@@ -229,3 +229,51 @@
         @apply font-sans;
     }
 }
+
+@media print {
+    /* Paper margins only. No `size`, so whatever paper the user has is respected. */
+    @page {
+        margin: 12mm;
+    }
+
+    /*
+     * A dark-theme session must not print a dark sheet, including when the browser is set to print
+     * background graphics. These two are the document's own page, not a component's.
+     */
+    html,
+    body {
+        background: #ffffff;
+    }
+
+    /*
+     * The printable document forces light tokens onto its own sheet. `.dark` declares these on
+     * <html>, so re-declaring them on the sheet makes every descendant below it resolve to
+     * black-on-white for print whatever the session's theme is — while on screen the sheet keeps
+     * resolving through the normal theme tokens and stays readable in both.
+     */
+    .print-sheet {
+        --background: #ffffff;
+        --foreground: #000000;
+        --card: #ffffff;
+        --card-foreground: #000000;
+        --muted: #ffffff;
+        --muted-foreground: #444444;
+        --border: #999999;
+        --primary: #000000;
+        --primary-foreground: #ffffff;
+        --ring: #000000;
+    }
+
+    /*
+     * shadcn's Table wraps itself in a scroll container, which clips a wide sheet on paper. The class
+     * is unreachable from JSX, so it is un-clipped here.
+     */
+    .print-sheet [data-slot="table-container"] {
+        overflow: visible;
+    }
+
+    /* With colour gone, row rules are what carry the table's structure. */
+    .print-sheet [data-slot="table-row"] {
+        border-color: #cccccc;
+    }
+}

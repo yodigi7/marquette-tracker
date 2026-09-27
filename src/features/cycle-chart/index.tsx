@@ -86,6 +86,11 @@ export function CycleChartView() {
         <Button asChild variant="ghost" size="sm">
           <Link to="/cycle-compare">Compare cycles</Link>
         </Button>
+        <Button asChild variant="ghost" size="sm">
+          <Link to={`/summary/${model.cycleId}`} data-testid="cycle-summary-link">
+            Instructor summary
+          </Link>
+        </Button>
       </div>
       <Legend algorithmEnabled={settings.algorithmEnabled} />
       <div aria-label="Cycle chart">
@@ -156,16 +161,12 @@ function Legend({ algorithmEnabled }: { algorithmEnabled: boolean }) {
       <LegendItem className={cn("rounded", FERTILITY_MONITOR_VISUALS.low.dot)} label="Low" />
       <LegendItem className={cn("rounded", FERTILITY_MONITOR_VISUALS.high.dot)} label="High" />
       <LegendItem className={cn("rounded", FERTILITY_MONITOR_VISUALS.peak.dot)} label="Peak" />
+      {/* One window, one treatment. The chart draws a single reference area, so a second key would
+          advertise a distinction the model no longer has — and the spec forbids that cue outright. */}
       {algorithmEnabled && (
         <LegendItem
           className={cn("rounded border", FERTILITY_FORECAST_VISUAL.cellBorder)}
-          label="Predicted window"
-        />
-      )}
-      {algorithmEnabled && (
-        <LegendItem
-          className={cn("rounded border border-fertility-forecast-border")}
-          label="Confirmed window"
+          label="Fertile window"
         />
       )}
       <LegendDot className="bg-fertility-overlay-mucus-high" label="Mucus" />

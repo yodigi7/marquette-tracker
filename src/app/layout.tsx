@@ -25,7 +25,8 @@ export function RootLayout() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b">
+      {/* Print-hidden: a document route prints on its own, with no navigation on the paper. */}
+      <header className="print:hidden border-b">
         <div className="flex items-center justify-between px-4 py-3 md:hidden">
           <span className="font-semibold">Marquette Tracker</span>
           <Sheet>
@@ -69,7 +70,7 @@ export function RootLayout() {
           </div>
         </nav>
       </header>
-      <main className="flex-1 px-4 py-6">
+      <main className="flex-1 px-4 py-6 print:p-0">
         <Outlet />
       </main>
     </div>

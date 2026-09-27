@@ -131,4 +131,32 @@ describe("RootLayout navigation (app-shell)", () => {
         .every((link) => link.getAttribute("href") !== "#/calendar"),
     ).toBe(true);
   });
+
+  it("suppresses the navigation and the page padding in print, and nothing else", () => {
+    // A document route prints on its own: the shell's chrome is the one thing that must not reach
+    // the paper. `print:` is a Tailwind variant, so the class name is the whole contract.
+    const { container } = renderLayout();
+
+    const header = container.querySelector("header");
+    expect(header).not.toBeNull();
+    expect(header?.className).toContain("print:hidden");
+
+    const main = container.querySelector("main");
+    expect(main?.className).toContain("print:p-0");
+
+    // Everything else about the shell is unchanged on screen.
+    expect(header?.className).toContain("border-b");
+    expect(main?.className).toContain("px-4");
+    expect(main?.className).toContain("py-6");
+  });
+
+  it("does not add a document route to the primary navigation", () => {
+    // The cycle summary is reached from a cycle's own chart, not from the nav bar.
+    const { container } = renderLayout();
+    const labels = Array.from(desktopNav(container).querySelectorAll("a")).map(
+      (a) => a.textContent,
+    );
+
+    expect(labels).toEqual(["Calendar", "Status", "History", "Settings"]);
+  });
 });

@@ -50,6 +50,19 @@ describe("CycleChartView", () => {
     expect(screen.queryByText("Confirmed window")).toBeNull();
   });
 
+  it("names one window in the legend when the algorithm is on", async () => {
+    // The chart draws a single reference area, so the legend used to advertise two windows — a
+    // confirmed/predicted distinction the model dropped and the spec forbids as a source cue. The
+    // algorithm-off tests above never covered the on state, which is why it survived.
+    const { a } = await seedCycles();
+    renderAt(a);
+
+    expect(document.querySelector('[data-legend-label="Fertile window"]')).not.toBeNull();
+    expect(screen.queryByText("Predicted window")).toBeNull();
+    expect(screen.queryByText("Confirmed window")).toBeNull();
+    expect(screen.getAllByTestId("fertile-window-band")).toHaveLength(1);
+  });
+
   it("keeps user records and drops only the window band while the algorithm is off", async () => {
     await resetStore();
     const start = addDays(todayKey(), -20);
