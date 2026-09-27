@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { StripModel } from "../lib";
 import { CycleComparisonChart } from "../comparison-chart";
 import { installChartShim } from "./helpers";
@@ -144,5 +144,92 @@ describe("CycleComparisonChart", () => {
     render(<CycleComparisonChart models={models} />);
     expect(screen.getByText(/Cycle 1/)).toBeInTheDocument();
     expect(screen.getByText(/Cycle 2/)).toBeInTheDocument();
+  });
+
+  it("renders a distinct overlap region where two windows overlap", () => {
+    const models = [
+      makeModel({
+        cycleId: "c1",
+        cycleNo: 1,
+        span: 28,
+        window: { begin: 6, end: 17, beginRule: "calendar-day-6", endRule: "current-peak-plus-n" },
+      }),
+      makeModel({
+        cycleId: "c2",
+        cycleNo: 2,
+        span: 28,
+        window: {
+          begin: 8,
+          end: 19,
+          beginRule: "first-high-or-peak",
+          endRule: "current-peak-plus-n",
+        },
+      }),
+    ];
+    render(<CycleComparisonChart models={models} />);
+    const overlaps = screen.getAllByTestId("comparison-window-overlap");
+    expect(overlaps.length).toBe(1);
+    expect(overlaps[0].getAttribute("data-begin")).toBe("8");
+    expect(overlaps[0].getAttribute("data-end")).toBe("17");
+  });
+
+  it("renders no overlap region when windows do not overlap", () => {
+    const models = [
+      makeModel({
+        cycleId: "c1",
+        cycleNo: 1,
+        span: 28,
+        window: { begin: 6, end: 10, beginRule: "calendar-day-6", endRule: "current-peak-plus-n" },
+      }),
+      makeModel({
+        cycleId: "c2",
+        cycleNo: 2,
+        span: 28,
+        window: {
+          begin: 15,
+          end: 20,
+          beginRule: "first-high-or-peak",
+          endRule: "current-peak-plus-n",
+        },
+      }),
+    ];
+    render(<CycleComparisonChart models={models} />);
+    expect(screen.queryByTestId("comparison-window-overlap")).toBeNull();
+  });
+
+  it("clicking a legend item hides that cycle from the chart", () => {
+    const models = [
+      makeModel({ cycleId: "c1", cycleNo: 1, span: 28 }),
+      makeModel({ cycleId: "c2", cycleNo: 2, span: 21 }),
+    ];
+    render(<CycleComparisonChart models={models} />);
+    const bandsBefore = screen.getAllByTestId("comparison-day-band");
+    expect(bandsBefore.length).toBe(49); // 28 + 21
+
+    // Click the first legend item to hide cycle 1
+    const legendItem = screen.getAllByTestId("comparison-legend-item")[0];
+    fireEvent.click(legendItem);
+
+    const bandsAfter = screen.getAllByTestId("comparison-day-band");
+    expect(bandsAfter.length).toBe(21); // only cycle 2 remains
+  });
+
+  it("clicking a legend item twice toggles the cycle back on", () => {
+    const models = [
+      makeModel({ cycleId: "c1", cycleNo: 1, span: 28 }),
+      makeModel({ cycleId: "c2", cycleNo: 2, span: 21 }),
+    ];
+    render(<CycleComparisonChart models={models} />);
+    const bandsBefore = screen.getAllByTestId("comparison-day-band");
+    expect(bandsBefore.length).toBe(49);
+
+    // Click to hide
+    const legendItem = screen.getAllByTestId("comparison-legend-item")[0];
+    fireEvent.click(legendItem);
+    expect(screen.getAllByTestId("comparison-day-band").length).toBe(21);
+
+    // Click again to show
+    fireEvent.click(legendItem);
+    expect(screen.getAllByTestId("comparison-day-band").length).toBe(49);
   });
 });

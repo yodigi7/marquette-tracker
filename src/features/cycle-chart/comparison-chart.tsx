@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Bar,
   ComposedChart,
@@ -10,6 +11,7 @@ import {
 import type { ReactElement } from "react";
 import {
   buildComparisonData,
+  computeWindowOverlaps,
   CYCLE_COLORS,
   maxSpanOf,
   MONITOR_OPACITIES,
@@ -102,8 +104,10 @@ function ComparisonTooltip({
 }
 
 export function CycleComparisonChart({ models }: CycleComparisonChartProps): ReactElement {
-  const data = buildComparisonData(models);
-  const maxSpan = maxSpanOf(models);
+  const [disabledCycleIds, setDisabledCycleIds] = useState<Set<string>>(new Set());
+  const visibleModels = models.filter((m) => !disabledCycleIds.has(m.cycleId));
+  const data = buildComparisonData(visibleModels);
+  const maxSpan = maxSpanOf(visibleModels);
   const xMax = maxSpan + X_PAD;
 
   if (models.length === 0) {
@@ -116,6 +120,23 @@ export function CycleComparisonChart({ models }: CycleComparisonChartProps): Rea
       </div>
     );
   }
+
+  const windows = visibleModels
+    .map((m) => m.window)
+    .filter((w): w is NonNullable<typeof w> => w !== null);
+  const overlaps = computeWindowOverlaps(windows);
+
+  const toggleCycle = (cycleId: string) => {
+    setDisabledCycleIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(cycleId)) {
+        next.delete(cycleId);
+      } else {
+        next.add(cycleId);
+      }
+      return next;
+    });
+  };
 
   return (
     <div className="space-y-2">
@@ -133,11 +154,29 @@ export function CycleComparisonChart({ models }: CycleComparisonChartProps): Rea
                 tick={{ fontSize: 11 }}
               />
               <YAxis hide domain={[0, 2]} />
-              {models.map((model, i) => {
+              {overlaps.map((overlap, i) => (
+                <ReferenceArea
+                  key={`overlap-${i}`}
+                  x1={overlap.begin - X_PAD}
+                  x2={overlap.end + X_PAD}
+                  y1={0}
+                  y2={2}
+                  fill="#1e293b"
+                  fillOpacity={0.3}
+                  stroke="#1e293b"
+                  strokeOpacity={0.5}
+                  strokeWidth={1}
+                  ifOverflow="extendDomain"
+                  data-testid="comparison-window-overlap"
+                  data-begin={overlap.begin}
+                  data-end={overlap.end}
+                />
+              ))}
+              {visibleModels.map((model) => {
                 if (!model.window) {
                   return null;
                 }
-                const color = CYCLE_COLORS[i % CYCLE_COLORS.length];
+                const color = CYCLE_COLORS[models.indexOf(model) % CYCLE_COLORS.length];
                 return (
                   <ReferenceArea
                     key={model.cycleId}
@@ -146,9 +185,9 @@ export function CycleComparisonChart({ models }: CycleComparisonChartProps): Rea
                     y1={0}
                     y2={2}
                     fill={color}
-                    fillOpacity={0.12}
+                    fillOpacity={0.08}
                     stroke={color}
-                    strokeOpacity={0.4}
+                    strokeOpacity={0.2}
                     strokeWidth={1}
                     ifOverflow="extendDomain"
                     data-testid="comparison-window-band"
@@ -159,30 +198,50 @@ export function CycleComparisonChart({ models }: CycleComparisonChartProps): Rea
                 );
               })}
               <Bar dataKey="value" isAnimationActive={false} shape={ComparisonBandShape} />
-              <Tooltip content={<ComparisonTooltip models={models} />} />
+              <Tooltip content={<ComparisonTooltip models={visibleModels} />} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>
-      <ComparisonLegend models={models} />
+      <ComparisonLegend
+        models={models}
+        disabledCycleIds={disabledCycleIds}
+        onToggle={toggleCycle}
+      />
     </div>
   );
 }
 
-function ComparisonLegend({ models }: { models: StripModel[] }): ReactElement {
+function ComparisonLegend({
+  models,
+  disabledCycleIds,
+  onToggle,
+}: {
+  models: StripModel[];
+  disabledCycleIds: Set<string>;
+  onToggle: (cycleId: string) => void;
+}): ReactElement {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
       {models.map((model, i) => {
         const color = CYCLE_COLORS[i % CYCLE_COLORS.length];
+        const disabled = disabledCycleIds.has(model.cycleId);
         return (
-          <span
+          <button
             key={model.cycleId}
-            className="flex items-center gap-1"
+            type="button"
+            className={`flex items-center gap-1 rounded px-1 py-0.5 transition-opacity ${
+              disabled ? "opacity-30 line-through" : "opacity-100 hover:bg-muted"
+            }`}
+            onClick={() => onToggle(model.cycleId)}
             data-testid="comparison-legend-item"
+            data-cycle-id={model.cycleId}
+            data-disabled={disabled}
+            title={disabled ? "Click to show this cycle" : "Click to hide this cycle"}
           >
             <span className="h-2.5 w-2.5 rounded" style={{ backgroundColor: color }} />
             Cycle {model.cycleNo} ({model.span} days)
-          </span>
+          </button>
         );
       })}
     </div>
