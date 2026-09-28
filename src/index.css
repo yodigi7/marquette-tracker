@@ -189,8 +189,15 @@
     /* Two quiet phase fills, and two constraints fight over them.
        A fill is capped in lightness by the monitor marker painted on it -- 0.0435 luminance here, set by
        the Low reading -- and that cap is the whole of the available headroom, whatever the hue. Before
-       sits at 94% of it. There is no value that is both bright and far from the window: the two are the
+       sits at 98% of it. The next value up is 3.00:1 against the reading, so this is the last one that
+       clears the floor. There is no value that is both bright and far from the window: the two are the
        same knob, and it is turned as far as the reading floor allows.
+
+       Darkening the Low reading dot is NOT the way past this, which is worth recording because it looks
+       like it should be. A dot darker than its background has to clear 3:1 the other way round, so a
+       dark Low dot forces a *light* background (>= 0.1439) while Peak, being lighter, forces a *dark*
+       one (<= 0.0922). The two readings straddle the fill and ask for opposite things about the same day,
+       so there is no background that serves all three once Low goes dark.
        Before used to be amber at hue 46 while the window is rose at hue 14, thirty degrees apart, so
        every step of lift walked it toward the window: brightening it made the two look more alike, which
        is the opposite of what was asked for. Before is a warm gold at hue 86 now, seventy-one degrees
@@ -200,7 +207,7 @@
        so the window is still the most prominent surface on the calendar. Light mode is
        unchanged: it has the same shape of problem but the markers there are darker and nobody has
        reported it. See scripts/__tests__/fertility-palette.test.mjs. */
-    --fertility-status-pre-bg: #4a3600;
+    --fertility-status-pre-bg: #4c3700;
     --fertility-status-pre-fg: #fef3c7;
     --fertility-status-pre-border: #f59e0b;
     --fertility-status-fertile-bg: #4c0519;

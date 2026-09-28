@@ -114,8 +114,16 @@ reach `3:1` against whatever the day's background is, which caps _any_ backgroun
 whatever its hue. `Before` is at `0.0409`, which is 94% of that.
 
 So the sweep is flat: every value in the band sits between `0.149` and `0.167` from the card, and the one
-that is furthest from the window is always the dimmest. The last step available is `#4a3600`, and it is
-the last because the next one down is `2.96:1` against the reading floor.
+that is furthest from the window is always the dimmest. The value shipped is `#4c3700` at `0.0427`, and it
+is the last one that clears the reading floor at all — the next value up is `3.00:1` and the one after that
+is `2.94:1`.
+
+**Darkening the Low reading dot is not the way past this**, which is worth recording because it looks like
+it should be, and it was the obvious next idea. A dot _darker_ than its background has to clear 3:1 the
+other way round, so a dark Low dot forces a _light_ background — at `0.0146` luminance it would demand
+`0.1439` or more — while the Peak reading, being lighter, demands `0.0922` or less. The readings straddle
+the fill and ask for opposite things about the same day, so no background serves all three once Low goes
+dark. There is no version of "make the days lighter" that leaves the readings alone.
 
 **What that step costs.** Reading margin goes from `3.21:1` to `3.08:1`. That is the whole payment, and it
 is a real one — it leaves almost nothing for a later edit — but the three things that were asked for all
@@ -126,6 +134,13 @@ than a colour to pick.
 
 That is also the argument for the mark the band used to carry and no longer does: the cap is a hard
 ceiling, and a ceiling is exactly the situation where a mark that is not a background is the answer.
+
+**Open, and it is a product decision rather than a colour to pick.** Lighter days than `#4c3700` need a
+change to the reading markers, and the two instructions on this change conflict: the readings are the one
+thing that must not move, and the quiet phases are the thing that must get lighter. The ways through are a
+hairline outline on the markers, which keeps their colours and their bare-dot character and changes their
+edge, or dark markers throughout, which changes what a reading looks like everywhere including the cycle
+chart. Both are visible; neither is a colour choice.
 
 **Two things the search got wrong, recorded because they nearly shipped.** A search that maximises
 distance from the window will always run to the widest gap on the colour wheel, and on this palette the
