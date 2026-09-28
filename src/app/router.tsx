@@ -5,6 +5,7 @@ import { StatusView } from "@/features/status";
 import { CycleChartView } from "@/features/cycle-chart";
 import { CycleComparisonView } from "@/features/cycle-chart/comparison";
 import { SummaryView } from "@/features/cycle-summary";
+import { InstructorChartView } from "@/features/instructor-chart";
 import { HistoryView } from "@/features/history";
 import { SettingsView } from "@/features/settings";
 
@@ -18,6 +19,8 @@ export function AppRouter() {
         <Route path="cycle-compare" element={<CycleComparisonView />} />
         {/* The printable document for one cycle, reached from that cycle's own chart. */}
         <Route path="summary/:cycleId" element={<SummaryView />} />
+        {/* The printable chart for a run of cycles, reached from History. Count in `?cycles=`. */}
+        <Route path="instructor-chart" element={<InstructorChartView />} />
         <Route path="history" element={<HistoryView />} />
         <Route path="settings" element={<SettingsView />} />
       </Route>

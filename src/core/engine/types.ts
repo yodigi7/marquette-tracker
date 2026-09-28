@@ -89,6 +89,17 @@ export interface DayResult {
 /** Monitor-only contract: Peak evidence comes from a user-entered monitor Peak. */
 export type PeakSource = "monitor" | "none";
 
+/**
+ * One monitor Peak day inside a cycle's history window, with the cycle it belongs to.
+ *
+ * This is the *input* to the calendar rule, not its output. A surface that states a window begin from
+ * that rule can print these alongside the claim, so the claim is checkable where it is made.
+ */
+export interface LookbackPeak {
+  cycleNo: number;
+  peakDay: number;
+}
+
 export interface CycleResult {
   cycleId: string;
   cycleNo: number;
@@ -100,6 +111,16 @@ export interface CycleResult {
   fertileWindow: FertileWindow;
   days: DayResult[];
   warnings: EngineWarning[];
+  /**
+   * The lookback monitor Peak days the calendar rule was derived from, oldest first, restricted to
+   * cycles that actually recorded one.
+   *
+   * Additive and never an input to `fertileWindow` — the begin day and rule above are computed without
+   * reference to this field. Empty whenever the calendar rule did not produce the begin: cycles 1-6, a
+   * begin set by the first High or Peak, or a window holding no Peak to measure from. A surface printing a
+   * calendar-rule begin uses this to show its evidence; a surface printing any other begin shows none.
+   */
+  lookbackPeaks: LookbackPeak[];
 }
 
 export type EngineWarning =

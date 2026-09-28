@@ -46,7 +46,7 @@ Shared rules for both lanes:
 ## Non-negotiable project decisions (as agreed with the user)
 
 - **Audience**: currently personal use (user/partner). Future: possibly open to other users, but NOT in MVP scope.
-- **Fully digital** — no printed chart features and no PDF/PNG export. A read-only CSV export exists for spreadsheets and is not a backup.
+- **The app never generates a document file of its own.** No PDF, PNG, or other document export. Two printable instructor documents exist and are handed to the browser's own print or save action: the single-cycle summary (one cycle, in words) and the instructor chart (a run of cycles, as a grid with days across and observations down). Separately, a read-only CSV export exists in Settings for spreadsheets and is not a backup. "Export" in this app means a file lands on the device; a printable document is handed to the browser, and those two are never conflated.
 - **Algorithm is ON by default** but must have a user-facing toggle to disable computed fertile-window logic (app then logs data without interpreting it).
 - **Normal cycling protocol only** — no postpartum/non-cycling/transitioning rules in MVP.
 - **Current Marquette Institute protocols** (Fehring et al.) — see domain rules below.
@@ -111,7 +111,8 @@ Fertile-window **end**:
 ```
 src/
   app/          # App shell: router, layout, providers
-  features/     # Feature modules (calendar, status, cycle-chart, history, settings)
+  features/     # Feature modules (calendar, status, cycle-chart, cycle-summary,
+                #   instructor-chart, history, settings)
   core/engine/  # PURE framework-agnostic marquette.ts + types (no React/IDB imports)
   core/store/   # Zustand stores + Dexie repositories
   components/   # Shared UI components
@@ -132,8 +133,10 @@ src/
 1. **Calendar** — month grid and the sole daily-input surface: menses, monitor icons, fertile-window shading, and per-day entry dialog.
 2. **Status** — date-selectable read-only status summary at `/status`.
 3. **Cycle chart** — CBPM-style strip chart per cycle (Low/High/Peak bands) with optional mucus/BBT/intercourse overlays (Recharts).
-4. **History/Stats** — cycle table, avg/median cycle length, peak variability, fertile-day counts, forecast panel.
-5. **Settings** — `/settings` view with Core (goal, algorithm toggle, history window, theme), Display & protocol (week-start, cycle band, chart overlays), and Danger zone (clear all data).
+4. **Instructor summary** (`/summary/:cycleId`) — one printable cycle, in words, with the basis of each window end and the protocol warnings raised. Reached from a cycle's own chart.
+5. **Instructor chart** (`/instructor-chart`) — a printable run of recent cycles as a grid: cycle days across as columns, observations down as rows, the fertile window banded across. Reached from History, with an adjustable cycle count defaulting to the configured history window. Prints the lookback Peak days behind any calendar-rule claim, marking which are on the page.
+6. **History/Stats** — cycle table, avg/median cycle length, peak variability, fertile-day counts, forecast panel.
+7. **Settings** — `/settings` view with Core (goal, algorithm toggle, history window, theme), Display & protocol (week-start, cycle band, chart overlays), and Danger zone (clear all data).
 
 ## Predictions / forecasting
 

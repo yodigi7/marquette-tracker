@@ -23,11 +23,24 @@ export function HistoryView() {
 
   return (
     <div className="mx-auto w-full max-w-lg space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">History</h2>
-        <Button asChild variant="outline" size="sm">
-          <Link to="/cycle-compare">Compare cycles</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* A sibling of the table, never inside it: the whole-row control below navigates to a cycle's
+              own chart and a control nested in those rows would swallow it. Named "Print", not
+              "export" — the word belongs to the file exports in Settings, and reusing it is what made
+              this document unfindable the first time. */}
+          {cycleRows.length > 0 ? (
+            <Button asChild variant="outline" size="sm">
+              <Link to="/instructor-chart" data-testid="history-instructor-chart">
+                Print instructor chart
+              </Link>
+            </Button>
+          ) : null}
+          <Button asChild variant="outline" size="sm">
+            <Link to="/cycle-compare">Compare cycles</Link>
+          </Button>
+        </div>
       </div>
       {algorithmEnabled ? (
         <>

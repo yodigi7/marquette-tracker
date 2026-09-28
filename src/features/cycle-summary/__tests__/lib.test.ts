@@ -70,6 +70,7 @@ function closedCycle(overrides: Partial<CycleResult> = {}): CycleResult {
       day(index + 1, `2026-01-${String(index + 1).padStart(2, "0")}`),
     ),
     warnings: [],
+    lookbackPeaks: [],
     ...overrides,
   };
 }

@@ -175,6 +175,27 @@ in two units, not two readings, and both are present whatever the display unit i
 stored; `bbt_f` is computed from it at a precision that converts back exactly, so neither is a
 rounded copy of the other. Ignore whichever you do not read.
 
+### Handing a chart to an instructor
+
+The app has two printable documents, both reached from the app and handed to your browser's own print or
+save action. Neither writes a file, uploads anything, or changes stored data.
+
+- **Instructor summary** — one cycle on one page, in words. Reached from a cycle's own chart, it covers a
+  single cycle and explains the basis of that cycle's window ends, plus any protocol warnings the app
+  raised.
+- **Instructor chart** — a run of the most recent cycles laid out the way an instructor reads a chart:
+  cycle days run **across** as columns, each kind of observation runs **down** as rows, and the computed
+  fertile window is banded across the grid. Reached from **History**, it defaults to the configured
+  history window (six) and the cycle count can be changed before printing.
+
+The chart prints the evidence behind each calendar-rule claim. A window that began on the earliest Peak
+minus six days names that Peak day and the cycle it came from, and marks whether that cycle is charted on
+the same page — so a claim on paper is one a reader can check rather than take on trust.
+
+These are **printed documents, not data exports**. The word "export" in this app means a file lands on your
+device, and those actions stay in Settings. Choosing landscape in the print dialog suits the chart's width;
+the app deliberately does not force a paper size.
+
 ### Rollback
 
 If a release is unhealthy, revert the deployment commit on `main` and let the workflow publish the reverted revision, or manually rerun the workflow for the last known-good `main` commit. Verify the Pages URL and offline shell after recovery.
