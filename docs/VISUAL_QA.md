@@ -6,7 +6,7 @@ Manual verification checklist for the shared light/dark fertility visual languag
 
 1. Run `pnpm dev` and open the app at a narrow viewport (320px wide) and a desktop viewport (at least 1024px wide).
 2. Use Settings to switch between Light, Dark, and System themes. Repeat each case in the resolved light and dark themes.
-3. Use the seeded demo data or log a cycle containing a user-entered monitor High and monitor Peak. Include an inferred post-Peak Low when post-Peak fill is enabled.
+3. Use the seeded demo data or log a cycle containing a user-entered monitor High and monitor Peak.
 4. Keep the algorithm enabled for the interpretation cases, then disable and re-enable it for the logging-only cases.
 
 ## Shared contrast checks

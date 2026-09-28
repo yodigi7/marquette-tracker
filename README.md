@@ -2,7 +2,9 @@
 
 Offline-first PWA for tracking a woman's fertility cycle using the **Marquette Method** with the **ClearBlue Fertility Monitor (CBPM)**. Logs daily observations, computes the fertile window per the Marquette Institute algorithm, and provides predictions/forecasting.
 
-See [AGENTS.md](./AGENTS.md) for full project context, decisions, and domain rules, and [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md) (plus [docs/MILESTONE_1_SCAFFOLD.md](./docs/MILESTONE_1_SCAFFOLD.md)) for roadmap.
+See [AGENTS.md](./AGENTS.md) for project context, decisions, and the Marquette domain rules. What the app
+does is specified capability by capability under [`openspec/specs/`](./openspec/specs), and the change
+history behind it — including decisions that were later reversed — is in `openspec/changes/archive/`.
 
 ## Stack
 
@@ -206,20 +208,28 @@ If a release is unhealthy, revert the deployment commit on `main` and let the wo
 src/
   app/           # App shell: router, layout, providers
   components/    # Shared UI (shadcn/ui in components/ui, lib/utils)
-  core/engine/   # Pure, framework-agnostic Marquette algorithm (M2)
+  core/engine/   # Pure, framework-agnostic Marquette algorithm
   core/backup/   # Versioned JSON backup contract, validation, and migrations
   core/export/   # Human-readable CSV projection of cycles and day records (read-only)
-  core/store/    # Zustand stores + Dexie repositories (M3)
-  features/      # calendar / status / cycle-chart / history / settings
+  core/store/    # Zustand stores + Dexie repositories
+  features/      # calendar / status / cycle-chart (+ comparison) / cycle-summary /
+                 #   instructor-chart / history / settings
 ```
 
 ## Status
 
-Milestone 1 (scaffold), Milestone 2 (Marquette engine + table-driven tests), and Milestone 3 (Dexie storage + Zustand store) complete: toolchain, shadcn/ui, PWA shell, routing skeleton, Vitest harness, pure-TS engine (`computeAll` + forecasting), and the IndexedDB/Zustand data layer with sync-ready rows and engine recompute on every write.
-Milestone 4 (Status view) complete: date-selectable read-only status/forecast card and an "algorithm off" notice.
-Milestone 5 (Calendar view) complete: Calendar is the daily-input surface with a month grid, per-day entry dialog, status shading, raw markers, and month navigation.
-Milestone 6 (Cycle strip chart) complete: Recharts CBPM-style strip per cycle with monitor band colors, fertile-window shading (hidden when the algorithm is off), overlay toggles for BBT/mucus/intercourse, and a cycle selector with `/cycle/:id` routing — plus view/lib/selector tests (current full suite: 316 tests, all green).
-Milestone 7 (History/Stats) complete: forecast panel (predicted tags on every projection), cycle stats (length/peak/fertile-day averages), and a per-cycle table — plus view tests (current full suite: 316 tests, all green).
-Milestone 8 (Settings) complete: goal, algorithm on/off (log-only when off, app-wide), post-Peak days (default 4), history window, theme (system/light/dark), calendar week-start (Monday/Sunday), configurable cycle-length protocol band (default 21–42), persisted chart overlay toggles (BBT/mucus/intercourse), and a confirmed clear-all-data danger zone (current full suite: 316 tests, all green).
+The app covers its MVP scope. What it does is specified capability by capability under
+[`openspec/specs/`](./openspec/specs), and the change history behind it — including decisions that were
+later reversed — is in `openspec/changes/archive/`. That history is the record of progress; this file
+describes the app, not its state of development.
 
-**Remaining before first release**: remove the demo-seed block and `src/core/store/seedDemo.ts` (`TODO(remove-after-dev)`).
+Two protocol decisions are easy to get backwards, so they are stated here rather than left to the specs:
+
+- **A cycle's Peak day is its _first_ monitor Peak reading, and the window _end_ is measured from the
+  _last_ one.** The monitor normally shows Peak for at least two days, and the protocol reads a
+  different one for each end of the window.
+- **The post-Peak interval is a fixed 3 days.** It is a protocol constant, not a preference: there is
+  no setting for it, and no stored value can move it.
+
+**Remaining before first release:** remove the demo-seed block and `src/core/store/seedDemo.ts`
+(`TODO(remove-after-dev)`).
