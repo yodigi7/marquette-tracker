@@ -86,7 +86,7 @@ thirty-two degrees apart. Brightening amber therefore walked it _toward_ the win
 and "make it look less like the window" were the same request pointed in opposite directions. An earlier
 attempt lifted the tints and the review came back saying `Before` was now similar to the window. It was.
 
-`Before` is a warm gold at hue `79` now, sixty-five degrees from the window instead of thirty-one, and
+`Before` is a warm gold at hue `86` now, seventy-one degrees from the window instead of thirty-one, and
 `After` stays teal. Both are lifted: `0.105 -> 0.149` and `0.075 -> 0.125` measured from the card, which is
 the surface the Calendar actually renders on. Both sit below the window in lightness _and_ chroma, so the
 window is still the most prominent surface on the calendar.
@@ -106,10 +106,26 @@ this started at, so it is a partial give-back and not a return to the problem. I
 out to be hard to tell apart on a device, the honest place to fix that is the summary or the legend rather
 than another mark on every day.
 
-**The ceiling, plainly.** The Low reading permits `0.0435` luminance and every warm hue in this band lands
-at `0.032-0.034`. There is no value that is both bright and far from the window; that is what the cap
-means. Two review rounds have each taken the available headroom and this one is nearly exhausted, which is
-itself the argument for the mark the band used to carry and no longer does.
+**The ceiling, and why the next review could not have what it asked for.** A review asked for the gold to
+be yellower, more differentiating, less dark and less red. Three of those are the same knob: in the warm
+band, moving the hue up and the luminance up and the distance from the window up are one movement, and the
+Low reading's floor stops it. Concretely, the binding reading dot sits at `0.2304` luminance and has to
+reach `3:1` against whatever the day's background is, which caps _any_ background at `0.0435` luminance
+whatever its hue. `Before` is at `0.0409`, which is 94% of that.
+
+So the sweep is flat: every value in the band sits between `0.149` and `0.167` from the card, and the one
+that is furthest from the window is always the dimmest. The last step available is `#4a3600`, and it is
+the last because the next one down is `2.96:1` against the reading floor.
+
+**What that step costs.** Reading margin goes from `3.21:1` to `3.08:1`. That is the whole payment, and it
+is a real one — it leaves almost nothing for a later edit — but the three things that were asked for all
+move in the right direction, so it is the right place to spend it. If the quiet phases ever need to be
+visibly lighter than this, the only remaining lever is the reading dot itself, which is the one thing
+this change has been told repeatedly not to touch, and it would be a decision to take deliberately rather
+than a colour to pick.
+
+That is also the argument for the mark the band used to carry and no longer does: the cap is a hard
+ceiling, and a ceiling is exactly the situation where a mark that is not a background is the answer.
 
 **Two things the search got wrong, recorded because they nearly shipped.** A search that maximises
 distance from the window will always run to the widest gap on the colour wheel, and on this palette the
