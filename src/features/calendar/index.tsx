@@ -24,7 +24,15 @@ import type { CalendarLayerId, CycleEntity, DayRecordEntity } from "@/core/store
 import { DayCell } from "./day-cell";
 import { CalendarSummary } from "./summary";
 import { autoOpenStorageKey, shouldAutoOpenToday } from "./auto-open";
-import { monthGrid, monthTitle, resolveCell, shiftMonth, weekdayLabels } from "./grid";
+import {
+  monthGrid,
+  monthTitle,
+  resolveCell,
+  shiftMonth,
+  weekdayLabels,
+  windowEdgesByDay,
+  type CellInfo,
+} from "./grid";
 import { QuickEntry } from "./quick-entry";
 import {
   hasHiddenOnScreen,
@@ -81,6 +89,30 @@ export function CalendarView() {
   const currentRecord = currentCycle
     ? dayRecords.find((record) => record.cycleId === currentCycle.id && record.date === today)
     : undefined;
+
+  // The window's edges are a property of the whole month, not of one day: a cell cannot know whether
+  // the day above or beside it is inside the window. Resolving every cell up front and deriving the
+  // edges once is what keeps a run that wraps weeks free of a seam, and it is cheaper than resolving
+  // each cell twice during the render below.
+  const cells = useMemo(() => {
+    const byDate = new Map<string, CellInfo>();
+    const slots: { dateKey: string; inWindow: boolean }[] = [];
+    for (const week of grid.weeks) {
+      for (const dateKey of week) {
+        if (!dateKey) continue;
+        const cell = resolveCell(cycles, dayRecords, results, forecast, dateKey, today, projected);
+        byDate.set(dateKey, cell);
+        slots.push({ dateKey, inWindow: cell.info === "fertile" });
+      }
+    }
+    // The window's true last day, when it is on screen, so a run that merely runs off the end of the
+    // displayed month is not rounded as though the window ended there.
+    const windowEndsOn = [...byDate.values()].find((cell) => cell.windowEnd)?.windowEnd
+      ? slots.find((slot) => byDate.get(slot.dateKey)?.windowEnd)?.dateKey
+      : undefined;
+    return { byDate, edges: windowEdgesByDay(slots, windowEndsOn) };
+  }, [grid, cycles, dayRecords, results, forecast, today, projected]);
+  const { edges } = cells;
 
   useEffect(() => {
     if (autoOpenAttempted.current) {
@@ -164,15 +196,10 @@ export function CalendarView() {
             if (!dateKey) {
               return <div key={`${w}-${d}`} />;
             }
-            const cell = resolveCell(
-              cycles,
-              dayRecords,
-              results,
-              forecast,
-              dateKey,
-              today,
-              projected,
-            );
+            const cell = cells.byDate.get(dateKey);
+            if (!cell) {
+              return <div key={`${w}-${d}`} />;
+            }
             return (
               <DayCell
                 key={dateKey}
@@ -184,8 +211,7 @@ export function CalendarView() {
                 cycleStart={cell.cycleStart}
                 monitor={cell.monitor}
                 intercourse={cell.intercourse}
-                windowStart={interpreted ? cell.windowStart : false}
-                windowEnd={interpreted ? cell.windowEnd : false}
+                windowEdges={interpreted ? edges[dateKey] : undefined}
                 isToday={dateKey === today}
                 detailMode={detailMode}
                 hiddenLayers={hiddenLayers}

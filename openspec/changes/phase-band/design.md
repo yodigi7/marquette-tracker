@@ -17,12 +17,17 @@ A monitor marker is painted inside the day cell, on top of the fill, so every ti
 lightness for the best three-phase palette inside the cap reaches a worst-pair separation of `0.0616`,
 against `0.0572` today. Three tinted fills are not separable in the dark theme.
 
+The consequence that decides this design: **a background a marker sits on cannot be loud.** The window
+is a region — it occupies the whole day — so it is still a background, and the cap still applies to its
+interior. Anything that is allowed to be bright has to be something no marker is painted on.
+
 ## Goals / Non-Goals
 
 **Goals:**
 
 - Make `Before`, `Fertile`, and `After` genuinely distinguishable in dark mode.
-- Make the fertile window the most prominent of the three.
+- Make the fertile window unmistakably the thing the eye lands on.
+- Make the window's mark impossible to confuse with the menses stripe.
 - Keep every reading marker's legibility exactly as it is today.
 - Make the window's opening and closing days identifiable without a second mark on screen.
 
@@ -32,82 +37,137 @@ against `0.0572` today. Three tinted fills are not separable in the dark theme.
 - No change to the Status view's badges, which show the precise status and need four distinguishable
   fills of their own.
 - No change to the tile fills, so nothing about the reading markers moves.
+- No change to the menses stripe, which stays where it is, in its own colour.
 - No new dependency.
 
 ## Decisions
 
-### The band carries the distinction; the fill keeps the hue
+### The window is a region; the two quiet phases keep a band
 
-A 4px band along the top of each day, in the phase's full-chroma colour. Nothing is painted on it, so
-the marker cap does not apply and it is free of the constraint that caps the fills:
+The first pass at this change put a 4px band on the top edge of every day, in the phase's full-chroma
+colour. It worked on the reported problem and it was built and verified. It then failed on a second
+complaint, which is the one that decided the final shape:
 
-|                                     | worst pair | vs page      |
-| ----------------------------------- | ---------- | ------------ |
-| fills, today                        | 0.0572     | 1.27–1.58:1  |
-| fills, best possible inside the cap | 0.0616     | —            |
-| **bands, dark**                     | **0.2118** | 7.36–11.86:1 |
-| **bands, light**                    | **0.1721** | 4.70–5.47:1  |
+> the fertile window band and the menses stripe get confused with the next week being close vertically
 
-The dark band values already exist in the stylesheet as the `--fertility-status-*-border` tokens. They
-are already contrast-checked against their own fills, and they are simply never painted. The palette
-already contains the answer.
+That is a real defect and it is structural rather than cosmetic. A band is a horizontal line along a
+cell's **top** edge; the menses stripe is a horizontal line along the **bottom** edge of the cell above.
+The grid separates rows by 4px, so across a week boundary the two are 8px apart and both horizontal.
+They read as one stripe. No change to a band can fix that, because a band is the same kind of mark as the
+stripe; only changing the kind of mark fixes it.
 
-The tile fills are left exactly as they are. That is the reason this change is cheap on legibility: the
-readings sit on the same background they always did, at 6.09:1 or better.
+So the window is now a full-height outlined region, and the two quiet phases keep their bands:
 
-### The band bridges the grid gap
+| mark                | worst pair vs page | shape                           |
+| ------------------- | ------------------ | ------------------------------- |
+| fills               | 0.0572             | large background                |
+| band (before/after) | 0.2118 dark        | 4px bar along a cell's top      |
+| region (window)     | —                  | 2px closed outline, full height |
 
-The grid is `grid-cols-7 gap-1`. The band extends 4px into the gap on each side, so an 11-day window
-reads as one region rather than 11 dashes. The cell therefore cannot be `overflow-hidden`, and the
-band deliberately overhangs the cell's `rounded-md` corner — it is a stroke across the top of the
-calendar, not a fill clipped to the tile.
+The region's **interior** is the ordinary phase fill, unchanged. That is not an oversight: the interior
+is a background a marker is painted on, so the cap applies to it and it cannot be lightened without
+either breaching the marker rules or dropping a reading's legibility. The brightness lives in the
+**outline**, because no marker is painted on an edge. That is the whole reason the window reads as an
+object rather than as a tint, and it is why the reading markers are exactly as legible as they are
+today.
 
-### The run's ends are marked by shaping the band
+The two quiet phases keeping their bands is a deliberate asymmetry: the window is the thing the user
+scans for, and a region on every phase would put three regions in competition for that attention.
 
-A first attempt drew a short stub below the band's edge in the band's own colour. Verified in the
-browser as pixel-identical to the band (`rgb(251, 113, 133)` on both), and at true size a 4×10px stub
-below a 4px bar reads as a floating period. The tests asserted the element _existed_ and never that it
-was _legible_, which is the gap that let it ship.
+### The region's edges are computed from the month, not from the cell
 
-The band's outer corners are now rounded on the first and last day of a run and square everywhere else.
-Same colour, no additional element, and nothing on screen that can be read as debris. The tests now
-assert that the first and last day are presented differently from an interior day, which is the
-property that was actually required.
+A day cell cannot decide the region's edges, because it does not know whether the day above or beside
+it is inside the window. `windowEdgesByDay` therefore takes the whole displayed month and returns, per
+day, which of the four sides the window has. Two properties of that result are the entire fix for the
+two rendering defects found on the first attempt:
 
-### A run clipped by a month is shaped as though it continued
+- **No edge across the middle of a run.** A side is painted only where the window genuinely stops in
+  that column. Where the run continues down, neither the bottom edge nor the top edge below it is
+  drawn, so the outline runs unbroken through the row gap.
+- **No half-rounded ends.** Rounding is applied at the window's two true ends and nowhere else, and the
+  vertical edge is painted on the same cell that rounds. A row that begins mid-window stays square,
+  which is what makes the run's ends legible as its ends.
 
-The window's end is 3 days after the last Peak. A band rounded at the last day of a displayed month
-would report an end the window does not have, and in a fertility app that reads as a protocol result.
-The two flags are pure functions of the window and carry no month information, so paging the calendar
-cannot change what is marked.
+### Each side is coloured in its own right, and this is load-bearing
 
-### A rejection worth recording
+The first attempt at the region carried a single `border-<colour>` class. A border-colour utility sets
+all four sides at once, and setting a side's **width** does not undo a **colour** that has been set. So
+the region outlined itself through the middle of every run that wrapped weeks, and squared off the
+rounded corners it had just drawn — which is exactly the pair of defects reported against it, and the
+reason a fix to the width logic alone changed nothing on screen.
 
-Painting **only** the fertile window, and leaving `Before` and `After` untinted, does fix the reported
-problem much more thoroughly — a single band is findable at 0.279 lightness above the page, and no
-marker has to survive a tint. That was implemented and is the subject of the previous revision of this
-branch.
+`BlockEdges` is therefore four classes, and an unpainted side is left transparent. The test that guards
+this asserts the **absence** of every side's colour class on an interior day, because the failure mode
+is a class that is present when it should not be. The class names are written out in full rather than
+built from a token, because Tailwind generates its utilities from the class names it finds in the
+source and a computed `border-l-${token}` is not one of them.
 
-It was withdrawn because all three phases are wanted, and it is the wrong trade for that requirement:
-it is a decision about which information the Calendar offers, not about how to render it. Worth noting
-in the record that the same reasoning _does_ apply to the fills within a phase, which is why the fills
-are exempt from separation while the bands are not.
+### A window that wraps weeks is two runs, and the render says so
+
+A window is 11 days in a 7-wide grid. Its last day in one row is in the final column and its next day
+is in the first, so the two cells are not neighbours in any direction. There is no shape that joins
+them, and a rendering that looked like one connected region would misrepresent the calendar's geometry.
+
+The region is therefore drawn per row, with the grid gap between segments left open. The eye joins them
+because they are the same colour, aligned, and in adjacent rows. The region bleeds 4px into the row gap
+**only** in a column where the run actually continues, which is what keeps the vertical edges unbroken
+without bleeding over a day that is not part of the window.
+
+### The region's ends are the window's ends, not the month's
+
+A run clipped by the edge of the displayed month is not finished, and rounding it would report a window
+end the protocol does not have — which in a fertility app reads as a clinical result. The true end day
+is passed into the edge calculation, and a clipped run's outer edge stays square. The same rule already
+applied to the band, and still does.
+
+### The menses stripe is left alone
+
+The obvious remedy for the band/stripe collision is to restyle the menses. It is not needed here, and
+restyling it would be the wrong trade for two reasons:
+
+- **They never share a day.** Menses is cycle days 1–5 and the window is days 6 and later, so the
+  stripe is never painted on the region's fill. The collision was between a _band_ and a stripe in
+  adjacent cells, not between two marks on one cell.
+- **The band is gone.** The collision existed because the window's mark was a line. A region is a
+  closed shape and cannot be read as a stripe, so the conflict is resolved by the window's mark, at no
+  cost to the user.
+
+Worth recording what the collision _would_ have cost, had the marks shared a day: a red stripe on a rose
+fill is 2.90:1 and the same hue, so it would have sunk into the region it was annotating. A near-white
+stripe would have worked (9.40:1 on the fill, 18.96:1 on a plain day) at the price of the calendar
+having two near-white things on it.
+
+## Rejections worth recording
+
+- **A backing disc behind the reading marker.** Invisible at the size the marker is drawn, and it does
+  not help: the marker already clears 3:1 against every fill.
+- **Lifting all three reading markers** so the fills could be lighter. Raises the fill cap by 1.6x but
+  drops the readings' own separation to 0.197, under their 0.25 floor. Two accessibility rules in direct
+  conflict, and the marker's should not give.
+- **Painting only the fertile window** and leaving `Before` and `After` untinted. Fixes the reported
+  problem more thoroughly than anything here, and was implemented. Withdrawn because all three phases
+  are wanted, and it is a decision about which information the Calendar offers rather than how to render
+  it.
+- **A single connected outline** traced around a window that wraps weeks. Needs a bespoke path per
+  window shape, and it would misrepresent the grid.
 
 ## Risks / Trade-offs
 
-- **The band is a thin mark, and the fill is most of what is seen.** The band fixes the boundary and
-  the phase identity; it does not lift the month out of a dark field the way a lighter fill would.
-  This is the honest limit of what a band can do, and it is the cost of painting all three phases.
-  → Accepted, and named in the issue, because the alternative tops out at 0.0616 and does not work.
-
-- **The band overhangs the rounded corners.** → Deliberate; recorded rather than smoothed over.
-
-- **Light mode's bands only reach 0.1721**, because a 4px band on white has to clear 3:1 and the dark
-  values that satisfy that crowd each other. → The guard's separation floor is per theme for this
-  reason, with a comment naming what it replaced.
-
-- **The band is easy to lose behind the reading marker** if the two are ever drawn in the same place.
-  → The marker sits mid-tile and the band at the top edge, verified by the coexisting test.
+- **The region needs the whole month to draw one cell.** A cell cannot decide its own edges, so the
+  Calendar resolves every cell once and derives the edges from that. The cost is that the edge
+  calculation is no longer local to a cell; the mitigation is that it is a pure function with its own
+  tests, and resolving the month once is cheaper than resolving each cell twice.
+- **A rose outline is intrinsically close to the amber `Before` band.** Rose-400 is 0.227 from it in
+  dark and rose-600 is 0.172 in light; no rose step clears light's 0.15 floor by much, and the two are
+  told apart by shape and position long before hue — a 2px closed box round a run against a 4px bar
+  along the top edge of a single day. The guard asserts the pair anyway, per theme, because the risk is
+  worth watching even when the margin is thin.
+- **Light mode's marks only reach 0.1721** against each other, because a mark on white has to clear 3:1
+  and the dark values that satisfy that crowd each other. → The guard's separation floor is per theme
+  for this reason.
+- **The region's outline and the menses stripe can still be close vertically** on a week boundary. →
+  They are different kinds of mark — a closed box against a bar — which is the distinction the change
+  was made to establish. Verified on a month whose window wraps three rows.
 
 ## Migration Plan
 

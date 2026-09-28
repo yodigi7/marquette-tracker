@@ -11,6 +11,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { CalendarView } from "../index";
 import { DayCell } from "../day-cell";
 import type { DayCellProps } from "../day-cell";
+import { windowEdgesByDay, type WindowEdges } from "../grid";
 import { CALENDAR_LAYERS, LAYER_PAINT } from "../layers";
 import { autoOpenStorageKey } from "../auto-open";
 
@@ -430,15 +431,18 @@ describe("CalendarView", () => {
     }
   });
 
-  describe("the phase band", () => {
+  describe("the window region and the phase band", () => {
     const band = '[data-testid="calendar-phase-band"]';
+    const block = '[data-testid="calendar-window-block"]';
+    const SIDE = {
+      top: "border-t-fertility-status-fertile-block",
+      right: "border-r-fertility-status-fertile-block",
+      bottom: "border-b-fertility-status-fertile-block",
+      left: "border-l-fertility-status-fertile-block",
+    };
 
-    function renderBand(
-      info: DayStatus | null,
-      windowStart = false,
-      windowEnd = false,
-      extra: Partial<DayCellProps> = {},
-    ) {
+    /** A cell rendering one phase, with the window edges the Calendar would have supplied. */
+    function renderCell(info: DayStatus | null, extra: Partial<DayCellProps> = {}) {
       return render(
         <DayCell
           dateKey="2026-01-14"
@@ -448,8 +452,6 @@ describe("CalendarView", () => {
           menses={false}
           monitor={undefined}
           intercourse={false}
-          windowStart={windowStart}
-          windowEnd={windowEnd}
           isToday={false}
           onSelect={() => {}}
           {...extra}
@@ -457,129 +459,235 @@ describe("CalendarView", () => {
       );
     }
 
+    function blockClasses(info: DayStatus | null, edges?: WindowEdges): string {
+      const { container } = renderCell(info, edges ? { windowEdges: edges } : {});
+      return container.querySelector(block)?.className ?? "";
+    }
+
+    /** The window's first day: a run opens here and nothing continues up. */
+    const FIRST_DAY: WindowEdges = {
+      start: true,
+      end: false,
+      continuesUp: false,
+      continuesDown: true,
+      roundStart: true,
+      roundEnd: false,
+    };
+    /** The window's last day. */
+    const LAST_DAY: WindowEdges = {
+      start: false,
+      end: true,
+      continuesUp: true,
+      continuesDown: false,
+      roundStart: false,
+      roundEnd: true,
+    };
+    /** A day in the middle of a run that spans three rows. */
+    const INTERIOR: WindowEdges = {
+      start: false,
+      end: false,
+      continuesUp: true,
+      continuesDown: true,
+      roundStart: false,
+      roundEnd: false,
+    };
+    /** The last day of a row whose window carries on in the next row. */
+    const ROW_END_CONTINUES: WindowEdges = {
+      start: false,
+      end: true,
+      continuesUp: true,
+      continuesDown: true,
+      roundStart: false,
+      roundEnd: false,
+    };
+    /** The first day of a row the window carried into from the row above. */
+    const ROW_START_CONTINUED: WindowEdges = {
+      start: true,
+      end: false,
+      continuesUp: true,
+      continuesDown: true,
+      roundStart: false,
+      roundEnd: false,
+    };
+    /** A one-day window: the same day is both ends. */
+    const ALONE: WindowEdges = {
+      start: true,
+      end: true,
+      continuesUp: false,
+      continuesDown: false,
+      roundStart: true,
+      roundEnd: true,
+    };
+
     it.each([
       ["pre-fertile" as const, "bg-fertility-status-pre-band"],
-      ["fertile" as const, "bg-fertility-status-fertile-band"],
       ["post-peak" as const, "bg-fertility-status-post-peak-band"],
       // `post-calendar` collapses into the `after` phase on a Calendar, so it wears the post-peak
       // band. The Status view is where it is distinguished, and it has its own band token for that.
       ["post-calendar" as const, "bg-fertility-status-post-peak-band"],
     ])("paints a %s day with that phase's band", (info, cls) => {
-      // Every phase gets a band. Painting only the fertile one was implemented and withdrawn: it
+      // The two quiet phases get a band. Painting only one phase was implemented and withdrawn: it
       // fixed the reported problem more thoroughly but it decides which information the Calendar offers
       // rather than how to render it, and all three phases are wanted.
-      const { container } = renderBand(info);
+      const { container } = renderCell(info);
       expect(container.querySelector(band)?.className).toContain(cls);
     });
 
     it("paints the band alongside the fill, not instead of it", () => {
       // The fill keeps the phase's hue so the month still reads as tinted. It simply is no longer what
       // separates one phase from another, which is the band's job.
-      const { container } = renderBand("fertile");
-      const cell = screen.getByTestId("day-cell");
-      expect(cell.className).toContain("bg-fertility-status-fertile");
+      const { container } = renderCell("post-peak");
+      expect(screen.getByTestId("day-cell").className).toContain("bg-fertility-status-post-peak");
       expect(container.querySelector(band)).not.toBeNull();
     });
 
     it("paints no band on a day with no phase", () => {
-      const { container } = renderBand(null);
+      const { container } = renderCell(null);
       expect(container.querySelector(band)).toBeNull();
     });
 
     it("bridges the grid gap so a run reads as one band", () => {
       // The grid separates cells by 4px. A band inset to the cell would break every run into
       // separate marks, which is the failure the band exists to fix.
-      const { container } = renderBand("fertile");
+      const { container } = renderCell("post-peak");
       expect(container.querySelector(band)?.className).toContain("inset-x-[-4px]");
     });
 
-    it("is not clipped by the cell", () => {
-      const { container } = renderBand("fertile");
-      expect(container.querySelector(band)?.className).not.toContain("overflow");
-      expect(screen.getByTestId("day-cell").className).not.toContain("overflow-hidden");
+    it("draws the window as a full-height region and gives it no band", () => {
+      // A band and the menses stripe are both horizontal lines at opposite cell edges, 8px apart
+      // across a week boundary, where they read as one mark. A band on the window would put that mark
+      // back, so the window is a region instead and carries the phase's fill inside its outline.
+      const { container } = renderCell("fertile", { windowEdges: FIRST_DAY });
+      expect(container.querySelector(band)).toBeNull();
+      expect(container.querySelector(block)).not.toBeNull();
+      expect(screen.getByTestId("day-cell").className).toContain("bg-fertility-status-fertile");
+    });
+
+    it("leaves every side transparent by default, so only the edges the window has are painted", () => {
+      // The load-bearing guard. A single `border-<colour>` class paints all four sides at once, and a
+      // side's width cannot undo that: the block then outlines itself through the middle of every run
+      // that wraps weeks, and squares off the rounded ends it just drew. Unpainted has to mean
+      // transparent, so this asserts the absence of every side's colour class on an interior day.
+      const className = blockClasses("fertile", INTERIOR);
+      for (const side of Object.values(SIDE)) {
+        expect(className, `an interior day must not paint ${side}`).not.toContain(side);
+      }
+      expect(className, "and the element starts from a transparent border").toContain(
+        "border-transparent",
+      );
     });
 
     it.each([
-      ["the first day", true, false, "rounded-l-full", "rounded-r-full"],
-      ["the last day", false, true, "rounded-r-full", "rounded-l-full"],
-      // A one-day window: the single day is both ends, so both edges round.
-      ["a day that is both", true, true, "rounded-l-full", null],
-      ["an interior day", false, false, null, null],
-    ])("marks %s of the run by rounding the band's outer edge", (_l, start, end, has, lacks) => {
-      const { container } = renderBand("fertile", start, end);
-      const className = container.querySelector(band)?.className ?? "";
+      ["the window's first day", FIRST_DAY, ["top", "left"], []],
+      ["the window's last day", LAST_DAY, ["bottom", "right"], []],
+      ["an interior day", INTERIOR, [], []],
+      ["the last day of a row the run continues past", ROW_END_CONTINUES, ["right"], ["bottom"]],
+      ["the first day of a row the run continued into", ROW_START_CONTINUED, ["left"], ["top"]],
+      ["a one-day window", ALONE, ["top", "right", "bottom", "left"], []],
+    ] as const)("paints %s", (_label, edges, painted, unpainted) => {
+      const className = blockClasses("fertile", edges);
+      for (const side of painted) {
+        expect(className, `expected ${side}`).toContain(SIDE[side]);
+      }
+      for (const side of unpainted) {
+        expect(className, `expected no ${side}`).not.toContain(SIDE[side]);
+      }
+    });
+
+    it.each([
+      ["the window's first day", FIRST_DAY, "rounded-l-2xl", "rounded-r-2xl"],
+      ["the window's last day", LAST_DAY, "rounded-r-2xl", "rounded-l-2xl"],
+      ["a day the run merely continues past", INTERIOR, null, null],
+      ["a one-day window", ALONE, "rounded-l-2xl", null],
+    ] as const)("rounds only the outer edge of %s", (_l, edges, has, lacks) => {
+      const className = blockClasses("fertile", edges);
       if (has) expect(className, `expected ${has}`).toContain(has);
-      else expect(className).not.toContain("rounded-l-full");
+      else expect(className).not.toContain("rounded-l-2xl");
       if (lacks) expect(className, `expected no ${lacks}`).not.toContain(lacks);
     });
 
-    it("draws no separate mark beside the band, so nothing reads as a stray dot", () => {
-      // An earlier attempt drew a stub below the band's edge in the band's own colour. It was the same
-      // colour as the band and therefore invisible, and at true size it read as a floating period.
-      const { container } = renderBand("fertile", true, true);
-      expect(container.querySelectorAll('[data-testid="calendar-run-edge"]')).toHaveLength(0);
-      expect(container.querySelectorAll(band)).toHaveLength(1);
+    it("reaches into the row gap only where the run carries on down that column", () => {
+      // The grid separates rows by 4px too. Stopping flush at every cell would break a run that spans
+      // weeks into a stack of separate boxes; bleeding unconditionally would spill the region over a
+      // day that is not part of the window.
+      expect(blockClasses("fertile", INTERIOR)).toContain("-top-1");
+      expect(blockClasses("fertile", INTERIOR)).toContain("-bottom-1");
+      expect(blockClasses("fertile", LAST_DAY), "nothing continues below the last day").toContain(
+        "bottom-0",
+      );
+      expect(blockClasses("fertile", FIRST_DAY), "nothing continued above the first day").toContain(
+        "top-0",
+      );
+    });
+
+    it("is not clipped by the cell", () => {
+      const { container } = renderCell("post-peak");
+      expect(container.querySelector(band)?.className).not.toContain("overflow");
+      expect(screen.getByTestId("day-cell").className).not.toContain("overflow-hidden");
+      expect(blockClasses("fertile", FIRST_DAY)).not.toContain("overflow");
     });
 
     it.each(["pre-fertile", "post-peak", "post-calendar"] as const)(
-      "never marks a %s day, even if flagged as a window end",
+      "never draws a window region on a %s day, even if edges were supplied",
       (info) => {
-        // The bracket marks the fertile interval specifically. A day flagged as an edge while showing
-        // another phase would be advertising a window the cell is not painting.
-        const { container } = renderBand(info, true, true);
-        const className = container.querySelector(band)?.className ?? "";
-        expect(className).not.toContain("rounded-l-full");
-        expect(className).not.toContain("rounded-r-full");
+        // Only a fertile day is part of a run. A region on another phase would be advertising a window
+        // the cell is not painting.
+        const { container } = renderCell(info, { windowEdges: FIRST_DAY });
+        expect(container.querySelector(block)).toBeNull();
       },
     );
 
-    it("paints no band and no mark on a projected day that has no phase", () => {
-      const { container } = renderBand(null, false, false, { forecast: true });
-      expect(container.querySelector(band)).toBeNull();
+    it("paints no region on a day with no phase", () => {
+      const { container } = renderCell(null, { windowEdges: FIRST_DAY });
+      expect(container.querySelector(block)).toBeNull();
+    });
+
+    it("paints no region on a projected day that has no phase", () => {
+      const { container } = renderCell(null, { forecast: true });
+      expect(container.querySelector(block)).toBeNull();
       expect(screen.getByTestId("day-cell").className).toContain("bg-fertility-forecast-bg");
     });
 
-    it("marks a projected fertile day, so a forecast band reads as the same kind of run", () => {
-      const { container } = renderBand("fertile", true, false, { forecast: true });
-      expect(container.querySelector(band)?.className).toContain(
-        "bg-fertility-status-fertile-band",
-      );
-      expect(container.querySelector(band)?.className).toContain("rounded-l-full");
+    it("draws a region on a projected fertile day, so a forecast window is the same kind of shape", () => {
+      const { container } = renderCell("fertile", { forecast: true, windowEdges: FIRST_DAY });
+      expect(container.querySelector(block)).not.toBeNull();
     });
 
-    it("shows the band, the menses stripe, and the monitor marker on the same day", () => {
-      // Menses days fall inside a phase, so the absolute positioning has to coexist rather than one
-      // layer covering another.
-      const { container } = renderBand("fertile", false, false, { menses: true, monitor: "high" });
+    it("draws no separate mark beside the region, so nothing reads as a stray dot", () => {
+      // An earlier attempt drew a stub below the band's edge in the band's own colour. It was the same
+      // colour as the band and therefore invisible, and at true size it read as a floating period.
+      const { container } = renderCell("fertile", { windowEdges: FIRST_DAY });
+      expect(container.querySelectorAll('[data-testid="calendar-run-edge"]')).toHaveLength(0);
+      expect(container.querySelectorAll(block)).toHaveLength(1);
+    });
+
+    it("keeps the region, the menses stripe, and the monitor marker on the same day", () => {
+      // Menses days and window days never overlap in the protocol, but the positioning still has to
+      // coexist rather than one layer covering another.
+      const { container } = renderCell("fertile", {
+        windowEdges: INTERIOR,
+        menses: true,
+        monitor: "high",
+      });
       const cell = screen.getByTestId("day-cell");
-      expect(container.querySelector(band)).not.toBeNull();
+      expect(container.querySelector(block)).not.toBeNull();
       expect(cell.querySelector('[data-testid="calendar-menses-stripe"]')).not.toBeNull();
       expect(cell.querySelector('[data-testid="calendar-monitor-marker"]')?.className).toContain(
         "bg-fertility-monitor-high",
       );
     });
 
-    it("paints no band when the phase layer is hidden, and keeps the phase in the label", () => {
-      const { container } = render(
-        <DayCell
-          dateKey="2026-01-14"
-          dayNumber={14}
-          info="fertile"
-          forecast={false}
-          menses={false}
-          monitor={undefined}
-          intercourse={false}
-          windowStart
-          isToday={false}
-          hiddenLayers={["fertile" as never]}
-          onSelect={() => {}}
-        />,
-      );
+    it("paints neither band nor region when the phase layer is hidden, and keeps the label", () => {
+      const { container } = renderCell("fertile", {
+        windowEdges: FIRST_DAY,
+        hiddenLayers: ["fertile" as never],
+      });
+      expect(container.querySelector(block)).toBeNull();
       expect(container.querySelector(band)).toBeNull();
       expect(screen.getByTestId("day-cell").getAttribute("aria-label")).toContain("Fertile");
     });
 
-    it("renders no band anywhere when the algorithm is disabled", async () => {
+    it("renders no region and no band anywhere when the algorithm is disabled", async () => {
       const cycle = await store().setNewCycle(addDays(todayKey(), -5));
       await store().addDayRecord(cycle.id, addDays(todayKey(), -5), 1, { bloodFlow: "medium" });
       await store().addDayRecord(cycle.id, addDays(todayKey(), -3), 3, { monitor: "high" });
@@ -587,7 +695,27 @@ describe("CalendarView", () => {
 
       render(<CalendarView />);
       await waitFor(() => expect(screen.getAllByTestId("day-cell").length).toBeGreaterThan(0));
+      expect(document.querySelectorAll('[data-testid="calendar-window-block"]')).toHaveLength(0);
       expect(document.querySelectorAll('[data-testid="calendar-phase-band"]')).toHaveLength(0);
+    });
+
+    it("paints one region across a window that wraps weeks, with no seam between the rows", () => {
+      // The seam defect, end to end: a window of days 6-16 in a 7-wide month renders on three rows,
+      // and the region has to be continuous down every column it passes through.
+      const slots = Array.from({ length: 21 }, (_, i) => ({
+        dateKey: `2026-09-${String(i + 1).padStart(2, "0")}`,
+        inWindow: i + 1 >= 6 && i + 1 <= 16,
+      }));
+      const edges = windowEdgesByDay(slots, "2026-09-16");
+      // Day 7 ends its row in column 6 and the run carries on below it, so it must not close the row
+      // with a bottom edge; day 8 opens a new row in column 0, so it must not grow a top edge either.
+      expect(edges["2026-09-07"].end).toBe(true);
+      expect(edges["2026-09-07"].continuesDown).toBe(true);
+      expect(edges["2026-09-08"].start).toBe(true);
+      expect(edges["2026-09-08"].continuesUp).toBe(false);
+      // Only the two true ends are rounded, so a row boundary is not mistaken for the window's end.
+      expect(edges["2026-09-08"].roundStart).toBe(false);
+      expect(edges["2026-09-15"].roundEnd).toBe(false);
     });
   });
 

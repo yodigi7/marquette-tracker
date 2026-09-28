@@ -12,6 +12,8 @@ import {
   FERTILITY_FORECAST_VISUAL,
   FERTILITY_MARKER_VISUALS,
   FERTILITY_MONITOR_VISUALS,
+  NO_BLOCK_EDGES,
+  type BlockEdges,
   type CalendarPhase,
 } from "@/lib/fertility-visuals";
 import { cn } from "@/lib/utils";
@@ -50,11 +52,23 @@ export interface LayerPaint {
    * the band is required to distinguish one layer from another.
    */
   band: string;
+  /**
+   * The four sides of a layer drawn as a full-height block. Separate from `border`, which outlines the
+   * whole cell for the predictive treatment, because a block draws only the edges it actually has, and
+   * each edge has to be coloured on its own to leave the others unpainted.
+   */
+  block: BlockEdges;
   /** Colour or icon class of a layer drawn as a marker inside the cell. */
   marker: string;
 }
 
-const NO_PAINT: LayerPaint = { fill: "", border: "", band: "", marker: "" };
+const NO_PAINT: LayerPaint = {
+  fill: "",
+  border: "",
+  band: "",
+  block: NO_BLOCK_EDGES,
+  marker: "",
+};
 
 export const LAYER_PAINT: Record<CalendarLayerId, LayerPaint> = {
   before: {
@@ -66,6 +80,9 @@ export const LAYER_PAINT: Record<CalendarLayerId, LayerPaint> = {
     ...NO_PAINT,
     fill: FERTILITY_CALENDAR_PHASE_VISUALS.fertile.fill,
     band: FERTILITY_CALENDAR_PHASE_VISUALS.fertile.band,
+    // Only the fertile phase is drawn as a block. The other two keep their band, so the window is the
+    // only region on the calendar and the phases around it stay quiet.
+    block: FERTILITY_CALENDAR_PHASE_VISUALS.fertile.block,
   },
   after: {
     ...NO_PAINT,
@@ -87,13 +104,18 @@ export const LAYER_PAINT: Record<CalendarLayerId, LayerPaint> = {
 /**
  * The classes a shown key's swatch carries, taken from the same paint record.
  *
- * A band wins over the fill so the key shows the mark the day cells actually use to tell the phases
- * apart. A sample built from the fill would describe a treatment the user cannot rely on, because the
- * fills are too close together to distinguish and only the band is meant to be.
+ * A band or a block wins over the fill, so the key shows the mark the day cells actually use to tell
+ * the phases apart. A sample built from the fill would describe a treatment the user cannot rely on,
+ * because the fills are too close together to distinguish and only the band and the block are meant to
+ * be. A block is sampled as an outlined region on the phase's own fill, because that is the shape the
+ * day cell draws: a closed run, not a stroke.
  */
 export function swatchSample(layer: CalendarLayer): string {
   const paint = LAYER_PAINT[layer.id];
   if (paint.band) return cn(paint.band, BAND_FOOTPRINT);
+  if (paint.block.left) {
+    return cn(paint.block.top, paint.block.right, paint.block.bottom, paint.block.left, paint.fill);
+  }
   return paint.fill ? cn(paint.border, paint.fill) : paint.marker;
 }
 
@@ -113,14 +135,17 @@ export const LAYER_GROUP_LABELS: Record<LayerGroup, string> = {
 const SQUARE = "h-2.5 w-2.5 rounded";
 
 /**
- * A phase key shows a bar rather than a block, matching the band its day cells draw. The legend applies
- * the footprint itself, so `swatchSample` carries the colour and the band shape together and this
- * records the shape on the layer as well, so the two cannot disagree.
+ * A phase key shows the shape its day cells draw. Before and After draw a band, so their key is a bar.
+ * Fertile draws the window as a full-height region, so its key is a bordered box. The legend applies
+ * the footprint itself, so `swatchSample` carries the colour and this records the shape on the layer as
+ * well, so the two cannot disagree.
  */
 const BAND_FOOTPRINT = "h-1 w-6 rounded-full";
+const BLOCK_FOOTPRINT = "h-3 w-5 rounded-md border-2";
 
 function phaseLayer(id: CalendarPhase, label: string): CalendarLayer {
-  return { id, label, group: "status", needs: "algorithm", footprint: BAND_FOOTPRINT };
+  const footprint = LAYER_PAINT[id].block.left ? BLOCK_FOOTPRINT : BAND_FOOTPRINT;
+  return { id, label, group: "status", needs: "algorithm", footprint };
 }
 
 function monitorLayer(id: "low" | "high" | "peak", label: string): CalendarLayer {

@@ -8,6 +8,7 @@ import {
   FERTILITY_MONITOR_VISUALS,
   FERTILITY_STATUS_VISUALS,
   FERTILITY_TEXT_VISUALS,
+  NO_BLOCK_EDGES,
   calendarPhaseForStatus,
   calendarPhaseLabel,
   fertilityStatusBadge,
@@ -40,31 +41,62 @@ describe("fertility visual mappings", () => {
     expect(calendarPhaseLabel(phase)).toBe(label);
   });
 
-  it("reuses the existing status treatments for the three Calendar phases", () => {
-    // Both parts of the treatment, so the collapsed view cannot drift from the palette the Status view
-    // shows for the same status.
+  it("reuses the existing status fills for the three Calendar phases", () => {
+    // The fill, so the collapsed view cannot drift from the palette the Status view shows for the same
+    // status. The mark each phase is told apart by is its own business: see the two tests below.
     for (const [phase, status] of [
       ["before", "pre-fertile"],
       ["fertile", "fertile"],
       ["after", "post-peak"],
     ] as const) {
-      const visual = FERTILITY_CALENDAR_PHASE_VISUALS[phase];
-      expect(visual.fill, `${phase} fill`).toBe(FERTILITY_STATUS_VISUALS[status].fill);
-      expect(visual.band, `${phase} band`).toBe(FERTILITY_STATUS_VISUALS[status].band);
+      expect(FERTILITY_CALENDAR_PHASE_VISUALS[phase].fill, `${phase} fill`).toBe(
+        FERTILITY_STATUS_VISUALS[status].fill,
+      );
     }
     expect(FERTILITY_CALENDAR_PHASE_VISUALS.after.label).toBe("After");
   });
 
-  it("gives every status a band, and every phase a distinct one", () => {
-    // The band is what tells the phases apart, so a status without one is a treatment the Calendar
-    // cannot distinguish.
+  it("gives every status a band, and the two quiet phases a distinct one each", () => {
+    // The band is what tells the two quiet phases apart, so a status without one is a treatment the
+    // Calendar cannot distinguish.
     for (const status of Object.keys(FERTILITY_STATUS_VISUALS) as DayStatus[]) {
       expect(FERTILITY_STATUS_VISUALS[status].band, `${status} band`).not.toBe("");
     }
-    const bands = (["before", "fertile", "after"] as const).map(
+    const bands = (["before", "after"] as const).map(
       (phase) => FERTILITY_CALENDAR_PHASE_VISUALS[phase].band,
     );
-    expect(new Set(bands).size, `bands were ${bands.join(", ")}`).toBe(3);
+    expect(new Set(bands).size, `bands were ${bands.join(", ")}`).toBe(2);
+  });
+
+  it("draws the window as a region and the quiet phases as a band, never both", () => {
+    // The window is a closed region because a band and the menses stripe are both horizontal lines at
+    // opposite cell edges, 8px apart across a week boundary, where they read as one mark. The other two
+    // phases keep their band, which is what leaves the window as the only region on the calendar.
+    for (const phase of ["before", "after"] as const) {
+      expect(FERTILITY_CALENDAR_PHASE_VISUALS[phase].block, `${phase} block`).toEqual(
+        NO_BLOCK_EDGES,
+      );
+    }
+    const fertile = FERTILITY_CALENDAR_PHASE_VISUALS.fertile;
+    expect(fertile.band, "the window carries no band").toBe("");
+    for (const side of ["top", "right", "bottom", "left"] as const) {
+      expect(fertile.block[side], `fertile block ${side}`).not.toBe("");
+    }
+  });
+
+  it("colours each side of the block on its own, because a side's width cannot undo a colour", () => {
+    // The load-bearing constraint. `border-<colour>` paints all four sides at once, so a block that
+    // carried one colour class would outline itself through the middle of every run that wraps weeks
+    // and square off the rounded ends. Each side therefore has to be a separate class, naming the
+    // edge it paints.
+    const sides = Object.entries(FERTILITY_CALENDAR_PHASE_VISUALS.fertile.block);
+    expect(new Set(sides.map(([, className]) => className)).size, "sides share a class").toBe(4);
+    const edge = { top: "t", right: "r", bottom: "b", left: "l" } as const;
+    for (const [side, className] of sides) {
+      expect(className, `${side} must name its own edge`).toBe(
+        `border-${edge[side as keyof typeof edge]}-fertility-status-fertile-block`,
+      );
+    }
   });
 
   it.each(statusCases)("maps %s to a complete tokenized treatment", (status, token) => {

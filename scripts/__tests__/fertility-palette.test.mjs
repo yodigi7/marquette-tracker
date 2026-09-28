@@ -200,6 +200,7 @@ function readPalette() {
       markers: {},
       fill: {},
       band: {},
+      block: {},
       foreground: {},
       surfaces: { base: readColour(block, "background"), card: readColour(block, "card") },
       predicted: readColour(block, "fertility-forecast-bg"),
@@ -210,6 +211,7 @@ function readPalette() {
     for (const status of STATUSES) {
       entry.fill[status] = readColour(block, `fertility-status-${status}-bg`);
       entry.band[status] = readColour(block, `fertility-status-${status}-band`);
+      entry.block[status] = readColour(block, `fertility-status-${status}-block`);
       entry.foreground[status] = readColour(block, `fertility-status-${status}-fg`);
     }
     palette[theme] = entry;
@@ -237,6 +239,7 @@ describe("palette is read from the stylesheet the app loads", () => {
         for (const [part, values] of Object.entries({
           fill: palette[theme].fill,
           band: palette[theme].band,
+          block: palette[theme].block,
           foreground: palette[theme].foreground,
         })) {
           expect(values[status], `${theme} ${status} ${part}`).toMatch(/^#[0-9a-f]{6}$/i);
@@ -358,6 +361,52 @@ describe("status band separation", () => {
       ).toBeGreaterThan(worstFill);
     }
   });
+});
+
+describe("the window's outline", () => {
+  /**
+   * The outline is the one part of the window that may be as light as it likes, because nothing is
+   * painted on it -- no monitor marker sits on an edge, so the cap that holds a fill near black does
+   * not apply. That freedom is the whole reason the window reads as an object rather than a tint, and
+   * these are the rules that hold it to being worth the freedom: the outline has to be plainly visible
+   * against the fill it encloses and against the surfaces behind the cell, and it has to be a
+   * different colour from the two quiet phases' bands so a window edge is never read as one of them.
+   */
+  for (const theme of THEMES) {
+    it(`${theme} window outline clears ${BAND_CONTRAST}:1 against the fill it encloses`, () => {
+      const ratio = contrast(palette[theme].block.fertile, palette[theme].fill.fertile);
+      expect(
+        ratio,
+        `${theme} window outline ${palette[theme].block.fertile} on ${palette[theme].fill.fertile}`,
+      ).toBeGreaterThanOrEqual(BAND_CONTRAST);
+    });
+
+    it(`${theme} window outline clears ${BAND_CONTRAST}:1 against the surface behind the cell`, () => {
+      for (const [name, surface] of Object.entries(palette[theme].surfaces)) {
+        const ratio = contrast(palette[theme].block.fertile, surface);
+        expect(
+          ratio,
+          `${theme} window outline ${palette[theme].block.fertile} on ${name} ${surface}`,
+        ).toBeGreaterThanOrEqual(BAND_CONTRAST);
+      }
+    });
+
+    it(`${theme} window outline is not read as either quiet phase's band`, () => {
+      // The window and the phases either side of it are the marks a user has to tell apart on a
+      // glance, so the outline is held to the same floor the bands are held to. A rose outline is
+      // intrinsically close to the amber band -- no rose step clears the dark theme's 0.2 floor by
+      // much -- and the two are told apart by shape and position long before they are told apart by
+      // hue: a 2px closed box round a run against a 4px bar along the top edge of a single day.
+      for (const phase of ["pre", "post-peak"]) {
+        const distance = separation(palette[theme].block.fertile, palette[theme].band[phase]);
+        const floor = BAND_SEPARATION[theme];
+        expect(
+          distance,
+          `${theme} window/${phase} separation is ${distance.toFixed(4)}, floor ${floor}`,
+        ).toBeGreaterThanOrEqual(floor);
+      }
+    });
+  }
 });
 
 describe("day number contrast", () => {

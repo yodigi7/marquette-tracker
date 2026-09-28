@@ -15,6 +15,7 @@ import {
   swatchSample,
   toggleLayer,
 } from "../layers";
+import { NO_BLOCK_EDGES } from "@/lib/fertility-visuals";
 
 const ALL = { interpreted: true, detailMode: "full" } as const;
 const ALGORITHM_OFF = { interpreted: false, detailMode: "full" } as const;
@@ -22,6 +23,11 @@ const SIMPLE = { interpreted: true, detailMode: "simple" } as const;
 
 function ids(options: Parameters<typeof offeredLayers>[0]): string[] {
   return offeredLayers(options).map((layer) => layer.id);
+}
+
+/** The declared key for a phase layer, which is what the legend actually renders. */
+function phase(id: "before" | "fertile" | "after") {
+  return CALENDAR_LAYERS.find((layer) => layer.id === id)!;
 }
 
 describe("the layer declaration", () => {
@@ -49,19 +55,33 @@ describe("the layer declaration", () => {
     expect(swatchSample(predicted)).toContain("border-fertility-forecast-border");
   });
 
-  it("paints a band for every phase, since every phase is shown", () => {
-    // All three phases get a band, because the band is what tells them apart. A phase with no band
-    // would be a phase the Calendar draws a fill for and cannot distinguish.
-    for (const id of ["before", "fertile", "after"] as const) {
+  it("paints a band for the two quiet phases, and a block for the window", () => {
+    // The window is a region and the phases around it are bars. A phase with neither would be a phase
+    // the Calendar draws a fill for and cannot distinguish; a phase with both would put a horizontal
+    // line back along the top edge of a region that exists to replace that line.
+    for (const id of ["before", "after"] as const) {
       expect(LAYER_PAINT[id].band, `${id} band`).not.toBe("");
+      expect(LAYER_PAINT[id].block, `${id} block`).toEqual(NO_BLOCK_EDGES);
       expect(swatchSample({ id } as never), `${id} sample`).toContain(LAYER_PAINT[id].band);
     }
+    expect(LAYER_PAINT.fertile.band, "the window carries no band").toBe("");
+    expect(swatchSample(phase("fertile"))).toContain(LAYER_PAINT.fertile.block.left);
   });
 
-  it("gives a phase key a band-shaped sample rather than a filled block", () => {
-    for (const layer of CALENDAR_LAYERS) {
-      if (!LAYER_PAINT[layer.id].band) continue;
-      expect(layer.footprint, `${layer.id} footprint`).toBe("h-1 w-6 rounded-full");
+  it("gives each phase key the shape its day cells draw", () => {
+    // A key that shows a bar for a region, or a box for a bar, misdescribes the calendar.
+    for (const id of ["before", "after"] as const) {
+      expect(phase(id).footprint, `${id} footprint`).toBe("h-1 w-6 rounded-full");
+    }
+    expect(phase("fertile").footprint, "fertile footprint").toBe("h-3 w-5 rounded-md border-2");
+  });
+
+  it("never draws a band or a block on a layer that is not a phase", () => {
+    // The predictive, menses, and reading-marker layers are not phases, and a mark on any of them would
+    // read as a window edge where there is none.
+    for (const id of ["predicted", "menses", "low", "high", "peak", "intercourse"] as const) {
+      expect(LAYER_PAINT[id].band, `${id} band`).toBe("");
+      expect(LAYER_PAINT[id].block, `${id} block`).toEqual(NO_BLOCK_EDGES);
     }
   });
 

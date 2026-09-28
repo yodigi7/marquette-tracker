@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { monthGrid, monthTitle, resolveCell, shiftMonth, weekdayLabels } from "../grid";
+import {
+  monthGrid,
+  monthTitle,
+  NO_WINDOW_EDGES,
+  resolveCell,
+  shiftMonth,
+  weekdayLabels,
+  windowEdgesByDay,
+} from "../grid";
 import type { CycleEntity, DayRecordEntity } from "@/core/store/entities";
 import type { CycleResult } from "@/core/engine/types";
 
@@ -453,6 +461,126 @@ describe("resolveCell with projected cycles", () => {
     const past = resolveCell([CYCLE], NO_RECORDS, RESULTS, forecast, "2026-08-10", TODAY);
     expect(past.forecast).toBe(false);
     expect(past.info).toBe("fertile");
+  });
+});
+
+describe("the window block's edges across the month", () => {
+  /** A 7-wide month, 21 days. */
+  const slots = (from: number, to: number) =>
+    Array.from({ length: 21 }, (_, i) => ({
+      dateKey: `2026-09-${String(i + 1).padStart(2, "0")}`,
+      inWindow: i + 1 >= from && i + 1 <= to,
+    }));
+
+  /**
+   * Window on days 6-16, so the month reads:
+   *   row 0:  .  .  .  .  .  6  7
+   *   row 1:  8  9 10 11 12 13 14
+   *   row 2: 15 16  .  .  .  .  .
+   */
+  const WINDOW = "2026-09-16";
+
+  it("closes each row's run sideways", () => {
+    const edges = windowEdgesByDay(slots(6, 16), WINDOW);
+    expect([edges["2026-09-06"].start, edges["2026-09-06"].end]).toEqual([true, false]);
+    expect([edges["2026-09-07"].start, edges["2026-09-07"].end]).toEqual([false, true]);
+    expect([edges["2026-09-08"].start, edges["2026-09-08"].end]).toEqual([true, false]);
+    expect([edges["2026-09-14"].start, edges["2026-09-14"].end]).toEqual([false, true]);
+    expect([edges["2026-09-15"].start, edges["2026-09-15"].end]).toEqual([true, false]);
+    expect([edges["2026-09-16"].start, edges["2026-09-16"].end]).toEqual([false, true]);
+  });
+
+  it("reports the run continuing down a column across the row boundary", () => {
+    // The seam defect. Day 7 ends its row in column 6, and day 14 sits in column 6 of the next row
+    // and is also in the window, so a bottom edge on day 7 would draw a line across the window.
+    const edges = windowEdgesByDay(slots(6, 16), WINDOW);
+    expect(edges["2026-09-07"].end, "day 7 ends its row").toBe(true);
+    expect(edges["2026-09-07"].continuesDown, "but the run carries on below it").toBe(true);
+    expect(edges["2026-09-14"].continuesUp).toBe(true);
+    expect(edges["2026-09-14"].continuesDown, "and stops there, column 6 of row 2 is outside").toBe(
+      false,
+    );
+  });
+
+  it("reports no continuation where the run does not carry down a column", () => {
+    // Days 8-15 alone: row 1 is full and day 15 continues in column 0, so day 8 continues down but
+    // day 14, in column 6, does not.
+    const edges = windowEdgesByDay(slots(8, 15), "2026-09-15");
+    expect(edges["2026-09-08"].continuesDown).toBe(true);
+    expect(edges["2026-09-14"].continuesDown).toBe(false);
+    expect(edges["2026-09-15"].continuesUp).toBe(true);
+  });
+
+  it("rounds only the window's two true ends", () => {
+    const edges = windowEdgesByDay(slots(6, 16), WINDOW);
+    expect(edges["2026-09-06"].roundStart).toBe(true);
+    expect(edges["2026-09-16"].roundEnd).toBe(true);
+    // The row boundaries are not the window's ends, so they stay square.
+    expect(edges["2026-09-08"].roundStart).toBe(false);
+    expect(edges["2026-09-15"].roundEnd).toBe(false);
+    expect(edges["2026-09-07"].roundEnd).toBe(false);
+  });
+
+  it("does not round the last visible day when the window continues past the month", () => {
+    // The window ends after the month does, so the run is clipped, not finished. Rounding it would
+    // report an end the protocol does not have. Same rule as `windowEnd`, for the same reason.
+    const edges = windowEdgesByDay(slots(6, 21), "2026-10-05");
+    expect(edges["2026-09-21"].end, "day 21 ends its row").toBe(true);
+    expect(edges["2026-09-21"].roundEnd, "but is not the window's end").toBe(false);
+    expect(edges["2026-09-06"].roundStart).toBe(true);
+  });
+
+  it("gives a day outside the window no edges at all", () => {
+    const edges = windowEdgesByDay(slots(6, 16), WINDOW);
+    for (const day of ["2026-09-01", "2026-09-05", "2026-09-17", "2026-09-21"]) {
+      expect(edges[day], day).toEqual(NO_WINDOW_EDGES);
+    }
+  });
+
+  it("marks both ends of a one-day window", () => {
+    const edges = windowEdgesByDay(slots(10, 10), "2026-09-10");
+    expect([edges["2026-09-10"].roundStart, edges["2026-09-10"].roundEnd]).toEqual([true, true]);
+    expect([edges["2026-09-10"].start, edges["2026-09-10"].end]).toEqual([true, true]);
+  });
+
+  it("handles a window that fills its first row entirely", () => {
+    const edges = windowEdgesByDay(slots(1, 21), "2026-10-05");
+    expect([edges["2026-09-01"].start, edges["2026-09-01"].roundStart]).toEqual([true, true]);
+    // Day 1 is column 0, so the run continues down into day 8 even though day 7 closed the row.
+    expect(edges["2026-09-01"].continuesDown).toBe(true);
+    expect(edges["2026-09-08"].continuesUp).toBe(true);
+  });
+
+  it("handles a month whose leading days are blank", () => {
+    // A month starting mid-week, so the first row is padded and the window opens on the 3rd.
+    const padded = [
+      { dateKey: "", inWindow: false },
+      { dateKey: "", inWindow: false },
+      { dateKey: "2026-09-03", inWindow: true },
+      { dateKey: "2026-09-04", inWindow: true },
+      { dateKey: "2026-09-05", inWindow: true },
+      { dateKey: "2026-09-06", inWindow: true },
+      { dateKey: "2026-09-07", inWindow: true },
+    ];
+    const edges = windowEdgesByDay(padded, "2026-09-07");
+    expect([edges["2026-09-03"].start, edges["2026-09-03"].roundStart]).toEqual([true, true]);
+    expect([edges["2026-09-07"].end, edges["2026-09-07"].roundEnd]).toEqual([true, true]);
+  });
+
+  it("handles a month whose leading days are blank", () => {
+    // A month that starts mid-week, so the first row is padded and the window starts on day 3.
+    const padded = [
+      { dateKey: "", inWindow: false },
+      { dateKey: "", inWindow: false },
+      { dateKey: "2026-09-03", inWindow: true },
+      { dateKey: "2026-09-04", inWindow: true },
+      { dateKey: "2026-09-05", inWindow: true },
+      { dateKey: "2026-09-06", inWindow: true },
+      { dateKey: "2026-09-07", inWindow: true },
+    ];
+    const edges = windowEdgesByDay(padded);
+    expect([edges["2026-09-03"].start, edges["2026-09-03"].roundStart]).toEqual([true, true]);
+    expect([edges["2026-09-07"].end, edges["2026-09-07"].roundEnd]).toEqual([true, true]);
   });
 });
 

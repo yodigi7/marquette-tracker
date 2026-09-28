@@ -16,24 +16,39 @@ obeys that cap reaches a worst-pair separation of `0.0616` — against `0.0572` 
 fills cannot be told apart in dark mode; that is a property of the constraint, not of the values
 chosen.
 
+A first pass at this put the same kind of mark on all three phases and fixed the reported problem. It
+then failed a second test: a band is a horizontal line along a day's **top** edge and the menses stripe
+is a horizontal line along the **bottom** edge of the day above, so across a week boundary the two sit
+8px apart and read as a single stripe. No adjustment to a band fixes that, because a band is the same
+kind of mark as the stripe. The window is therefore drawn as a **region** instead.
+
 ## What Changes
 
-- **Every phase keeps a painted treatment**, and all three are identified by a **band along the top
-  edge of the day** in that phase's full-chroma colour. The band is not painted beneath a marker, so
-  the marker cap does not apply to it and it is free of the constraint that caps the fills. Worst-pair
-  separation goes from `0.0572` to `0.2118` in dark mode and `0.1721` in light.
-- **The tiles stay dark.** A marker's contrast on its own tile is unchanged, so nothing about reading
-  legibility is traded for the band.
-- **The fertile band is the most prominent of the three**, and the fertile window is marked at its
-  ends by shaping the band, not by adding a separate mark.
-- The band spans the grid gap so consecutive same-phase days read as one continuous run.
+- **Every phase keeps a painted treatment.** The two phases outside the window are identified by a
+  **band along the top edge of the day**; the window is drawn as a **full-height outlined region**, so
+  it is the only region on the Calendar and the phases either side of it stay quiet. Worst-pair
+  separation of the quiet phases' bands goes from `0.0572` to `0.2118` in dark mode and `0.1721` in
+  light.
+- **The region's interior is the ordinary phase fill, unchanged**, and the brightness lives in its
+  outline. A region's interior is still a background a marker is painted on, so the cap still applies
+  to it; an outline has no marker on it, so it is free of the cap. That is the only way the window can
+  be loud without moving a reading marker's contrast.
+- **The window's mark cannot be confused with the menses stripe**, which stays where it is, in its own
+  colour, at its own width. A closed box and a bar are different kinds of mark.
+- **The window's two ends are the only rounded edges in it**, and each end day draws its own vertical
+  edge, so an end is one shape rather than a rounded corner on a square edge. A row that begins
+  mid-window stays square, so the run's ends are legible as its ends.
+- A run that wraps weeks is **two runs**, because the last day of one row is in the final column and
+  the next is in the first. No edge is drawn across the gap between them, and the region reaches into
+  the row gap only in a column where the run actually continues, so the outline runs unbroken and
+  nothing bleeds over a day outside the window.
 - The Cycle-chart fertile band is aligned to the same hue.
-- The palette guard keeps the marker and text rules, **gains** rules for the bands, and reads its
-  values from the stylesheet instead of hand-copying them.
+- The palette guard keeps the marker and text rules, **gains** rules for the bands and the outline, and
+  reads its values from the stylesheet instead of hand-copying them.
 
 Not in scope: any change to the engine, the window computation, or the status semantics; the Status
 view's badges, which show the precise status and must keep four distinguishable treatments; the
-instructor surfaces; the meaning of the three legend entries.
+menses stripe; the instructor surfaces; the meaning of the three legend entries.
 
 ## Capabilities
 
@@ -43,21 +58,26 @@ None.
 
 ### Modified Capabilities
 
-- `fertility-visuals`: each status treatment is composed of a fill and a band with different
-  obligations. The band is the element that distinguishes the statuses and is mutually separable; the
-  fill is not, because a marker is painted on it. The contrast requirement changes accordingly.
-- `calendar`: the day cell paints a band for every phase, marks the fertile run's ends by shaping the
-  band, and the legend shows the band.
+- `fertility-visuals`: each status treatment is composed of parts with different obligations. A band
+  or an outline is the element that distinguishes the statuses and is mutually separable; the fill is
+  not, because a marker is painted on it. The window is drawn with an outline, and the contrast
+  requirement covers it.
+- `calendar`: the day cell paints a band for the two quiet phases and a region for the window; the
+  region's edges are derived from the whole month and painted per side; the run's two true ends are the
+  only rounded ones; and the legend shows each phase's actual mark.
 
 ## Impact
 
-- `src/index.css` — per-phase band tokens in both themes; the chart band hue.
-- `src/lib/fertility-visuals.ts` — a band class on each status visual and on each Calendar phase.
-- `src/features/calendar/day-cell.tsx` — paints the band and shapes the fertile run's ends.
-- `src/features/calendar/grid.ts` — the fertile window's two end days, for the shaping.
-- `src/features/calendar/layers.ts` — the band as a first-class paint slot; the legend swatch.
+- `src/index.css` — per-phase band and outline tokens in both themes; the chart band hue.
+- `src/lib/fertility-visuals.ts` — a band class per status and phase, and `BlockEdges`, four
+  separately-coloured sides.
+- `src/features/calendar/day-cell.tsx` — paints the band and the region, and shapes the run's ends.
+- `src/features/calendar/grid.ts` — the window's two end days, and `windowEdgesByDay`, which derives
+  every day's four region edges from the whole displayed month.
+- `src/features/calendar/layers.ts` — the band and the block as first-class paint slots; the legend
+  swatch and each phase key's footprint.
 - `scripts/__tests__/fertility-palette.test.mjs` — rewritten guard: reads the stylesheet, asserts the
-  markers, the text, and the bands.
+  markers, the text, the bands, and the outline.
 
-No new dependencies. No engine change. No data-model or storage change. No change to the tile fills,
-so nothing about the reading markers moves.
+No new dependencies. No engine change. No data-model or storage change. No change to the tile fills or
+to the menses stripe, so nothing about the reading markers or the recorded menses cue moves.

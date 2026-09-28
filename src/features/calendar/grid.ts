@@ -96,7 +96,7 @@ export interface CellInfo {
 /**
  * Which end of the window a cycle day sits at, given the window that produced its status.
  */
-function windowEdges(
+function windowEnds(
   window: FertileWindow,
   dayNo: number,
 ): Pick<CellInfo, "windowStart" | "windowEnd"> {
@@ -106,10 +106,103 @@ function windowEdges(
   };
 }
 
-const NO_WINDOW_EDGES: Pick<CellInfo, "windowStart" | "windowEnd"> = {
+const NO_WINDOW_ENDS: Pick<CellInfo, "windowStart" | "windowEnd"> = {
   windowStart: false,
   windowEnd: false,
 };
+
+/**
+ * Which edges of the fertile window a day cell should draw.
+ *
+ * The window is drawn as a full-height block rather than a strip on the cell's top edge, because a
+ * strip and the menses stripe are both horizontal lines at opposite cell edges and sit 8px apart
+ * across a week boundary, where they read as one mark.
+ *
+ * A block's edges cannot be decided per cell, so they are computed here from the whole month. A day
+ * cell has no idea whether the day above or beside it is inside the window, and guessing is what
+ * produced two defects in a first attempt: a horizontal seam across the middle of a window that
+ * continued into the next row, and end days that were half square and half rounded.
+ *
+ * A window that crosses a week boundary is two separate horizontal runs, because the last day of one
+ * row is in the final column and the next day is in the first. Those cells are not neighbours, so
+ * there is no shape that joins them, and the block is drawn per row with the grid gap left open. The
+ * eye joins the segments because they are the same colour, aligned, and in adjacent rows.
+ */
+export interface WindowEdges {
+  /** The cell starts a run within its row. */
+  start: boolean;
+  /** The cell ends a run within its row. */
+  end: boolean;
+  /** The run continues into the same column in the row above. */
+  continuesUp: boolean;
+  /** The run continues into the same column in the row below. */
+  continuesDown: boolean;
+  /** This is the window's first day overall, so its outer edge is rounded. */
+  roundStart: boolean;
+  /** This is the window's last day overall, so its outer edge is rounded. */
+  roundEnd: boolean;
+}
+
+/** No edges: the day is not inside the window, so it is not part of a run. */
+export const NO_WINDOW_EDGES: WindowEdges = {
+  start: false,
+  end: false,
+  continuesUp: false,
+  continuesDown: false,
+  roundStart: false,
+  roundEnd: false,
+};
+
+/**
+ * Compute the window's edges for every day in a displayed month.
+ *
+ * Takes the month's cell positions in row-major order along with whether each is inside the window,
+ * and returns the edges for each. Pure, so the shape can be tested without rendering anything.
+ */
+export function windowEdgesByDay(
+  slots: readonly { dateKey: string; inWindow: boolean }[],
+  /**
+   * The window's true last day, when it is on screen. A run that merely runs off the end of the
+   * displayed month is clipped, not finished, so it must not be rounded as though it ended there —
+   * the window's end is a protocol result and this display is not where it happened.
+   */
+  windowEndsOn?: string,
+): Record<string, WindowEdges> {
+  const edges: Record<string, WindowEdges> = {};
+  const width = 7;
+  const inWindowAt = new Map(slots.map((slot) => [slot.dateKey, slot.inWindow]));
+  const windowSlots = slots.filter((slot) => slot.inWindow);
+
+  for (const [index, slot] of slots.entries()) {
+    if (!slot.inWindow) {
+      edges[slot.dateKey] = NO_WINDOW_EDGES;
+      continue;
+    }
+    const row = Math.floor(index / width);
+    const sameRow = slots.filter(
+      (_, i) => Math.floor(i / width) === row && inWindowAt.get(slots[i].dateKey),
+    );
+    const sameColumnUp = slots[index - width];
+    const sameColumnDown = slots[index + width];
+
+    edges[slot.dateKey] = {
+      start: sameRow[0] === slot,
+      end: sameRow[sameRow.length - 1] === slot,
+      // The row above may be a shorter row at the top of the month, so the slot has to exist and
+      // be in the window rather than being assumed.
+      continuesUp: sameColumnUp !== undefined && sameColumnUp.inWindow,
+      continuesDown: sameColumnDown !== undefined && sameColumnDown.inWindow,
+      roundStart: windowSlots[0] === slot,
+      // The last day on screen is the window's end only if the window actually ends there. Absent
+      // that, the run is clipped and the edge stays square, matching the `windowEnd` rule the grid
+      // already reports for the same reason.
+      roundEnd:
+        windowSlots[windowSlots.length - 1] === slot &&
+        (windowEndsOn === undefined || windowEndsOn === slot.dateKey),
+    };
+  }
+  return edges;
+}
 
 /** Latest projected cycle covering the date, if any. */
 function projectedCycleForDate(projected: CycleResult[], dateKey: string): CycleResult | undefined {
@@ -163,7 +256,7 @@ export function resolveCell(
       intercourse: false,
       // A projected window is shaped the same way a recorded one is, so a
       // forecast band reads as the same kind of interval.
-      ...windowEdges(projectedCycle.fertileWindow, dayNo),
+      ...windowEnds(projectedCycle.fertileWindow, dayNo),
     };
   }
 
@@ -182,7 +275,7 @@ export function resolveCell(
     intercourse: !!record?.intercourse,
     // No status means no band to shape: a day outside a cycle, a future date with no projection, and
     // a day past a closed cycle all render unbanded.
-    ...(status && result ? windowEdges(result.fertileWindow, dayNo) : NO_WINDOW_EDGES),
+    ...(status && result ? windowEnds(result.fertileWindow, dayNo) : NO_WINDOW_ENDS),
   };
 }
 
