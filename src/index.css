@@ -186,14 +186,21 @@
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
 
-    /* A fill is capped in lightness by the monitor marker painted on it, which is why the three phase
-       fills sit within 0.017 OKLab lightness of one another and why they cannot be the thing that tells
-       the phases apart. The window is not a fill: it spans the whole day in its own colour, and
-       --fertility-status-fertile-window below is what makes it the loudest thing on the page. See
-       scripts/__tests__/fertility-palette.test.mjs, which guards all of it. */
-    --fertility-status-pre-bg: #451a03;
+    /* Two quiet phase fills, and two constraints fight over them.
+       A fill is capped in lightness by the monitor marker painted on it -- 0.0435 luminance here, set by
+       the Low reading -- so it cannot be made bright without costing a reading its legibility. And
+       Before used to be amber at hue 46 while the window is rose at hue 14, thirty degrees apart, so
+       every step of lift walked it toward the window: brightening it made the two look more alike, which
+       is the opposite of what was asked for.
+       So Before is indigo now, ninety-four degrees from the window and further from it than amber ever
+       was, and both fills sit below the window in lightness and chroma so the window is still the most
+       prominent surface on the calendar. A cool fill spends its whole luminance budget on being cool and
+       is capped harder than a warm one, which is the price of the hue separation. Light mode is
+       unchanged: it has the same shape of problem but the markers there are darker and nobody has
+       reported it. See scripts/__tests__/fertility-palette.test.mjs. */
+    --fertility-status-pre-bg: #282465;
     --fertility-status-pre-fg: #fef3c7;
-    --fertility-status-pre-border: #fbbf24;
+    --fertility-status-pre-border: #818cf8;
     --fertility-status-fertile-bg: #4c0519;
     --fertility-status-fertile-fg: #ffe4e6;
     --fertility-status-fertile-border: #fb7185;
@@ -204,7 +211,7 @@
        binding reading here is LOW -- 0.0435 luminance is what it permits -- not the Peak, at 0.0922.
        #700b25 sits at 0.0382, clears all three, and is a 0.209 step above the page. */
     --fertility-status-fertile-window: #700b25;
-    --fertility-status-post-peak-bg: #022c22;
+    --fertility-status-post-peak-bg: #053b2c;
     --fertility-status-post-peak-fg: #d1fae5;
     --fertility-status-post-peak-border: #34d399;
     --fertility-status-post-calendar-bg: #292524;

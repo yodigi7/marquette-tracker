@@ -70,12 +70,44 @@ This is the model Google Calendar and FullCalendar use for a multi-day span: a s
 ends, no outline. An outline around a filled bar is redundant, and on a 48px cell a 2px wire reads as a
 box rather than a bar — which is what the intermediate revision looked like.
 
-The two quiet phases going back to being plain tints is a second, smaller call, and the honest summary of
-it is what the numbers say: `Before` and `After` are now told apart only by their hue, and those two
-hues are `0.057` apart. That is the original complaint from issue #41, narrowed to the pair that matters
-least. It is a reasonable trade — the window is now unmissable, and both of the quiet phases mean "not
-trying" — but it is a trade, not a fix. The precise status is always one glance away in the Status view,
-the calendar summary, and each day's accessible text.
+The two quiet phases going back to being plain tints is a second, smaller call, and it drew a second
+review in turn: the tints were too dark, and `Before` looked like the window.
+
+### The quiet phases: Before changes hue, both get lighter
+
+Two constraints were fighting, and neither was visible in the code.
+
+**The lift is capped.** A fill cannot be brighter than `0.0435` luminance, set by the Low reading, and
+that cap is the reason the tints read as barely-there. It is also why a full-height shape at the tint's
+lightness is not a surface, which is the whole argument for the window's own colour.
+
+**The hue made the lift useless.** `Before` was amber at hue `46` and the window is rose at `14` —
+thirty-two degrees apart. Brightening amber therefore walked it _toward_ the window, so "make it lighter"
+and "make it look less like the window" were the same request pointed in opposite directions. An earlier
+attempt lifted the tints and the review came back saying `Before` was now similar to the window. It was.
+
+`Before` is indigo at hue `280` now, ninety-four degrees from the window and further from it than amber
+ever was, and `After` stays teal. Both are lifted: `0.105 → 0.151` and `0.075 → 0.125` measured from the
+card, which is the surface the Calendar actually renders on. Both sit below the window in lightness _and_
+chroma, so the window is still the most prominent surface on the calendar.
+
+**What the hue change costs.** A cool fill spends its whole luminance budget on being cool, so it is
+capped harder than a warm one — indigo clears the Low reading at `3.66:1` where amber managed `4.00:1`
+at a lower lightness. The visible result is that `Before` is about as light as it can be and no lighter.
+That is the price of the separation, and it is the right price: mistaking the window for a `Before` day is
+the complaint, and a slightly darker `Before` is not.
+
+**Two things the search got wrong, recorded because they nearly shipped.** A search that maximises
+distance from the window will always run to the widest gap on the colour wheel, and on this palette the
+widest gaps sit next to a _reading marker_ — one candidate came back magenta, four degrees from the Peak
+dot. And a candidate came back as prominent as the window itself and more chromatic than it, which would
+have inverted the one thing this change exists for. Both are now constraints rather than preferences:
+no fill may match a marker's hue, and the window must be the most prominent surface.
+
+**Light mode is untouched, deliberately.** It has the same shape of problem — its two quiet phases are
+cream and mint, both near-neutral, `0.062` apart, and the pale pink window sits among them — but the
+readings there are darker steps, so the cap and the achievable lift are different, and nobody has
+reported it. Worth checking on a real device rather than changing blind.
 
 ### The window day is painted in the window's own colour, cell and all
 
@@ -195,11 +227,12 @@ having two near-white things on it.
   Calendar resolves every cell once and derives the shape from that. The cost is that the shape is no
   longer local to a cell; the mitigation is that it is a pure function with its own tests, including
   tests for a padded month.
-- **`Before` and `After` are told apart only by hue**, and those two hues are `0.057` apart. This is the
-  original complaint narrowed to the pair that matters least, and it is the cost of not drawing a mark on
-  every day. The window is unmissable, and both quiet phases mean "not trying"; the precise status is in
-  the Status view, the summary, and each day's accessible text. → Accepted, and named here rather than left
-  to be discovered.
+- **`Before` and `After` are still told apart by hue alone**, now `0.144` apart rather than `0.062`. Better,
+  and still the weakest pair in the palette. → Accepted, guarded against regressing, and named here rather
+  than left to be discovered.
+- **Light mode has the same shape of problem and has not been fixed** — cream and mint, `0.062` apart, with
+  the pale pink window among them. → Deliberate: the readings there are darker, so the numbers differ and
+  nobody has reported it. Flagged for the device check.
 - **The bar is intrinsically close to the amber `Before` tint in hue.** The two are told apart by shape
   long before hue — a full-height filled bar against a tinted day with nothing on it.
 - **Dark's bar clears its worst reading by 0.18:1.** That is the price of being the loudest thing on a

@@ -68,6 +68,19 @@ const MARKER_SEPARATION = 0.25;
  */
 const BAR_SEPARATION = { light: 0.1, dark: 0.1 };
 
+/**
+ * Minimum OKLab distance between a Calendar phase fill and the surface behind the cell.
+ *
+ * The rule a review asked for and the palette did not have. A large filled area does not need 3:1 against
+ * its surface -- nothing in this palette manages that -- but a fill that sits almost on the surface is
+ * invisible, and that is a reportable failure rather than a matter of taste.
+ *
+ * The Calendar renders on the card, not the page, and the card is the lighter of the two, so the card is
+ * the binding surface: the fills that shipped clear 0.151 and 0.125 against it where the ones before
+ * them managed 0.105 and 0.075. The dark floor of 0.11 fails both of those, which is the point.
+ */
+const FILL_VISIBILITY = { light: 0.05, dark: 0.11 };
+
 /** Brace-matched body of a top-level rule, so `.dark` is read whole and not line by line. */
 function extractBlock(css, selector) {
   const start = css.indexOf(`${selector} {`);
@@ -244,6 +257,16 @@ function cellFills(theme) {
   };
 }
 
+/** OKLab lightness, which is what "loud" means perceptually. Relative luminance is not it. */
+function lightness(hex) {
+  const [r, g, b] = hexToRgb(hex).map(toLinear);
+  return (
+    0.2104542553 * Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b) +
+    0.793617785 * Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b) -
+    0.0040720468 * Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
+  );
+}
+
 describe("palette is read from the stylesheet the app loads", () => {
   it("resolves the theme surfaces from oklch, not from a guessed hex", () => {
     expect(palette.light.surfaces.base).toBe("#ffffff");
@@ -300,6 +323,41 @@ describe("monitor marker separation", () => {
   }
 });
 
+describe("the phase fills are visible against the page", () => {
+  /**
+   * The reported failure: in dark mode the two quiet phases were almost indistinguishable from the
+   * background behind them. Nothing in the guard would have caught it, because every other rule here is
+   * about a fill against a *marker* or against its *own* phase, and none of them is about a fill against
+   * the page it sits on.
+   */
+  for (const theme of THEMES) {
+    for (const phase of ["pre", "post-peak"]) {
+      it(`${theme} ${phase} fill is a visible area, not a tint the card swallows`, () => {
+        const floor = FILL_VISIBILITY[theme];
+        for (const [name, surface] of Object.entries(palette[theme].surfaces)) {
+          const distance = separation(palette[theme].fill[phase], surface);
+          expect(
+            distance,
+            `${theme} ${phase} ${palette[theme].fill[phase]} against ${name} ${surface}`,
+          ).toBeGreaterThanOrEqual(floor);
+        }
+      });
+
+      it(`${theme} the window is a more prominent surface than ${phase}`, () => {
+        // Stated as distance from the surface rather than as lightness, because "loud" means different
+        // things in the two themes: in dark the window is the lightest thing on the calendar, in light it
+        // is the darkest. Comparing lightness across themes gets one of the two exactly backwards, which
+        // is what an earlier draft of this rule did.
+        const surface = palette[theme].surfaces.card;
+        expect(
+          separation(palette[theme].bar, surface),
+          `${theme} the window is no more prominent than the ${phase} fill against ${surface}`,
+        ).toBeGreaterThan(separation(palette[theme].fill[phase], surface));
+      });
+    }
+  }
+});
+
 describe("the window's bar", () => {
   /**
    * The bar is the window's own surface. Unlike the outline it replaced, it is painted *under* the
@@ -349,14 +407,6 @@ describe("the window's bar", () => {
       // is not the darker of the two, because a full-height shape at the tint's lightness is not a
       // surface. In light the tint is already the loudest thing on a white page and the two are the same
       // value by design.
-      const lightness = (hex) => {
-        const [r, g, b] = hexToRgb(hex).map(toLinear);
-        return (
-          0.2104542553 * Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b) +
-          0.793617785 * Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b) +
-          -0.0040720468 * Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
-        );
-      };
       expect(
         lightness(palette[theme].bar),
         `${theme} window ${palette[theme].bar} is darker than the tint ${palette[theme].fill.fertile}`,
