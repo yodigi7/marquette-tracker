@@ -909,6 +909,13 @@ describe("CalendarView with cycle projection", () => {
     );
 
     const future = addDays(todayKey(), 3);
+    // The view renders one month at a time, so from the 28th onward "today + 3" lands
+    // in the next month and the cell this test looks for was never rendered — it failed
+    // on the date rather than on the behaviour. Show whichever month holds the day.
+    if (monthTitleFor(parseDateKey(future)) !== monthTitleFor(parseDateKey(todayKey()))) {
+      await user.click(screen.getByRole("button", { name: /next month/i }));
+    }
+
     const cell = cellByDate(future);
     expect(cell).not.toBeNull();
     // it is painted as a projected day, and still not loggable
