@@ -117,7 +117,7 @@ function Header({
             readings sitting in the raw log directly below. */}
         {algorithmEnabled ? (
           <Fact label="Monitor Peak" testId="summary-peak">
-            {peakLine(model.peakDay, model.peakCount)}
+            {peakLine(model.firstPeakDay, model.lastPeakDay, model.peakCount)}
           </Fact>
         ) : null}
         <Fact label="State" testId="summary-state">

@@ -7,6 +7,7 @@ import {
   DEFAULT_EARLIEST_PEAK,
   DEFAULT_HISTORY_WINDOW,
   DEFAULT_POST_PEAK_DAYS,
+  MIN_PEAK_RUN_DAYS,
 } from "../marquette";
 import { computeCycle } from "../marquette";
 import { computePredictions } from "../predict";
@@ -32,7 +33,7 @@ function settings(overrides: Partial<EngineSettings> = {}): EngineSettings {
 }
 
 function emptyHistory(): CycleHistory {
-  return { peaksByCycle: [], cycleNos: [] };
+  return { firstPeaksByCycle: [], lastPeaksByCycle: [], cycleNos: [] };
 }
 
 function closedCycle(
@@ -111,6 +112,38 @@ function closedCyclesWith(peaks: (number | null)[]): CycleResult[] {
   let day1 = "2026-01-01";
   for (let [index, peak] of peaks.entries()) {
     cycles.push(closedCycle(index + 1, day1, 28, peak));
+    day1 = addDays(day1, 28);
+  }
+  return cycles;
+}
+
+/**
+ * Closed 28-day cycles whose monitor showed Peak on every day of `run`, as the device does for a
+ * minimum of two days. The two edges of a projected window come from different readings, so the
+ * projection has to be exercised against runs rather than single days.
+ */
+function closedCyclesWithPeakRuns(runsPerCycle: (number[] | null)[]): CycleResult[] {
+  const cycles: CycleResult[] = [];
+  let day1 = "2026-01-01";
+  for (const [index, run] of runsPerCycle.entries()) {
+    const records = (run ?? []).map((day) => ({
+      id: `c${index + 1}-peak-${day}`,
+      cycleId: `c${index + 1}`,
+      date: addDays(day1, day - 1),
+      dayInCycle: day,
+      monitor: "peak" as const,
+    }));
+    cycles.push(
+      computeCycle(
+        { id: `c${index + 1}`, day1 },
+        records,
+        index + 1,
+        28,
+        emptyHistory(),
+        settings(),
+        day1,
+      ),
+    );
     day1 = addDays(day1, 28);
   }
   return cycles;
@@ -347,7 +380,8 @@ describe("projectCycles fertile window", () => {
     const projected = projectCycles(cycles, settings(), TODAY, "2026-10-31");
 
     for (const cycle of projected) {
-      expect(cycle.peakDay).toBeNull();
+      expect(cycle.firstPeakDay).toBeNull();
+      expect(cycle.lastPeakDay).toBeNull();
       expect(cycle.peakSource).toBe("none");
     }
   });
@@ -377,8 +411,11 @@ describe("projectCycles fertile window", () => {
 
     // The end is the composition, asserted from the constants rather than as a literal, so a change
     // to either protocol constant moves the expectation instead of silently diverging from it.
-    const composed = DEFAULT_EARLIEST_PEAK + DEFAULT_POST_PEAK_DAYS;
+    // Day 12 is the earliest possible *first* Peak day; the monitor then shows at least one more
+    // Peak day, so the earliest possible *last* Peak day is 13 and the earliest end is 16.
+    const composed = DEFAULT_EARLIEST_PEAK + (MIN_PEAK_RUN_DAYS - 1) + DEFAULT_POST_PEAK_DAYS;
     expect(PROTOCOL_DEFAULT_WINDOW_END).toBe(composed);
+    expect(PROTOCOL_DEFAULT_WINDOW_END).toBe(16);
     expect(projected[0].fertileWindow).toMatchObject({
       begin: PROTOCOL_DEFAULT_WINDOW_BEGIN,
       end: composed,
@@ -392,6 +429,83 @@ describe("projectCycles fertile window", () => {
     expect(past?.status).not.toBe("fertile");
   });
 
+  it("takes the open edge from a run's first reading and the close edge from its last", () => {
+    // The calendar rule's "earliest peak day" is a cycle's first monitor Peak reading; the end rule is
+    // defined through the last one. A lookback of two-day runs therefore opens a day earlier and closes
+    // a day later than the same cycles measured from one reading would.
+    // Three single-day cycles stand in front so the configured window lands on the five runs below
+    // rather than on their tail, matching `withLookbackPeaks`.
+    const cycles = [
+      ...closedCyclesWithPeakRuns([
+        [11],
+        [11],
+        [11],
+        [12, 13],
+        [14, 15],
+        [16, 17],
+        [18, 19],
+        [20, 21],
+      ]),
+      openCycle(9, OPEN_DAY1, null, TODAY),
+    ];
+
+    const projected = projectCycles(cycles, settings(), TODAY, "2026-10-31");
+
+    // first-Peaks 12 14 16 18 20 -> 12 - 6 = 6. last-Peaks 13 15 17 19 21 -> 21 + 3 = 24.
+    expect(projected[0].fertileWindow).toMatchObject({
+      begin: 6,
+      end: 21 + DEFAULT_POST_PEAK_DAYS,
+      beginRule: "calendar-earliest-peak-minus-6",
+      endRule: "lookback-latest-peak-plus-n",
+    });
+  });
+
+  it("does not open the window from a run's last reading", () => {
+    // The same lookback with each run a day longer, so only the *later* readings move. The open edge
+    // must not follow them: measuring from last readings would put the begin on day 8.
+    const cycles = [
+      ...closedCyclesWithPeakRuns([
+        [11],
+        [11],
+        [11],
+        [12, 13, 14],
+        [14, 15, 16],
+        [16, 17, 18],
+        [18, 19, 20],
+        [20, 21, 22],
+      ]),
+      openCycle(9, OPEN_DAY1, null, TODAY),
+    ];
+
+    const projected = projectCycles(cycles, settings(), TODAY, "2026-10-31");
+
+    // first-Peaks unchanged at 12 14 16 18 20 -> 6. min(last-Peaks) 14 would give 8.
+    expect(projected[0].fertileWindow.begin).toBe(6);
+    // The close edge does follow the last readings: 22 + 3 = 25.
+    expect(projected[0].fertileWindow.end).toBe(22 + DEFAULT_POST_PEAK_DAYS);
+  });
+
+  it("does not close the window on a run's first reading", () => {
+    const cycles = [
+      ...closedCyclesWithPeakRuns([
+        [11],
+        [11],
+        [11],
+        [12, 13],
+        [14, 15],
+        [16, 17],
+        [18, 19],
+        [20, 21],
+      ]),
+      openCycle(9, OPEN_DAY1, null, TODAY),
+    ];
+
+    const projected = projectCycles(cycles, settings(), TODAY, "2026-10-31");
+
+    // A first-reading-only measurement would end on 20 + 3 = 23 rather than 21 + 3 = 24.
+    expect(projected[0].fertileWindow.end).not.toBe(20 + DEFAULT_POST_PEAK_DAYS);
+  });
+
   it("matches the real open cycle's end, because its own Peak is the last lookback entry", () => {
     // `projected[0]` re-derives the open cycle from no readings, so its window is the calendar rule
     // over a lookback whose last element is the open cycle's own Peak. That makes the derived end
@@ -401,7 +515,8 @@ describe("projectCycles fertile window", () => {
 
     const projected = projectCycles(cycles, settings(), TODAY, "2026-10-31");
 
-    expect(real.peakDay).toBe(20);
+    expect(real.firstPeakDay).toBe(20);
+    expect(real.lastPeakDay).toBe(20);
     expect(real.fertileWindow.end).toBe(20 + DEFAULT_POST_PEAK_DAYS);
     expect(projected[0].fertileWindow).toMatchObject({
       begin: 6,

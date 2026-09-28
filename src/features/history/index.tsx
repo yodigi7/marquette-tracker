@@ -159,8 +159,8 @@ function CycleStats({ results, forecast }: { results: CycleResult[]; forecast: F
           <Stat
             label="Peak day range"
             value={
-              forecast && forecast.peakDayEarliest > 0
-                ? `day ${forecast.peakDayEarliest}–${forecast.peakDayLatest}`
+              forecast && forecast.firstPeakDayEarliest > 0
+                ? `day ${forecast.firstPeakDayEarliest}–${forecast.firstPeakDayLatest}`
                 : "—"
             }
           />
@@ -225,9 +225,7 @@ function CycleTable({ results, showDerived }: { results: CycleResult[]; showDeri
                 </TableCell>
                 <TableCell>{result.day1}</TableCell>
                 <TableCell>{result.length ?? "open"}</TableCell>
-                {showDerived && (
-                  <TableCell>{result.peakDay !== null ? `day ${result.peakDay}` : "—"}</TableCell>
-                )}
+                {showDerived && <TableCell>{peakDayCell(result)}</TableCell>}
                 {showDerived && <TableCell>{countFertileDays(result)}</TableCell>}
                 <TableCell>
                   {result.length === null ? (
@@ -247,6 +245,26 @@ function CycleTable({ results, showDerived }: { results: CycleResult[]; showDeri
 
 function countFertileDays(result: CycleResult): number {
   return result.days.filter((d) => d.status === "fertile").length;
+}
+
+/**
+ * A cycle's Peak day and, when it holds more than one reading, the one its window end came from.
+ *
+ * A monitor shows Peak for a minimum of two days, so naming one day as though it were the whole story
+ * hides the reading the end was measured from. Both are named with their jobs rather than shown as a
+ * range, because a range reads as "ovulation happened somewhere in here" — the single-day estimate the
+ * Peak-day rules rule out. The count is only computed when the two differ, so a single-reading cycle
+ * is not given a clause it does not need.
+ */
+function peakDayCell(result: CycleResult): string {
+  const { firstPeakDay, lastPeakDay } = result;
+  if (firstPeakDay === null) {
+    return "—";
+  }
+  if (firstPeakDay === lastPeakDay) {
+    return `day ${firstPeakDay}`;
+  }
+  return `day ${firstPeakDay} (end from ${lastPeakDay})`;
 }
 
 function Stat({ label, value }: { label: string; value: string }) {

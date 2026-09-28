@@ -45,14 +45,34 @@ function record(
 }
 
 function emptyHistory(): CycleHistory {
-  return { peaksByCycle: [], cycleNos: [] };
+  return { firstPeaksByCycle: [], lastPeaksByCycle: [], cycleNos: [] };
 }
 
 /** Fixed "today" for closed-cycle cases, where the open-cycle bound is inert. */
 const TODAY = "2026-06-01";
 
+/** History where every cycle held a single monitor Peak reading, so both values coincide. */
 function historyWithPeaks(peaks: (number | null)[]): CycleHistory {
-  return { peaksByCycle: peaks, cycleNos: peaks.map((_, i) => i + 1) };
+  return {
+    firstPeaksByCycle: peaks,
+    lastPeaksByCycle: [...peaks],
+    cycleNos: peaks.map((_, i) => i + 1),
+  };
+}
+
+/**
+ * History built from per-cycle monitor Peak **day runs** rather than a flat list of single days.
+ *
+ * A monitor shows Peak for a minimum of two days, so the calendar rule has to be exercised against
+ * histories whose cycles each hold a run — a case a flat list of integers cannot express, and the gap
+ * that let the rule measure from the last reading without a test noticing.
+ */
+function historyFromPeakRuns(runsPerCycle: (number[] | null)[]): CycleHistory {
+  return {
+    firstPeaksByCycle: runsPerCycle.map((run) => run?.[0] ?? null),
+    lastPeaksByCycle: runsPerCycle.map((run) => (run ? run[run.length - 1] : null)),
+    cycleNos: runsPerCycle.map((_, i) => i + 1),
+  };
 }
 
 interface WindowExpectation {
@@ -71,7 +91,8 @@ interface Case {
   settings?: EngineSettings;
   records: DayRecordInput[];
   expect: WindowExpectation & {
-    peakDay?: number | null;
+    firstPeakDay?: number | null;
+    lastPeakDay?: number | null;
     peakSource?: string;
     length?: number | null;
   };
@@ -91,7 +112,8 @@ const CASES: Case[] = [
       end: 17,
       beginRule: "calendar-day-6",
       endRule: "current-peak-plus-n",
-      peakDay: 14,
+      firstPeakDay: 14,
+      lastPeakDay: 14,
       peakSource: "monitor",
     },
   },
@@ -116,7 +138,8 @@ const CASES: Case[] = [
       end: 15,
       beginRule: "calendar-day-6",
       endRule: "current-peak-plus-n",
-      peakDay: 12,
+      firstPeakDay: 12,
+      lastPeakDay: 12,
       peakSource: "monitor",
     },
   },
@@ -129,7 +152,8 @@ const CASES: Case[] = [
       end: null,
       beginRule: "calendar-day-6",
       endRule: "none",
-      peakDay: null,
+      firstPeakDay: null,
+      lastPeakDay: null,
       peakSource: "none",
     },
   },
@@ -142,7 +166,8 @@ const CASES: Case[] = [
       end: 17,
       beginRule: "calendar-day-6",
       endRule: "current-peak-plus-n",
-      peakDay: 14,
+      firstPeakDay: 14,
+      lastPeakDay: 14,
       peakSource: "monitor",
     },
   },
@@ -233,7 +258,8 @@ const CASES: Case[] = [
       end: 18,
       beginRule: "first-high-or-peak",
       endRule: "current-peak-plus-n",
-      peakDay: 15,
+      firstPeakDay: 12,
+      lastPeakDay: 15,
     },
   },
   {
@@ -271,6 +297,109 @@ const CASES: Case[] = [
     },
   },
   {
+    name: "cycle 9 over six two-day Peak runs: the calendar begin comes from each run's first day",
+    cycleNo: 9,
+    // first-Peaks 12 15 12 14 16 15 -> begin 6. Last-Peaks 13 16 13 15 17 16 -> begin 7, so this
+    // case fails outright if the rule reaches for the last reading.
+    history: historyFromPeakRuns([
+      [12, 13],
+      [15, 16],
+      [12, 13],
+      [14, 15],
+      [16, 17],
+      [15, 16],
+    ]),
+    records: [record(9, 10, { monitor: "high" })],
+    expect: {
+      begin: 6,
+      end: null,
+      beginRule: "calendar-earliest-peak-minus-6",
+      endRule: "none",
+    },
+  },
+  {
+    name: "cycle 9 with nothing of its own: the begin is the earliest first-Peak of the lookback minus 6",
+    cycleNo: 9,
+    // first-Peaks 14 16 13 12 15 17 -> 12 - 6 = 6. Last-Peaks 15 17 14 13 16 18 -> 13 - 6 = 7.
+    history: historyFromPeakRuns([
+      [14, 15],
+      [16, 17],
+      [13, 14],
+      [12, 13],
+      [15, 16],
+      [17, 18],
+    ]),
+    records: [],
+    expect: {
+      begin: 6,
+      end: null,
+      beginRule: "calendar-earliest-peak-minus-6",
+      endRule: "none",
+    },
+  },
+  {
+    name: "cycle 9 over six three-day Peak runs: the begin still comes from the first day of a run",
+    cycleNo: 9,
+    // first-Peaks 12 15 12 14 16 13 -> 6. Last-Peaks 14 17 14 16 18 15 -> 8.
+    history: historyFromPeakRuns([
+      [12, 13, 14],
+      [15, 16, 17],
+      [12, 13, 14],
+      [14, 15, 16],
+      [16, 17, 18],
+      [13, 14, 15],
+    ]),
+    records: [],
+    expect: {
+      begin: 6,
+      end: null,
+      beginRule: "calendar-earliest-peak-minus-6",
+      endRule: "none",
+    },
+  },
+  {
+    name: "a cycle's own two-day Peak run: the Peak day is the first and the end is measured from the last",
+    cycleNo: 9,
+    history: historyFromPeakRuns([
+      [14, 15],
+      [16, 17],
+      [13, 14],
+      [12, 13],
+      [15, 16],
+      [17, 18],
+    ]),
+    records: [record(9, 11, { monitor: "peak" }), record(9, 12, { monitor: "peak" })],
+    expect: {
+      begin: 6,
+      end: 15,
+      beginRule: "calendar-earliest-peak-minus-6",
+      endRule: "current-peak-plus-n",
+      firstPeakDay: 11,
+      lastPeakDay: 12,
+    },
+  },
+  {
+    name: "a single-reading cycle is its own Peak day and its own anchor",
+    cycleNo: 9,
+    history: historyFromPeakRuns([
+      [14, 15],
+      [16, 17],
+      [13, 14],
+      [12, 13],
+      [15, 16],
+      [17, 18],
+    ]),
+    records: [record(9, 11, { monitor: "peak" })],
+    expect: {
+      begin: 6,
+      end: 14,
+      beginRule: "calendar-earliest-peak-minus-6",
+      endRule: "current-peak-plus-n",
+      firstPeakDay: 11,
+      lastPeakDay: 11,
+    },
+  },
+  {
     name: "records without provenance count as user evidence",
     cycleNo: 1,
     records: [record(1, 14, { monitor: "peak" }), record(1, 21, { monitor: "peak" })],
@@ -279,7 +408,8 @@ const CASES: Case[] = [
       end: 24,
       beginRule: "calendar-day-6",
       endRule: "current-peak-plus-n",
-      peakDay: 21,
+      firstPeakDay: 14,
+      lastPeakDay: 21,
       peakSource: "monitor",
     },
   },
@@ -301,8 +431,11 @@ describe("marquette computeCycle", () => {
       expect(result.fertileWindow.end).toBe(testCase.expect.end);
       expect(result.fertileWindow.beginRule).toBe(testCase.expect.beginRule);
       expect(result.fertileWindow.endRule).toBe(testCase.expect.endRule);
-      if (testCase.expect.peakDay !== undefined) {
-        expect(result.peakDay).toBe(testCase.expect.peakDay);
+      if (testCase.expect.firstPeakDay !== undefined) {
+        expect(result.firstPeakDay).toBe(testCase.expect.firstPeakDay);
+      }
+      if (testCase.expect.lastPeakDay !== undefined) {
+        expect(result.lastPeakDay).toBe(testCase.expect.lastPeakDay);
       }
       if (testCase.expect.peakSource !== undefined) {
         expect(result.peakSource).toBe(testCase.expect.peakSource);
@@ -333,16 +466,89 @@ describe("marquette computeCycle", () => {
         testCase.settings ?? settings(),
         TODAY,
       );
-      // `computePeak` keeps the last Peak in cycle-day order, so the anchoring day is the latest.
-      const peakDay = Math.max(
+      // The end is measured from the cycle's last Peak reading in cycle-day order.
+      const lastPeakDay = Math.max(
         ...testCase.records.filter((r) => r.monitor === "peak").map((r) => r.dayInCycle),
       );
-      expect(result.peakDay, testCase.name).toBe(peakDay);
+      expect(result.lastPeakDay, testCase.name).toBe(lastPeakDay);
       expect(
         result.fertileWindow.end ?? Number.NEGATIVE_INFINITY,
         testCase.name,
-      ).toBeGreaterThanOrEqual(peakDay);
+      ).toBeGreaterThanOrEqual(lastPeakDay);
     }
+  });
+
+  it("never reports a window begin later than the cycle's own monitor Peak", () => {
+    // The symmetric half of the end invariant above. The begin sits at or before the cycle's first
+    // High-or-Peak day because that reading is itself an opener — a consequence of the arithmetic
+    // rather than a stated guarantee, so it is asserted over every table case carrying a Peak instead
+    // of left to a hand-written row.
+    const withPeak = CASES.filter((testCase) => testCase.records.some((r) => r.monitor === "peak"));
+    expect(withPeak.length).toBeGreaterThan(0);
+
+    for (const testCase of withPeak) {
+      const result = computeCycle(
+        cycle(testCase.cycleNo),
+        testCase.records.map((r) => ({ ...r, cycleId: "c" + testCase.cycleNo })),
+        testCase.cycleNo,
+        testCase.expect.length ?? 28,
+        testCase.history ?? emptyHistory(),
+        testCase.settings ?? settings(),
+        TODAY,
+      );
+      const firstPeakDay = Math.min(
+        ...testCase.records.filter((r) => r.monitor === "peak").map((r) => r.dayInCycle),
+      );
+      expect(result.firstPeakDay, testCase.name).toBe(firstPeakDay);
+      expect(result.fertileWindow.begin, testCase.name).toBeLessThanOrEqual(firstPeakDay);
+    }
+  });
+
+  it("lets a cycle's own first Peak open the window the way a High does", () => {
+    // A Peak that lands well before the calendar begin pulls the window open, exactly as a High does.
+    // Without a High anywhere, the first High-or-Peak reading is the Peak itself.
+    const result = computeCycle(
+      cycle(9),
+      [record(9, 9, { monitor: "peak" })],
+      9,
+      28,
+      historyFromPeakRuns([
+        [16, 17],
+        [17, 18],
+        [16, 17],
+        [15, 16],
+        [17, 18],
+        [16, 17],
+      ]),
+      settings(),
+      TODAY,
+    );
+
+    // Calendar begin would be 15 - 6 = 9; the Peak is also on 9, so the rule does not strictly win.
+    expect(result.fertileWindow.begin).toBe(9);
+  });
+
+  it("opens the window on an early Peak when the calendar begin falls later", () => {
+    const result = computeCycle(
+      cycle(9),
+      [record(9, 8, { monitor: "peak" })],
+      9,
+      28,
+      historyFromPeakRuns([
+        [17, 18],
+        [18, 19],
+        [17, 18],
+        [16, 17],
+        [18, 19],
+        [17, 18],
+      ]),
+      settings(),
+      TODAY,
+    );
+
+    // Calendar begin would be 16 - 6 = 10, so the cycle's own Peak on day 8 opens it instead.
+    expect(result.fertileWindow.begin).toBe(8);
+    expect(result.fertileWindow.beginRule).toBe("first-high-or-peak");
   });
 
   it("uses a fixed three-day post-Peak protocol constant", () => {
@@ -402,7 +608,8 @@ describe("marquette computeCycle", () => {
       TODAY,
     );
 
-    expect(result.peakDay).toBeNull();
+    expect(result.firstPeakDay).toBeNull();
+    expect(result.lastPeakDay).toBeNull();
     expect(result.peakSource).toBe("none");
     expect(result.fertileWindow.end).toBeNull();
     expect(result.fertileWindow.endRule).toBe("none");
@@ -422,7 +629,8 @@ describe("marquette computeCycle", () => {
       TODAY,
     );
 
-    expect(result.peakDay).toBe(14);
+    expect(result.firstPeakDay).toBe(14);
+    expect(result.lastPeakDay).toBe(14);
     expect(result.fertileWindow.end).toBe(17);
     // Day coverage is now derived, so the array spans the whole closed cycle.
     expect(result.days).toHaveLength(28);
@@ -772,7 +980,8 @@ describe("run of consecutive High readings", () => {
 
     expect(highRuns(result.warnings)).toEqual([{ kind: "high-run", cycleNo: 1, run: 9 }]);
     // The run is an observation, never a Peak: it must not become one.
-    expect(result.peakDay).toBeNull();
+    expect(result.firstPeakDay).toBeNull();
+    expect(result.lastPeakDay).toBeNull();
     expect(result.fertileWindow.endRule).toBe("none");
   });
 
@@ -801,7 +1010,8 @@ describe("run of consecutive High readings", () => {
     const result = compute(highs(6, 8, [record(1, 14, { monitor: "peak" }), ...highs(15, 2)]));
 
     expect(highRuns(result.warnings)).toEqual([]);
-    expect(result.peakDay).toBe(14);
+    expect(result.firstPeakDay).toBe(14);
+    expect(result.lastPeakDay).toBe(14);
   });
 
   it("treats a day with no High reading as the end of the run", () => {

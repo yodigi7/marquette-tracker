@@ -14,7 +14,8 @@ function model(overrides: Partial<SummaryModel> = {}): SummaryModel {
     lastDay: 28,
     open: false,
     length: 28,
-    peakDay: 14,
+    firstPeakDay: 14,
+    lastPeakDay: 14,
     peakCount: 1,
     window: {
       begin: 6,
@@ -231,7 +232,8 @@ describe("SummaryDocument with interpretation off", () => {
       <SummaryDocument
         model={model({
           window: null,
-          peakDay: null,
+          firstPeakDay: null,
+          lastPeakDay: null,
           warnings: [],
           days: [
             { ...model().days[0], monitor: "peak" },
@@ -256,7 +258,7 @@ describe("SummaryDocument with interpretation off", () => {
   it("says why the derived half is missing", () => {
     render(
       <SummaryDocument
-        model={model({ window: null, peakDay: null, warnings: [] })}
+        model={model({ window: null, firstPeakDay: null, lastPeakDay: null, warnings: [] })}
         generatedOn="2026-09-27"
         cycleNotes={null}
         algorithmEnabled={false}
@@ -274,7 +276,8 @@ describe("SummaryDocument with interpretation off", () => {
       <SummaryDocument
         model={model({
           window: null,
-          peakDay: null,
+          firstPeakDay: null,
+          lastPeakDay: null,
           peakCount: 2,
           warnings: [],
           days: [

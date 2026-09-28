@@ -150,7 +150,7 @@ function statusForWindow(result: CycleResult, dayNo: number): DayStatus | null {
   if (dayNo < 1 || (result.length !== null && dayNo > result.length)) {
     return null;
   }
-  return dayInfo(result.fertileWindow, result.peakDay !== null, dayNo);
+  return dayInfo(result.fertileWindow, result.lastPeakDay !== null, dayNo);
 }
 
 function statusForCell(
@@ -170,7 +170,7 @@ function statusForCell(
   if (beyondCycle) {
     return null;
   }
-  return dayInfo(result.fertileWindow, result.peakDay !== null, dayNo);
+  return dayInfo(result.fertileWindow, result.lastPeakDay !== null, dayNo);
 }
 
 function mensesFor(record: DayRecordEntity | undefined, dayNo: number): boolean {

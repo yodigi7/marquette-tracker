@@ -79,8 +79,11 @@ export interface SummaryModel {
   lastDay: number;
   open: boolean;
   length: number | null;
-  peakDay: number | null;
-  /** Monitor Peak readings logged in this cycle. The engine keeps only the last one. */
+  /** The cycle's Peak day: its first monitor Peak reading. Null when the cycle holds none. */
+  firstPeakDay: number | null;
+  /** The cycle's last monitor Peak reading, the one the window end is measured from. */
+  lastPeakDay: number | null;
+  /** Monitor Peak readings logged in this cycle. */
   peakCount: number;
   window: SummaryWindow | null;
   days: SummaryDay[];
@@ -137,7 +140,8 @@ export function buildSummaryModel({
     lastDay: result.days[result.days.length - 1]?.day ?? 0,
     open: result.length === null,
     length: result.length,
-    peakDay: algorithmEnabled ? result.peakDay : null,
+    firstPeakDay: algorithmEnabled ? result.firstPeakDay : null,
+    lastPeakDay: algorithmEnabled ? result.lastPeakDay : null,
     peakCount,
     window: algorithmEnabled ? buildWindow(result) : null,
     days,
@@ -169,7 +173,7 @@ function loggedMonitor(record: DayRecordEntity | undefined): MonitorReading | nu
 
 function buildWindow(result: CycleResult): SummaryWindow {
   const window = result.fertileWindow;
-  const basis = windowBasis(window, result.peakDay);
+  const basis = windowBasis(window, result.lastPeakDay);
   return {
     begin: window.begin,
     end: window.end,
@@ -203,9 +207,11 @@ const BEGIN_BASIS: Record<BeginRule, string> = {
   "first-high-or-peak": "Set by your own reading — the first High or Peak of this cycle.",
 };
 
-const END_BASIS: Record<EndRule, (peakDay: number | null) => string> = {
-  "current-peak-plus-n": (peakDay) =>
-    `Set by your own reading — three full days after the monitor Peak you recorded on cycle day ${peakDay}.`,
+// Measured from the cycle's *last* Peak reading, which is the reading the end rule is defined
+// through — not from the cycle's Peak day, which is its first reading.
+const END_BASIS: Record<EndRule, (lastPeakDay: number | null) => string> = {
+  "current-peak-plus-n": (lastPeakDay) =>
+    `Set by your own reading — three full days after the monitor Peak you recorded on cycle day ${lastPeakDay}.`,
   "lookback-latest-peak-plus-n": () =>
     "Set by the Peaks in your recent cycles — three full days after the latest of them.",
   "protocol-fallback-window": () =>
@@ -221,11 +227,11 @@ export interface WindowBasis {
 
 export function windowBasis(
   window: { beginRule: BeginRule; endRule: EndRule },
-  peakDay: number | null,
+  lastPeakDay: number | null,
 ): WindowBasis {
   return {
     begin: BEGIN_BASIS[window.beginRule],
-    end: END_BASIS[window.endRule](peakDay),
+    end: END_BASIS[window.endRule](lastPeakDay),
   };
 }
 
@@ -341,18 +347,30 @@ export function lengthLine(length: number | null, lastDay: number): string {
 }
 
 /**
- * The Peak reading, and how many the cycle holds. A cycle can hold more than one and the window end is
- * measured from the latest, so a document that named one reading without saying how many would let a
- * reader assume the wrong one produced the window.
+ * The cycle's Peak reading, and how many the cycle holds. A cycle can hold more than one and the window
+ * end is measured from the latest, so a document that named one reading without saying how many would
+ * let a reader assume the wrong one produced the window.
+ *
+ * Both readings are named with the job each one has. The first reading is the cycle's Peak day — the
+ * day the surge started, and the value the calendar rule is derived from — while the last is what the
+ * window end is measured from. A single-reading cycle is its own Peak day and needs no second clause.
  */
-export function peakLine(peakDay: number | null, peakCount: number): string {
-  if (peakDay === null) {
+export function peakLine(
+  firstPeakDay: number | null,
+  lastPeakDay: number | null,
+  peakCount: number,
+): string {
+  if (firstPeakDay === null) {
     return "No monitor Peak reading recorded in this cycle.";
   }
-  const base = `Monitor Peak on cycle day ${peakDay}.`;
-  return peakCount > 1
-    ? `${base} The last of ${peakCount} monitor Peak readings in this cycle.`
-    : base;
+  if (firstPeakDay === lastPeakDay) {
+    return `Monitor Peak on cycle day ${firstPeakDay}.`;
+  }
+  return (
+    `Monitor Peak on cycle day ${firstPeakDay} — the first of ${peakCount} monitor Peak readings ` +
+    `in this cycle. The fertile window ends three full days after the last of them, on cycle day ` +
+    `${lastPeakDay}.`
+  );
 }
 
 /** The document is a snapshot, and says when it was taken. */

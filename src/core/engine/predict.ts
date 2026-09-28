@@ -42,7 +42,10 @@ export function computePredictions(
   }
 
   const lengths = closed.map((c) => c.length!);
-  const peaks = closed.map((c) => c.peakDay).filter((p): p is number => p !== null);
+  // First readings throughout: these are the cycles' Peak days, the values the calendar rule and every
+  // reported range are built from. A cycle's last reading anchors only its own window end.
+  const peaks = closed.map((c) => c.firstPeakDay).filter((p): p is number => p !== null);
+  const lastPeaks = closed.map((c) => c.lastPeakDay).filter((p): p is number => p !== null);
   const newest = cycles[cycles.length - 1];
 
   const inBand = lengths.filter(
@@ -61,7 +64,7 @@ export function computePredictions(
     return null;
   }
   const nextStart = addDays(newest.day1, projectedLength);
-  const calendar = predictFertileWindow(newest.day1, peaks, settings);
+  const calendar = predictFertileWindow(newest.day1, peaks, lastPeaks, settings);
   const forecast: Forecast = {
     basedOnCycles: closed.length,
     lookbackWindow: Math.min(settings.historyWindow, closed.length),
@@ -71,8 +74,8 @@ export function computePredictions(
     medianLength: round(median(lengths)),
     earliestLength: Math.min(...lengths),
     latestLength: Math.max(...lengths),
-    peakDayEarliest: peaks.length > 0 ? Math.min(...peaks) : 0,
-    peakDayLatest: peaks.length > 0 ? Math.max(...peaks) : 0,
+    firstPeakDayEarliest: peaks.length > 0 ? Math.min(...peaks) : 0,
+    firstPeakDayLatest: peaks.length > 0 ? Math.max(...peaks) : 0,
     peakDayRangeInWindow: calendar.peakDayRange,
     expectedPeriodStart: nextStart,
     nextFertileWindow: { begin: calendar.begin, end: calendar.end },
@@ -83,35 +86,41 @@ export function computePredictions(
 /**
  * The next cycle's window from the calendar rule, plus the Peak days that rule was derived from.
  *
- * The range is returned rather than discarded because a surface reporting "your expected Peak day is
- * X to Y" has to report the same days that produced this window. The all-cycles pair on the forecast
- * is a different statistic, and reporting it here would put a wider range on screen beside a begin and
- * end computed from these days.
+ * The two edges come from different readings, because the rules they implement do. The window opens
+ * from the earliest **first** Peak day in the lookback — the calendar rule's "earliest peak day" — and
+ * closes from the latest **last** Peak reading, since the end rule is defined through the last reading.
+ * The reported range is the first-Peak range, so a surface reporting "your expected Peak day is X to Y"
+ * reports the days that produced the open edge.
+ *
+ * The all-cycles pair on the forecast is a different statistic, and reporting it here would put a wider
+ * range on screen beside a begin and end computed from these days.
  */
 function predictFertileWindow(
   day1: string,
-  peaks: number[],
+  firstPeaks: number[],
+  lastPeaks: number[],
   settings: EngineSettings,
 ): { begin: string; end: string; peakDayRange: PeakDayRange | null } {
-  const lastWindow = peaks.slice(-settings.historyWindow);
+  const firstInWindow = firstPeaks.slice(-settings.historyWindow);
+  const lastInWindow = lastPeaks.slice(-settings.historyWindow);
   let beginDay: number;
   let endDay: number;
   let peakDayRange: PeakDayRange | null;
-  if (lastWindow.length === 0) {
+  if (firstInWindow.length === 0) {
     // Shared with the projection's bounded fallback: one protocol default, not
     // two literals that happen to agree. The `- 6` below is a different rule
-    // (earliest Peak minus six) that coincidentally shares the value.
+    // (earliest Peak day minus six) that coincidentally shares the value.
     beginDay = PROTOCOL_DEFAULT_WINDOW_BEGIN;
     endDay = PROTOCOL_DEFAULT_WINDOW_END;
     // The default band is a protocol constant, not a value read off the user's
     // own history, so it implies no Peak range.
     peakDayRange = null;
   } else {
-    const earliest = Math.min(...lastWindow);
-    const latest = Math.max(...lastWindow);
+    const earliest = Math.min(...firstInWindow);
+    const latest = Math.max(...firstInWindow);
     beginDay = earliest - 6;
-    endDay = latest + DEFAULT_POST_PEAK_DAYS;
-    peakDayRange = { earliest, latest, cycles: lastWindow.length };
+    endDay = Math.max(...lastInWindow) + DEFAULT_POST_PEAK_DAYS;
+    peakDayRange = { earliest, latest, cycles: firstInWindow.length };
   }
   return {
     begin: addDays(day1, beginDay - 1),
