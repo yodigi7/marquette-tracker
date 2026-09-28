@@ -8,7 +8,6 @@ import {
   FERTILITY_MONITOR_VISUALS,
   FERTILITY_STATUS_VISUALS,
   FERTILITY_TEXT_VISUALS,
-  NO_BLOCK_EDGES,
   calendarPhaseForStatus,
   calendarPhaseLabel,
   fertilityStatusBadge,
@@ -68,35 +67,26 @@ describe("fertility visual mappings", () => {
     expect(new Set(bands).size, `bands were ${bands.join(", ")}`).toBe(2);
   });
 
-  it("draws the window as a region and the quiet phases as a band, never both", () => {
-    // The window is a closed region because a band and the menses stripe are both horizontal lines at
-    // opposite cell edges, 8px apart across a week boundary, where they read as one mark. The other two
-    // phases keep their band, which is what leaves the window as the only region on the calendar.
+  it("draws the window as a solid bar and the quiet phases as a band, never both", () => {
+    // The window is a bar because a band and the menses stripe are both horizontal lines at opposite
+    // cell edges, 8px apart across a week boundary, where they read as one mark. The other two phases
+    // keep their band, which is what leaves the window as the only solid shape on the calendar.
     for (const phase of ["before", "after"] as const) {
-      expect(FERTILITY_CALENDAR_PHASE_VISUALS[phase].block, `${phase} block`).toEqual(
-        NO_BLOCK_EDGES,
-      );
+      expect(FERTILITY_CALENDAR_PHASE_VISUALS[phase].bar, `${phase} bar`).toBe("");
     }
     const fertile = FERTILITY_CALENDAR_PHASE_VISUALS.fertile;
     expect(fertile.band, "the window carries no band").toBe("");
-    for (const side of ["top", "right", "bottom", "left"] as const) {
-      expect(fertile.block[side], `fertile block ${side}`).not.toBe("");
-    }
+    expect(fertile.bar, "the window carries a bar").not.toBe("");
   });
 
-  it("colours each side of the block on its own, because a side's width cannot undo a colour", () => {
-    // The load-bearing constraint. `border-<colour>` paints all four sides at once, so a block that
-    // carried one colour class would outline itself through the middle of every run that wraps weeks
-    // and square off the rounded ends. Each side therefore has to be a separate class, naming the
-    // edge it paints.
-    const sides = Object.entries(FERTILITY_CALENDAR_PHASE_VISUALS.fertile.block);
-    expect(new Set(sides.map(([, className]) => className)).size, "sides share a class").toBe(4);
-    const edge = { top: "t", right: "r", bottom: "b", left: "l" } as const;
-    for (const [side, className] of sides) {
-      expect(className, `${side} must name its own edge`).toBe(
-        `border-${edge[side as keyof typeof edge]}-fertility-status-fertile-block`,
-      );
-    }
+  it("gives the bar its own colour, because the cell tint is too dark to carry the shape", () => {
+    // The bar spans the whole cell and a reading marker is painted on it, so it is held to the same 3:1
+    // as any other fill -- but it is allowed to be brighter than the cell's tint behind it, and it has
+    // to be: at the tint's own lightness a full-height bar is a barely-tinted block and the window stops
+    // being the thing the eye lands on. The Status view has no bar and keeps the darker tint.
+    const fertile = FERTILITY_CALENDAR_PHASE_VISUALS.fertile;
+    expect(fertile.bar).not.toBe(fertile.fill);
+    expect(fertile.bar).toContain("fertility-status-fertile-bar");
   });
 
   it.each(statusCases)("maps %s to a complete tokenized treatment", (status, token) => {

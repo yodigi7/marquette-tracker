@@ -465,11 +465,19 @@ describe("resolveCell with projected cycles", () => {
 });
 
 describe("the window block's edges across the month", () => {
-  /** A 7-wide month, 21 days. */
-  const slots = (from: number, to: number) =>
+  /**
+   * A 7-wide month of 21 days, each day carrying the grid position it sits in.
+   *
+   * `pad` inserts that many blank days before the 1st, which is what a month that does not start on the
+   * configured first day of the week looks like. The blanks are positions the window's shape has to
+   * account for, so the helper takes the real days only and the caller states where they sit.
+   */
+  const slots = (from: number, to: number, pad = 0) =>
     Array.from({ length: 21 }, (_, i) => ({
       dateKey: `2026-09-${String(i + 1).padStart(2, "0")}`,
       inWindow: i + 1 >= from && i + 1 <= to,
+      row: Math.floor((i + pad) / 7),
+      column: (i + pad) % 7,
     }));
 
   /**
@@ -553,32 +561,50 @@ describe("the window block's edges across the month", () => {
 
   it("handles a month whose leading days are blank", () => {
     // A month starting mid-week, so the first row is padded and the window opens on the 3rd.
-    const padded = [
-      { dateKey: "", inWindow: false },
-      { dateKey: "", inWindow: false },
-      { dateKey: "2026-09-03", inWindow: true },
-      { dateKey: "2026-09-04", inWindow: true },
-      { dateKey: "2026-09-05", inWindow: true },
-      { dateKey: "2026-09-06", inWindow: true },
-      { dateKey: "2026-09-07", inWindow: true },
-    ];
-    const edges = windowEdgesByDay(padded, "2026-09-07");
+    const edges = windowEdgesByDay(slots(3, 7, 2), "2026-09-07");
     expect([edges["2026-09-03"].start, edges["2026-09-03"].roundStart]).toEqual([true, true]);
     expect([edges["2026-09-07"].end, edges["2026-09-07"].roundEnd]).toEqual([true, true]);
   });
 
-  it("handles a month whose leading days are blank", () => {
-    // A month that starts mid-week, so the first row is padded and the window starts on day 3.
-    const padded = [
-      { dateKey: "", inWindow: false },
-      { dateKey: "", inWindow: false },
-      { dateKey: "2026-09-03", inWindow: true },
-      { dateKey: "2026-09-04", inWindow: true },
-      { dateKey: "2026-09-05", inWindow: true },
-      { dateKey: "2026-09-06", inWindow: true },
-      { dateKey: "2026-09-07", inWindow: true },
-    ];
-    const edges = windowEdgesByDay(padded);
+  it("places a padded month in the right rows, not in rows counted from the first real day", () => {
+    // The bug this guards: a month padded with leading blanks has fewer real days in its first row, so
+    // counting a day\'s index and dividing by the width put every later row one row out. That put the
+    // bar\'s edges on the wrong days -- bleeding it outside the calendar and leaving holes in the middle
+    // of the run, at the same time.
+    const pad = 2;
+    const edges = windowEdgesByDay(slots(8, 19, pad), "2026-09-19");
+    // Day 8 sits at index 0 of the real days, which is column 2 of row 0. The day above it is the blank
+    // at column 2 of nothing, so the run does not continue upward, and the day below it -- index 7, i.e.
+    // column 2 of row 1 -- is day 15, which is in the window.
+    // Day 8 is the first real day, so its index is 0 -- but it sits at column 2 of row 0, and day 15
+    // sits directly below it at column 2 of row 1. Counting from real days would have called day 8 a
+    // row of its own and put day 15 two rows away, so neither would have seen the other.
+    expect(edges["2026-09-08"].continuesUp, "nothing above column 2 of row 0").toBe(false);
+    expect(edges["2026-09-08"].continuesDown, "day 15 is below it in the same column").toBe(true);
+    expect(edges["2026-09-15"].continuesUp, "day 8 is above it in the same column").toBe(true);
+    // Day 14 is index 6, so column 1 of row 1, and the day above it is day 7 -- outside the window.
+    expect(edges["2026-09-14"].continuesUp, "day 7 above is outside the window").toBe(false);
+    expect(edges["2026-09-14"].continuesDown, "day 21 is below it, outside the window").toBe(false);
+  });
+
+  it("closes each row of a padded month where that row actually ends", () => {
+    // Day 12 is index 4, column 6 of row 0 -- the row\'s last column, so the run\'s right edge belongs
+    // there rather than on day 14, which counting from real days would have produced.
+    const edges = windowEdgesByDay(slots(8, 19, 2), "2026-09-19");
+    // Day 12 is index 4, the last column of row 0, so the run's right edge belongs there. Day 13 is
+    // index 5, the first column of row 1, so the run opens again there. Counting from real days would
+    // have put both on the wrong days.
+    expect(edges["2026-09-12"].end, "day 12 closes the first padded row").toBe(true);
+    expect(edges["2026-09-13"].start, "day 13 opens the next row").toBe(true);
+    expect(edges["2026-09-12"].continuesDown, "day 19 is below it, inside the window").toBe(true);
+    expect(edges["2026-09-13"].continuesUp, "day 6 is above it, outside the window").toBe(false);
+  });
+
+  it("marks a window that fills the rest of a padded first row as both ends", () => {
+    // A month that starts mid-week, so the first row is padded and the window runs from the 3rd to the
+    // end of that row. Both ends of the window are on screen, and the first row's right edge and the
+    // window's end are the same day.
+    const edges = windowEdgesByDay(slots(3, 7, 2), "2026-09-07");
     expect([edges["2026-09-03"].start, edges["2026-09-03"].roundStart]).toEqual([true, true]);
     expect([edges["2026-09-07"].end, edges["2026-09-07"].roundEnd]).toEqual([true, true]);
   });

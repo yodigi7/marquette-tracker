@@ -128,6 +128,26 @@ const NO_WINDOW_ENDS: Pick<CellInfo, "windowStart" | "windowEnd"> = {
  * there is no shape that joins them, and the block is drawn per row with the grid gap left open. The
  * eye joins the segments because they are the same colour, aligned, and in adjacent rows.
  */
+/** A day in the displayed month, with the grid position the window's shape is derived from. */
+export interface WindowSlot {
+  dateKey: string;
+  inWindow: boolean;
+  /**
+   * The day\'s row and column in the Calendar grid.
+   *
+   * These are passed in rather than counted from the slot\'s index, because a month that does not start
+   * on the configured first day of the week is padded with blanks. Dropping the blanks and dividing an
+   * index by the width puts every row after the first in the wrong row, which put the window\'s edges
+   * on the wrong days -- bleeding the bar outside the calendar and leaving holes in the middle of the
+   * run at the same time.
+   */
+  row: number;
+  column: number;
+}
+
+/** The Calendar grid is always seven days wide. */
+const GRID_COLUMNS = 7;
+
 export interface WindowEdges {
   /** The cell starts a run within its row. */
   start: boolean;
@@ -160,38 +180,35 @@ export const NO_WINDOW_EDGES: WindowEdges = {
  * and returns the edges for each. Pure, so the shape can be tested without rendering anything.
  */
 export function windowEdgesByDay(
-  slots: readonly { dateKey: string; inWindow: boolean }[],
+  slots: readonly WindowSlot[],
   /**
    * The window's true last day, when it is on screen. A run that merely runs off the end of the
-   * displayed month is clipped, not finished, so it must not be rounded as though it ended there —
+   * displayed month is clipped, not finished, so it must not be rounded as though it ended there --
    * the window's end is a protocol result and this display is not where it happened.
    */
   windowEndsOn?: string,
 ): Record<string, WindowEdges> {
   const edges: Record<string, WindowEdges> = {};
-  const width = 7;
-  const inWindowAt = new Map(slots.map((slot) => [slot.dateKey, slot.inWindow]));
+  const at = new Map(slots.map((slot) => [slot.row * GRID_COLUMNS + slot.column, slot]));
   const windowSlots = slots.filter((slot) => slot.inWindow);
 
-  for (const [index, slot] of slots.entries()) {
+  for (const slot of slots) {
     if (!slot.inWindow) {
       edges[slot.dateKey] = NO_WINDOW_EDGES;
       continue;
     }
-    const row = Math.floor(index / width);
-    const sameRow = slots.filter(
-      (_, i) => Math.floor(i / width) === row && inWindowAt.get(slots[i].dateKey),
-    );
-    const sameColumnUp = slots[index - width];
-    const sameColumnDown = slots[index + width];
+    const key = slot.row * GRID_COLUMNS + slot.column;
+    const inRow = slots.filter((other) => other.row === slot.row && other.inWindow);
+    // The slot a row above or below would occupy may be the blank padding at the edge of the month, in
+    // which case there is no day there and the run cannot continue.
+    const above = at.get(key - GRID_COLUMNS);
+    const below = at.get(key + GRID_COLUMNS);
 
     edges[slot.dateKey] = {
-      start: sameRow[0] === slot,
-      end: sameRow[sameRow.length - 1] === slot,
-      // The row above may be a shorter row at the top of the month, so the slot has to exist and
-      // be in the window rather than being assumed.
-      continuesUp: sameColumnUp !== undefined && sameColumnUp.inWindow,
-      continuesDown: sameColumnDown !== undefined && sameColumnDown.inWindow,
+      start: inRow[0] === slot,
+      end: inRow[inRow.length - 1] === slot,
+      continuesUp: above !== undefined && above.inWindow,
+      continuesDown: below !== undefined && below.inWindow,
       roundStart: windowSlots[0] === slot,
       // The last day on screen is the window's end only if the window actually ends there. Absent
       // that, the run is clipped and the edge stays square, matching the `windowEnd` rule the grid

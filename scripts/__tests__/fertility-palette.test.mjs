@@ -65,6 +65,16 @@ const TEXT_CONTRAST = 4.5;
 const MARKER_SEPARATION = 0.25;
 const BAND_SEPARATION = { light: 0.15, dark: 0.2 };
 
+/**
+ * Minimum OKLab distance between the window's bar and the surfaces it has to be told from.
+ *
+ * A floor, not a contrast ratio, because the bar is a large filled area and 3:1 is a rule about
+ * boundaries and indicator shapes. Dark reaches 0.108 against the Before fill, the tightest neighbour
+ * it has, and light 0.104 against the same. Both clear 0.1 with little room, which is the honest state
+ * of a palette whose fills are all capped near the page.
+ */
+const BAR_SEPARATION = { light: 0.1, dark: 0.1 };
+
 /** Brace-matched body of a top-level rule, so `.dark` is read whole and not line by line. */
 function extractBlock(css, selector) {
   const start = css.indexOf(`${selector} {`);
@@ -200,10 +210,13 @@ function readPalette() {
       markers: {},
       fill: {},
       band: {},
-      block: {},
       foreground: {},
       surfaces: { base: readColour(block, "background"), card: readColour(block, "card") },
       predicted: readColour(block, "fertility-forecast-bg"),
+      // Only the fertile phase is drawn as a bar, so it is the only one that has the token. Reading it
+      // for every status would assert a bar on Before and After that the Calendar deliberately does
+      // not draw.
+      bar: readColour(block, "fertility-status-fertile-bar"),
     };
     for (const reading of READINGS) {
       entry.markers[reading] = readColour(block, `fertility-monitor-${reading}`);
@@ -211,7 +224,6 @@ function readPalette() {
     for (const status of STATUSES) {
       entry.fill[status] = readColour(block, `fertility-status-${status}-bg`);
       entry.band[status] = readColour(block, `fertility-status-${status}-band`);
-      entry.block[status] = readColour(block, `fertility-status-${status}-block`);
       entry.foreground[status] = readColour(block, `fertility-status-${status}-fg`);
     }
     palette[theme] = entry;
@@ -221,10 +233,23 @@ function readPalette() {
 
 const palette = readPalette();
 
-/** Every fill a Calendar day cell can present, in the given theme. */
+/**
+ * Every surface a Calendar reading marker can be painted on, in the given theme.
+ *
+ * The window's bar is in this set and is not optional to it: the bar covers the whole cell, so a reading
+ * on a window day sits on the bar and not on the cell's own tint. Leaving it out would let the bar be
+ * brightened past what a reading can survive, which is the mistake the bar is most likely to invite --
+ * it is the one mark on the calendar whose whole job is to be loud.
+ */
 function cellFills(theme) {
   const t = palette[theme];
-  return { base: t.surfaces.base, card: t.surfaces.card, ...t.fill, predicted: t.predicted };
+  return {
+    base: t.surfaces.base,
+    card: t.surfaces.card,
+    ...t.fill,
+    bar: t.bar,
+    predicted: t.predicted,
+  };
 }
 
 describe("palette is read from the stylesheet the app loads", () => {
@@ -239,7 +264,6 @@ describe("palette is read from the stylesheet the app loads", () => {
         for (const [part, values] of Object.entries({
           fill: palette[theme].fill,
           band: palette[theme].band,
-          block: palette[theme].block,
           foreground: palette[theme].foreground,
         })) {
           expect(values[status], `${theme} ${status} ${part}`).toMatch(/^#[0-9a-f]{6}$/i);
@@ -363,50 +387,84 @@ describe("status band separation", () => {
   });
 });
 
-describe("the window's outline", () => {
+describe("the window's bar", () => {
   /**
-   * The outline is the one part of the window that may be as light as it likes, because nothing is
-   * painted on it -- no monitor marker sits on an edge, so the cap that holds a fill near black does
-   * not apply. That freedom is the whole reason the window reads as an object rather than a tint, and
-   * these are the rules that hold it to being worth the freedom: the outline has to be plainly visible
-   * against the fill it encloses and against the surfaces behind the cell, and it has to be a
-   * different colour from the two quiet phases' bands so a window edge is never read as one of them.
+   * The bar is the window's own surface. Unlike the outline it replaced, it is painted *under* the
+   * reading markers, so it is held to the same 3:1 as any other fill -- the rule above already covers
+   * it. What it has to earn on top of that is the shape: it is the only solid surface on a Calendar
+   * month, so it has to be plainly visible against the page and clearly the window's own, and it has to
+   * be far enough from the two quiet phases' bands that a window is never read as one of them.
+   *
+   * The values that reach those bars are worth recording, because they are the whole reason the bar
+   * exists. In dark, the binding reading is LOW, which permits a fill up to 0.0435 luminance -- not the
+   * Peak, which permits 0.0922. The cell tint is a 0.106 step above the page; the bar is 0.209, which is
+   * the difference between a bar that reads as a surface and a dark block with a wire around it.
    */
   for (const theme of THEMES) {
-    it(`${theme} window outline clears ${BAND_CONTRAST}:1 against the fill it encloses`, () => {
-      const ratio = contrast(palette[theme].block.fertile, palette[theme].fill.fertile);
-      expect(
-        ratio,
-        `${theme} window outline ${palette[theme].block.fertile} on ${palette[theme].fill.fertile}`,
-      ).toBeGreaterThanOrEqual(BAND_CONTRAST);
-    });
-
-    it(`${theme} window outline clears ${BAND_CONTRAST}:1 against the surface behind the cell`, () => {
+    it(`${theme} window bar is a large area of its own colour, not a boundary to be found`, () => {
+      // This is a separation check, deliberately not a 3:1 contrast check, and the difference matters.
+      // WCAG's 3:1 non-text rule covers boundaries needed to identify a control and indicator shapes; a
+      // large filled area is not one, and no fill in this palette reaches 3:1 against its page -- the
+      // phase tints sit at 1.1:1 and 1.3:1. Writing the contrast rule here would be a rule that fails a
+      // correct palette. What the bar actually needs is to be told from the page behind it and from the
+      // two fills it sits beside, and the instrument for that is OKLab distance.
       for (const [name, surface] of Object.entries(palette[theme].surfaces)) {
-        const ratio = contrast(palette[theme].block.fertile, surface);
+        const distance = separation(palette[theme].bar, surface);
         expect(
-          ratio,
-          `${theme} window outline ${palette[theme].block.fertile} on ${name} ${surface}`,
-        ).toBeGreaterThanOrEqual(BAND_CONTRAST);
+          distance,
+          `${theme} bar ${palette[theme].bar} against ${name} ${surface}`,
+        ).toBeGreaterThanOrEqual(BAR_SEPARATION[theme]);
+      }
+      for (const phase of ["pre", "post-peak"]) {
+        const distance = separation(palette[theme].bar, palette[theme].fill[phase]);
+        expect(
+          distance,
+          `${theme} bar against the ${phase} fill it sits beside`,
+        ).toBeGreaterThanOrEqual(BAR_SEPARATION[theme]);
       }
     });
 
-    it(`${theme} window outline is not read as either quiet phase's band`, () => {
-      // The window and the phases either side of it are the marks a user has to tell apart on a
-      // glance, so the outline is held to the same floor the bands are held to. A rose outline is
-      // intrinsically close to the amber band -- no rose step clears the dark theme's 0.2 floor by
-      // much -- and the two are told apart by shape and position long before they are told apart by
-      // hue: a 2px closed box round a run against a 4px bar along the top edge of a single day.
-      for (const phase of ["pre", "post-peak"]) {
-        const distance = separation(palette[theme].block.fertile, palette[theme].band[phase]);
+    it(`${theme} window bar is distinct from the cell tint it covers`, () => {
+      // The bar covers the whole cell, so on a window day the tint behind it is invisible. If the two
+      // were the same colour the bar would be unfalsifiable and a later edit could quietly delete the
+      // distinction the shape depends on. In the dark theme the tint is a step of 0.106 above the page
+      // and the bar 0.209; they have to differ. In light the tint is already the loudest thing on a
+      // white page, so the bar IS the tint by design and requiring a second light pink would buy nothing.
+      if (theme === "dark") {
+        expect(palette[theme].bar, "dark bar").not.toBe(palette[theme].fill.fertile);
+      }
+    });
+
+    for (const phase of ["pre", "post-peak"]) {
+      it(`${theme} window bar is not read as the ${phase} band`, () => {
+        const distance = separation(palette[theme].bar, palette[theme].band[phase]);
         const floor = BAND_SEPARATION[theme];
         expect(
           distance,
           `${theme} window/${phase} separation is ${distance.toFixed(4)}, floor ${floor}`,
         ).toBeGreaterThanOrEqual(floor);
-      }
-    });
+      });
+    }
   }
+
+  it.each(THEMES)("%s window bar survives its worst reading", (theme) => {
+    // Stated in its own right rather than left to the marker rule above, because the bar is the one
+    // surface on the calendar whose purpose is to be loud: the numbers here are what stop "make the
+    // window more obvious" from silently costing a reading its legibility.
+    const worst = Math.min(
+      ...READINGS.map((reading) => contrast(palette[theme].markers[reading], palette[theme].bar)),
+    );
+    expect(
+      worst,
+      `${theme} worst reading against the bar is ${worst.toFixed(2)}:1, and the binding reading is ` +
+        `${READINGS.reduce((a, b) =>
+          contrast(palette[theme].markers[b], palette[theme].bar) <
+          contrast(palette[theme].markers[a], palette[theme].bar)
+            ? b
+            : a,
+        )}`,
+    ).toBeGreaterThanOrEqual(MARKER_CONTRAST);
+  });
 });
 
 describe("day number contrast", () => {

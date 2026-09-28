@@ -52,13 +52,10 @@
     --color-fertility-status-post-calendar-fg: var(--fertility-status-post-calendar-fg);
     --color-fertility-status-post-calendar-border: var(--fertility-status-post-calendar-border);
     --color-fertility-status-pre-band: var(--fertility-status-pre-band);
-    --color-fertility-status-pre-block: var(--fertility-status-pre-block);
     --color-fertility-status-fertile-band: var(--fertility-status-fertile-band);
-    --color-fertility-status-fertile-block: var(--fertility-status-fertile-block);
+    --color-fertility-status-fertile-bar: var(--fertility-status-fertile-bar);
     --color-fertility-status-post-peak-band: var(--fertility-status-post-peak-band);
-    --color-fertility-status-post-peak-block: var(--fertility-status-post-peak-block);
     --color-fertility-status-post-calendar-band: var(--fertility-status-post-calendar-band);
-    --color-fertility-status-post-calendar-block: var(--fertility-status-post-calendar-block);
     --color-fertility-marker-menses: var(--fertility-marker-menses);
     --color-fertility-marker-intercourse: var(--fertility-marker-intercourse);
     --color-fertility-monitor-none: var(--fertility-monitor-none);
@@ -128,22 +125,22 @@
     --fertility-status-pre-fg: #78350f;
     --fertility-status-pre-border: #d97706;
     --fertility-status-pre-band: #a16207; /* amber-700; the border step is 2.86:1 on this fill */
-    --fertility-status-pre-block: #a16207;
     --fertility-status-fertile-bg: #fecdd3;
     --fertility-status-fertile-fg: #881337;
     --fertility-status-fertile-border: #e11d48;
     --fertility-status-fertile-band: #e11d48;
-    --fertility-status-fertile-block: #e11d48;
+    /* The bar is the window's own surface, so it carries the readings like any other fill and is
+       held to the same 3:1. Rose-200 clears all three on this bar and is the loudest thing on a
+       white page, without a reading losing its dot. */
+    --fertility-status-fertile-bar: #fecdd3;
     --fertility-status-post-peak-bg: #d1fae5;
     --fertility-status-post-peak-fg: #064e3b;
     --fertility-status-post-peak-border: #059669;
     --fertility-status-post-peak-band: #0f766e; /* teal-700; the border step is 3.16:1 on this fill */
-    --fertility-status-post-peak-block: #0f766e;
     --fertility-status-post-calendar-bg: #f5f5f4;
     --fertility-status-post-calendar-fg: #292524;
     --fertility-status-post-calendar-border: #78716c;
     --fertility-status-post-calendar-band: #78716c;
-    --fertility-status-post-calendar-block: #78716c;
     --fertility-marker-menses: #ef4444;
     --fertility-marker-intercourse: #be123c;
     --fertility-monitor-none: #a8a29e;
@@ -211,28 +208,24 @@
     --fertility-status-pre-fg: #fef3c7;
     --fertility-status-pre-border: #fbbf24;
     --fertility-status-pre-band: #fbbf24;
-    --fertility-status-pre-block: #fbbf24;
     --fertility-status-fertile-bg: #4c0519;
     --fertility-status-fertile-fg: #ffe4e6;
     --fertility-status-fertile-border: #fb7185;
     --fertility-status-fertile-band: #fb7185;
-    /* The window's own fill is #4c0519, and its outline is rose-400. Nothing is painted on an outline,
-       so it is free of the lightness cap that holds a fill near black -- which is what lets the window
-       read as an object rather than a tint. Rose-300 was tried first and is a step further from the
-       amber Before band, but at 0.169 it no longer clears the 0.2 floor the two themes hold their bands
-       to, and the window and its own band are the same hue by design, so the shape is what tells them
-       apart. */
-    --fertility-status-fertile-block: #fb7185;
+    /* The bar is the window's own surface, so it carries the readings like any other fill and is held to
+       the same 3:1. The binding reading here is LOW, which permits a fill up to 0.0435 luminance -- not
+       the Peak, which permits 0.0922. #700b25 sits at 0.0382 and clears all three, and it is a 0.209 step
+       above the page where the cell tint is 0.106, so the bar reads as a solid shape rather than a dark
+       void. The cell's own fill stays #4c0519, which is what the Status view uses. */
+    --fertility-status-fertile-bar: #700b25;
     --fertility-status-post-peak-bg: #022c22;
     --fertility-status-post-peak-fg: #d1fae5;
     --fertility-status-post-peak-border: #34d399;
     --fertility-status-post-peak-band: #34d399;
-    --fertility-status-post-peak-block: #6ee7b7;
     --fertility-status-post-calendar-bg: #292524;
     --fertility-status-post-calendar-fg: #e7e5e4;
     --fertility-status-post-calendar-border: #a8a29e;
     --fertility-status-post-calendar-band: #a8a29e;
-    --fertility-status-post-calendar-block: #a8a29e;
     --fertility-marker-menses: #f87171;
     --fertility-marker-intercourse: #fb7185;
     --fertility-monitor-none: #44403c;

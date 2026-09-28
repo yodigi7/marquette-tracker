@@ -32,6 +32,7 @@ import {
   weekdayLabels,
   windowEdgesByDay,
   type CellInfo,
+  type WindowSlot,
 } from "./grid";
 import { QuickEntry } from "./quick-entry";
 import {
@@ -96,20 +97,21 @@ export function CalendarView() {
   // each cell twice during the render below.
   const cells = useMemo(() => {
     const byDate = new Map<string, CellInfo>();
-    const slots: { dateKey: string; inWindow: boolean }[] = [];
-    for (const week of grid.weeks) {
-      for (const dateKey of week) {
-        if (!dateKey) continue;
+    const slots: WindowSlot[] = [];
+    grid.weeks.forEach((week, row) => {
+      week.forEach((dateKey, column) => {
+        if (!dateKey) return;
         const cell = resolveCell(cycles, dayRecords, results, forecast, dateKey, today, projected);
         byDate.set(dateKey, cell);
-        slots.push({ dateKey, inWindow: cell.info === "fertile" });
-      }
-    }
+        // The row and column come from where the day sits in the grid, not from how many days precede
+        // it: a month padded with leading blanks has fewer real days in its first row, and counting
+        // instead of positioning puts every later row in the wrong row.
+        slots.push({ dateKey, inWindow: cell.info === "fertile", row, column });
+      });
+    });
     // The window's true last day, when it is on screen, so a run that merely runs off the end of the
     // displayed month is not rounded as though the window ended there.
-    const windowEndsOn = [...byDate.values()].find((cell) => cell.windowEnd)?.windowEnd
-      ? slots.find((slot) => byDate.get(slot.dateKey)?.windowEnd)?.dateKey
-      : undefined;
+    const windowEndsOn = slots.find((slot) => byDate.get(slot.dateKey)?.windowEnd)?.dateKey;
     return { byDate, edges: windowEdgesByDay(slots, windowEndsOn) };
   }, [grid, cycles, dayRecords, results, forecast, today, projected]);
   const { edges } = cells;

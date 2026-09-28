@@ -2,13 +2,15 @@
 
 ## ADDED Requirements
 
-### Requirement: Calendar paints a band for the quiet phases and a region for the fertile window
+### Requirement: Calendar paints a band for the quiet phases and a solid bar for the fertile window
 
 The Calendar day cell SHALL distinguish the three collapsed phases by mark. The two phases outside the
 window — before it and after it — SHALL be marked with a band along the cell's top edge, in that
-phase's full-chroma colour, in every theme. The fertile window SHALL be marked with a full-height
-outlined region instead of a band, so that the window is the only region on the Calendar and the two
-phases either side of it stay quiet. A day with no phase SHALL paint neither.
+phase's full-chroma colour, in every theme. The fertile window SHALL be marked with a solid bar at full cell
+height instead of a band, so that the window is the only filled shape on the Calendar and the two phases
+either side of it stay quiet. A day with no phase SHALL paint neither. The bar SHALL carry its own
+colour, which MAY be brighter than the cell's own tint because the bar is the mark the window is
+recognised by; the tint behind it remains the treatment every surface without a bar uses.
 
 Each mark SHALL be painted independently of the cell's background fill, and the fill SHALL continue to
 carry the phase's hue. A day whose phase layer is hidden SHALL paint neither mark, while the day's
@@ -21,14 +23,14 @@ so that consecutive days in the same phase read as one continuous run rather tha
 
 - **WHEN** the Calendar renders a day before the window or after it
 - **THEN** that day carries a band in its own phase's colour along its top edge
-- **AND** a day with no phase carries neither a band nor a region
+- **AND** a day with no phase carries neither a band nor a bar
 
-#### Scenario: The window is marked as a region, not a band
+#### Scenario: The window is marked as a solid bar, not a band
 
 - **WHEN** a Calendar day falls inside the fertile window
-- **THEN** the cell shows an outlined region at full cell height in the window's colour
+- **THEN** the cell shows a solid bar at full cell height in the window's own colour
 - **AND** the cell carries no band
-- **AND** the region's interior keeps the phase's fill, so the month still reads as tinted
+- **AND** the bar is the fill rather than a wire around one, so the shape is carried by its own colour
 
 #### Scenario: A contiguous phase reads as one continuous mark
 
@@ -36,71 +38,81 @@ so that consecutive days in the same phase read as one continuous run rather tha
 - **THEN** their marks are continuous across the cells between them
 - **AND** no visible break appears between two adjacent days of the same phase
 
-#### Scenario: The region's own fill is never lightened to make the window louder
+#### Scenario: The bar is held to the marker rules, because a marker is painted on it
 
 - **WHEN** the window is drawn in either theme
-- **THEN** the region's interior uses the phase's ordinary fill, unchanged from the value that keeps
-  monitor markers legible against it
-- **AND** the region's brightness comes from its outline, on which no marker is painted
+- **THEN** the bar's colour meets the same 3:1 against every reading marker as any other Calendar fill
+- **AND** it is never brightened past that to make the window more prominent
+- **AND** in the dark theme it is brighter than the cell tint it covers, because the tint alone is too
+  close to the page for a full-height bar to read as a surface
 
 ## ADDED Requirements
 
-### Requirement: A region's edge is painted only where the window has that edge
+### Requirement: The window's bar spans the gap between days and stops at the gap between weeks
 
 The window spans more days than a Calendar week is wide, so in a seven-column grid it crosses row
-boundaries. A day cell cannot decide the region's edges on its own, because it does not know whether
-the day above or beside it is inside the window. The Calendar SHALL therefore derive the edges from
-the whole displayed month and supply them to each day cell.
+boundaries. A day cell cannot decide the bar's own edges on its own, because it does not know whether
+the day above or beside it is inside the window. The Calendar SHALL therefore derive the bar's shape
+from the whole displayed month and supply it to each day cell, positioning every day by where it sits in
+the grid rather than by counting the days before it, so that a month padded with leading blank days
+produces the same shape as one that is not.
 
-The region SHALL paint an edge on a given side only where the window actually has that edge, and every
-side it does not paint SHALL be left transparent. Each side SHALL be coloured independently, because a
-single colour applied to all four sides paints all four, and the width of a side cannot undo a colour
-that has been set. The region SHALL reach into the gap between rows only in a column where the run
-continues, and SHALL stop flush with the cell edge where it does not, so that a run spanning several
-rows is not broken into separate boxes and does not bleed over a day outside the window.
+The bar SHALL extend into the gap between two side-by-side days whenever the window continues across
+that gap, so that a run of days reads as one solid shape with nothing showing through between them.
+Left and right SHALL be decided independently, because a day can open its row and still have the window
+continuing to its right, and a day can close its row and still have it continuing to its left.
+
+The bar SHALL NOT extend into the gap between rows at all. The row gap is what makes the calendar's
+weeks legible, and a bar that filled it would dissolve the row structure inside the window. A run that
+crosses a row boundary is therefore one bar per row with the calendar's own gap between them, and the
+bar's height SHALL be exactly the cell's height.
 
 A run that crosses a row boundary is two separate horizontal runs, because the last day of one row is
-in the final column and the next day is in the first. Those cells are not neighbours, and the region
-SHALL NOT be drawn as though they were: the segments are joined by their colour, alignment, and
-adjacency, and no edge SHALL be drawn across the gap between them.
+in the final column and the next day is in the first. Those cells are not neighbours, and the bar SHALL
+NOT be drawn as though they were.
 
-#### Scenario: No edge is drawn through the middle of a run
+#### Scenario: Nothing shows through between two days of the window
 
-- **GIVEN** a window that continues from one Calendar row into the next in the same column
-- **WHEN** the region is drawn
-- **THEN** the cell at the end of that row draws no bottom edge
-- **AND** the cell at the start of the following row draws no top edge
-- **AND** the region's vertical edges run unbroken through the gap between the two rows
+- **WHEN** two days side by side are both inside the window
+- **THEN** the bar on each extends across the whole gap between them
+- **AND** no part of the page is visible inside the run
 
-#### Scenario: An unpainted side is transparent
+#### Scenario: A day that opens or closes a row still joins the run
 
-- **WHEN** a day inside the window has the window continuing above and below it in its column
-- **THEN** that day paints no horizontal edge
-- **AND** it paints no vertical edge either
-- **AND** every side it does not paint is left transparent rather than drawn in the region's colour
+- **WHEN** a day is the first in its row with the window continuing to its right
+- **THEN** its bar extends to the right across the gap
+- **AND** it does not extend to the left, so no part of the window appears outside the run
+- **AND** the same holds with left and right exchanged for a day that closes a row
 
-#### Scenario: The region's colour does not paint sides the window does not have
+#### Scenario: The bar never leaves the calendar
 
-- **WHEN** the region is drawn
-- **THEN** each of the four sides is coloured in its own right
-- **AND** no single colour class sets all four sides at once
+- **WHEN** a window includes a day in the calendar's first or last column
+- **THEN** no part of the bar extends beyond the edge of the grid
 
-#### Scenario: A row that begins mid-window is square, not rounded
+#### Scenario: The bar never fills a row gap
 
-- **WHEN** a row starts in the middle of a window that began in an earlier row
-- **THEN** that row's first day draws a vertical edge but no rounding
-- **AND** the run's two true ends are the only rounded edges in the run
+- **WHEN** a window continues from one Calendar row into the next
+- **THEN** the bar on each row's days is exactly that cell's height
+- **AND** the calendar's own gap remains between the two rows
+- **AND** the week rows stay legible across the whole window
+
+#### Scenario: A padded month is shaped by where its days sit, not by counting them
+
+- **GIVEN** a displayed month whose first week is padded with leading blank days
+- **WHEN** the bar's shape is derived
+- **THEN** every day is placed by its own row and column in the grid
+- **AND** the shape is the same as it would be for an unpadded month holding the same window
 
 ## ADDED Requirements
 
-### Requirement: The window's first and last day are the run's only rounded ends
+### Requirement: The window's first and last day are the bar's only rounded ends
 
 The fertile window is a single interval, and the Calendar SHALL mark it as one object rather than as a
 run of interchangeable days: the window's first and last day SHALL each be presented differently from
-the days between them. The difference SHALL be a property of the region's shape — a rounded outer
-corner on the side that faces outward from the window — and the region SHALL NOT be accompanied by a
-separate mark beside it, since a mark in the region's own colour is not visible and a mark in another
-colour is read as debris rather than as part of the region.
+the days between them. The difference SHALL be a property of the bar's shape — a rounded
+outer end on the side that faces outward from the window — and the bar SHALL NOT be accompanied by a
+separate mark beside it, since a mark in the bar's own colour is not visible and a mark in another
+colour is read as debris rather than as part of the bar.
 
 A run that is split across two displayed months SHALL be presented as though it continued, so that no
 month boundary is mistaken for a window boundary: a day that merely falls at the edge of a displayed
@@ -114,10 +126,10 @@ the edge of the month on screen SHALL NOT be rounded as though the window ended 
 #### Scenario: The window's ends are the run's only rounded edges
 
 - **WHEN** the Calendar renders a fertile run spanning more than one day
-- **THEN** the run's first day has a rounded edge facing away from the window
-- **AND** the run's last day has a rounded edge facing away from the window
-- **AND** no day between them is rounded
-- **AND** no separate mark is drawn beside the region
+- **THEN** the run's first day has a rounded end facing away from the window
+- **AND** the run's last day has a rounded end facing away from the window
+- **AND** no day between them, and no row that merely opens or closes inside the window, is rounded
+- **AND** no separate mark is drawn beside the bar
 
 #### Scenario: A one-day window is rounded at both of its ends
 
@@ -140,23 +152,23 @@ the edge of the month on screen SHALL NOT be rounded as though the window ended 
 
 ## ADDED Requirements
 
-### Requirement: The window's mark and the menses stripe are different kinds of mark
+### Requirement: The window's bar and the menses stripe are different kinds of mark
 
 A band and the menses stripe are both horizontal lines along opposite edges of a day cell, and across a
 Calendar row boundary they are close enough to read as a single mark. The window SHALL therefore be
-marked as a region, which cannot be confused with a stripe, and the menses stripe SHALL keep its
+marked as a filled bar, which cannot be confused with a stripe, and the menses stripe SHALL keep its
 existing position, shape, and colour. No menses day falls inside the fertile window under the current
-protocol, so the region never sits under the stripe; the requirement is on the marks being different in
+protocol, so the bar never sits under the stripe; the requirement is on the marks being different in
 kind, not on a coincidence of the data.
 
-The window's mark SHALL not alter the cell's existing markers. A day with a monitor reading SHALL show
-the region and the monitor marker together.
+The bar SHALL not alter the cell's existing markers. A day with a monitor reading SHALL show the bar and
+the monitor marker together.
 
 #### Scenario: A window that reaches past a row is not read as a stripe
 
 - **GIVEN** a window that continues from one Calendar row into the next
 - **WHEN** a menses stripe falls on the day at the end of the earlier row
-- **THEN** the window's mark on the following row is a region and not a line along a cell edge
+- **THEN** the window's mark on the following row is a filled bar and not a line along a cell edge
 - **AND** the two marks cannot be read as one continuous stripe
 
 #### Scenario: The menses stripe is unchanged
@@ -165,11 +177,11 @@ the region and the monitor marker together.
 - **THEN** the day cell shows the bottom menses stripe in its existing colour
 - **AND** the stripe keeps its position, shape, and width
 
-#### Scenario: Monitor markers coexist with the region's mark
+#### Scenario: Monitor markers coexist with the bar's mark
 
 - **WHEN** a day inside the window holds a monitor reading
-- **THEN** the cell shows the region and the monitor marker together
-- **AND** the marker is not altered by the region's presence
+- **THEN** the cell shows the bar and the monitor marker together
+- **AND** the marker is not altered by the bar's presence
 
 ## MODIFIED Requirements
 
@@ -207,7 +219,7 @@ The Calendar SHALL represent recorded menses with a visible stripe along the bot
 
 The Calendar legend SHALL match the colors, borders, line styles, and marker shapes used in the active presentation. The default legend SHALL be grouped around the simplified status categories, the predictive treatment, the menses stripe, and the color-coded monitor readings. The predictive treatment SHALL be described by a single entry covering both the next-window forecast and projected cycle days, because both use the same predictive cue. A full-detail legend SHALL additionally offer the secondary indicator that the full-detail presentation exposes.
 
-Each entry SHALL describe exactly one layer that the day cells can paint, and every layer the day cells can paint SHALL have an entry. An entry's sample SHALL render the same mark the day cells draw for that layer: a band for a phase the day cells paint as a band, and a region for a phase the day cells paint as a region, so the key cannot disagree with the cell. A hidden entry SHALL render a hollow swatch rather than the colour sample, so a hidden entry is distinguishable from a shown one without relying on colour alone, and its label SHALL remain unchanged.
+Each entry SHALL describe exactly one layer that the day cells can paint, and every layer the day cells can paint SHALL have an entry. An entry's sample SHALL render the same mark the day cells draw for that layer: a band for a phase the day cells paint as a band, and a bar for a phase the day cells paint as a bar, so the key cannot disagree with the cell. A hidden entry SHALL render a hollow swatch rather than the colour sample, so a hidden entry is distinguishable from a shown one without relying on colour alone, and its label SHALL remain unchanged.
 
 #### Scenario: Simplified legend covers the default vocabulary
 
@@ -218,7 +230,7 @@ Each entry SHALL describe exactly one layer that the day cells can paint, and ev
 #### Scenario: A phase sample shows the mark the day cells draw
 
 - **WHEN** a legend entry describes a phase
-- **THEN** its sample renders that phase's mark: a band where the day cells draw a band, and a region where the day cells draw a region
+- **THEN** its sample renders that phase's mark: a band where the day cells draw a band, and a bar where the day cells draw a bar
 - **AND** the sample is recognisably the same mark the day cells draw
 
 #### Scenario: Post-calendar state is explained
@@ -260,7 +272,7 @@ Each entry SHALL describe exactly one layer that the day cells can paint, and ev
 #### Scenario: Hiding a phase hides its mark and keeps the text
 
 - **WHEN** the user hides a phase layer from the legend
-- **THEN** days in that phase paint neither a band nor a region, and lose the phase's fill
+- **THEN** days in that phase paint neither a band nor a bar, and lose the phase's fill
 - **AND** no other layer's mark on those days is affected
 - **AND** each such day's accessible label still names its phase
 

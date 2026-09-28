@@ -12,8 +12,6 @@ import {
   FERTILITY_FORECAST_VISUAL,
   FERTILITY_MARKER_VISUALS,
   FERTILITY_MONITOR_VISUALS,
-  NO_BLOCK_EDGES,
-  type BlockEdges,
   type CalendarPhase,
 } from "@/lib/fertility-visuals";
 import { cn } from "@/lib/utils";
@@ -53,22 +51,16 @@ export interface LayerPaint {
    */
   band: string;
   /**
-   * The four sides of a layer drawn as a full-height block. Separate from `border`, which outlines the
-   * whole cell for the predictive treatment, because a block draws only the edges it actually has, and
-   * each edge has to be coloured on its own to leave the others unpainted.
+   * The fill of a layer drawn as a solid bar spanning the cell. Separate from `fill`, which tints the
+   * cell behind the day number, because the bar is the mark a run of days is recognised by and it is
+   * allowed to be brighter than the cell's own tint — up to the limit the reading markers place on it.
    */
-  block: BlockEdges;
+  bar: string;
   /** Colour or icon class of a layer drawn as a marker inside the cell. */
   marker: string;
 }
 
-const NO_PAINT: LayerPaint = {
-  fill: "",
-  border: "",
-  band: "",
-  block: NO_BLOCK_EDGES,
-  marker: "",
-};
+const NO_PAINT: LayerPaint = { fill: "", border: "", band: "", bar: "", marker: "" };
 
 export const LAYER_PAINT: Record<CalendarLayerId, LayerPaint> = {
   before: {
@@ -79,10 +71,9 @@ export const LAYER_PAINT: Record<CalendarLayerId, LayerPaint> = {
   fertile: {
     ...NO_PAINT,
     fill: FERTILITY_CALENDAR_PHASE_VISUALS.fertile.fill,
-    band: FERTILITY_CALENDAR_PHASE_VISUALS.fertile.band,
-    // Only the fertile phase is drawn as a block. The other two keep their band, so the window is the
-    // only region on the calendar and the phases around it stay quiet.
-    block: FERTILITY_CALENDAR_PHASE_VISUALS.fertile.block,
+    bar: FERTILITY_CALENDAR_PHASE_VISUALS.fertile.bar,
+    // Only the fertile phase is drawn as a bar. The other two keep their band, so the window is the
+    // only solid shape on the calendar and the phases around it stay quiet.
   },
   after: {
     ...NO_PAINT,
@@ -113,9 +104,7 @@ export const LAYER_PAINT: Record<CalendarLayerId, LayerPaint> = {
 export function swatchSample(layer: CalendarLayer): string {
   const paint = LAYER_PAINT[layer.id];
   if (paint.band) return cn(paint.band, BAND_FOOTPRINT);
-  if (paint.block.left) {
-    return cn(paint.block.top, paint.block.right, paint.block.bottom, paint.block.left, paint.fill);
-  }
+  if (paint.bar) return cn(paint.bar, BAR_FOOTPRINT);
   return paint.fill ? cn(paint.border, paint.fill) : paint.marker;
 }
 
@@ -141,10 +130,10 @@ const SQUARE = "h-2.5 w-2.5 rounded";
  * well, so the two cannot disagree.
  */
 const BAND_FOOTPRINT = "h-1 w-6 rounded-full";
-const BLOCK_FOOTPRINT = "h-3 w-5 rounded-md border-2";
+const BAR_FOOTPRINT = "h-3 w-5 rounded-md";
 
 function phaseLayer(id: CalendarPhase, label: string): CalendarLayer {
-  const footprint = LAYER_PAINT[id].block.left ? BLOCK_FOOTPRINT : BAND_FOOTPRINT;
+  const footprint = LAYER_PAINT[id].bar ? BAR_FOOTPRINT : BAND_FOOTPRINT;
   return { id, label, group: "status", needs: "algorithm", footprint };
 }
 

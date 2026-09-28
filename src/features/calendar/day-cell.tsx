@@ -55,17 +55,15 @@ export function DayCell({
   const phaseLabel = phase ? FERTILITY_CALENDAR_PHASE_VISUALS[phase].label : null;
   const phaseShown = phase !== null && shown(phase);
   const phaseFill = phaseShown ? LAYER_PAINT[phase!].fill : undefined;
-  // The band is what tells one phase from another, so it is painted independently of the fill and
+  // The band is what tells the two quiet phases apart, so it is painted independently of the fill and
   // follows the same layer. A hidden phase layer suppresses both and nothing else. The fertile phase
-  // has no band: the window is drawn as a region, and a band on top of it would put a horizontal line
-  // back along the cell's top edge, which is the mark the region exists to replace.
+  // has no band: the window is a bar, and a band on top of it would put a horizontal line back along
+  // the cell's top edge, which is the mark the bar exists to replace.
   const phaseBand = phaseShown ? LAYER_PAINT[phase!].band : undefined;
-  // The fertile window is a full-height block rather than a band, because a band and the menses stripe
-  // are both horizontal lines at opposite cell edges and read as one mark across a week boundary.
-  // Only a fertile day is part of a run, so a non-fertile phase is never given the block even if the
-  // edges were computed for it.
-  const inWindow = phaseShown && phase === "fertile";
-  const windowBlock = inWindow ? LAYER_PAINT.fertile.block : undefined;
+  // The window is a solid bar spanning the whole cell, not a strip on its top edge. A strip and the
+  // menses stripe are both horizontal lines at opposite cell edges and read as one mark across a week
+  // boundary. Only a fertile day is part of a run, so another phase is never given the bar.
+  const windowBar = phaseShown && phase === "fertile" ? LAYER_PAINT.fertile.bar : undefined;
   const predictedShown = shown("predicted");
   const hasMonitor = !!monitor && monitor !== "none";
   const monitorShown = hasMonitor && shown(monitor);
@@ -92,6 +90,12 @@ export function DayCell({
     phaseFill ?? (forecast && predictedShown ? LAYER_PAINT.predicted.fill : undefined);
   const statusCue = forecast && predictedShown ? LAYER_PAINT.predicted.border : undefined;
 
+  // The window's two true ends are its only rounded ends. A row that opens or closes mid-window keeps
+  // a square edge there, which is what makes the window's ends legible as the window's ends rather than
+  // as whichever rows happen to fall inside it.
+  const roundStart = windowEdges.roundStart;
+  const roundEnd = windowEdges.roundEnd;
+
   return (
     <button
       type="button"
@@ -103,8 +107,8 @@ export function DayCell({
       aria-label={accessibleParts.join(", ")}
       onClick={() => onSelect(dateKey)}
       className={cn(
-        // No `overflow-hidden`: the band bleeds 4px into the grid gap on both sides so a run of
-        // same-phase days reads as one region, and clipping the cell would cut it into separate marks.
+        // No `overflow-hidden`: the bar bleeds into the grid gap so a run of window days reads as one
+        // shape, and clipping the cell would cut it into separate marks.
         "relative flex h-12 flex-col items-center justify-center rounded-md text-xs transition-colors focus-visible:ring-2 focus-visible:ring-foreground/70 focus-visible:outline-none",
         statusFill,
         statusCue,
@@ -112,34 +116,30 @@ export function DayCell({
         "hover:brightness-105 cursor-pointer",
       )}
     >
-      {windowBlock && (
+      {windowBar && (
         <span
-          data-testid="calendar-window-block"
+          data-testid="calendar-window-bar"
           aria-hidden="true"
           className={cn(
-            // A 2px outline at full cell height, 4px wider on each side so it bridges the grid gap and
-            // the outline of a run reads as one unbroken line rather than a row of boxes.
-            "pointer-events-none absolute -left-1 -right-1 border-2 border-transparent",
-            // The block reaches into the row gap only where the run actually carries on down that
-            // column, and stops flush with the cell edge where it does not. The vertical edges
-            // therefore run unbroken through a run that spans weeks, and a run that ends mid-row ends
-            // cleanly instead of bleeding over a day that is not part of it.
-            windowEdges.continuesUp ? "-top-1" : "top-0",
-            windowEdges.continuesDown ? "-bottom-1" : "bottom-0",
-            // Each side is coloured in its own right, and only where the window has that edge. This is
-            // the load-bearing part: a single `border-<colour>` class paints all four sides at once,
-            // and a side's width cannot undo that, so the block would outline itself through the middle
-            // of every run that wraps weeks and square off its own rounded ends.
-            !windowEdges.continuesUp && windowBlock.top,
-            windowEdges.end && windowBlock.right,
-            !windowEdges.continuesDown && windowBlock.bottom,
-            windowEdges.start && windowBlock.left,
-            // Rounding is applied at the window's two true ends and nowhere else, so a run's first and
-            // last day are single shapes rather than a rounded corner on an otherwise square edge. A
-            // row that begins mid-window stays square, which is what makes the run's ends legible as
-            // its ends.
-            windowEdges.roundStart && "rounded-l-2xl",
-            windowEdges.roundEnd && "rounded-r-2xl",
+            // A solid bar, full cell height, carrying its own colour. The fill is the shape: an outline
+            // around it would be redundant, and on a 48px cell a 2px wire reads as a box rather than a
+            // bar. This is the model Google Calendar and FullCalendar use for a multi-day span.
+            "pointer-events-none absolute top-0 bottom-0",
+            windowBar,
+            // The bar bleeds 4px sideways into the grid gap, and only sideways. Left and right are
+            // decided independently, because they are independent facts: a day can open its row and
+            // still have the run continuing to its right, and a day can close its row and still have it
+            // continuing to its left. Deciding both sides at once put a 4px tab of window colour outside
+            // the calendar's first and last columns, and left a 4px gap inside the run immediately after
+            // the day it opened on.
+            windowEdges.start ? "left-0" : "-left-1",
+            windowEdges.end ? "right-0" : "-right-1",
+            // It never bleeds vertically. The row gap is what makes the calendar's weeks legible, and a
+            // run that filled it would dissolve the row structure inside the window -- losing the one
+            // cue that tells you which week you are looking at. A run that wraps weeks is therefore two
+            // bars, one per row, and the gap between them is the calendar's own.
+            roundStart && "rounded-l-2xl",
+            roundEnd && "rounded-r-2xl",
           )}
         />
       )}

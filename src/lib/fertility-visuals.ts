@@ -16,38 +16,18 @@ export interface FertilityStatusVisual {
   badge: string;
 }
 
-/**
- * The four sides of a full-height block, as separate classes.
- *
- * They have to be separate. A single `border-<colour>` class paints all four sides at once, and the
- * block's whole point is that it paints only the edges the window actually has -- a block that outlines
- * itself on every side puts a line across the middle of a run that wraps weeks, and turns the two ends
- * into half square, half rounded. Setting a side's *width* cannot undo that; only its colour can, so
- * each side is coloured in its own right and the unpainted ones stay transparent.
- *
- * The colours are per side rather than one colour with a CSS variable because Tailwind generates the
- * utilities from the class names it finds in the source, and a computed `border-l-${token}` is not one.
- */
-export interface BlockEdges {
-  top: string;
-  right: string;
-  bottom: string;
-  left: string;
-}
-
-/** No sides: a phase that is not drawn as a block. */
-export const NO_BLOCK_EDGES: BlockEdges = { top: "", right: "", bottom: "", left: "" };
-
 export interface CalendarPhaseVisual {
   label: string;
   fill: string;
   band: string;
   /**
-   * The outline the Calendar draws the fertile window with, as a region rather than a strip. Only the
-   * outline is free of the marker cap that holds a fill near black, which is why the window is legible
-   * as an object while the fill stays dark enough for a reading marker to sit on it.
+   * The solid bar the Calendar draws the fertile window with, spanning the whole day. The bar carries
+   * its own colour rather than reusing the cell's tint, because it is the mark a run of window days is
+   * recognised by, and a mark that spans the whole cell is the one thing that may be brighter than the
+   * cell behind it -- up to the limit the reading markers painted on it allow. The cell's `fill` stays
+   * the darker tint, which is what the Status view and any surface without a bar keep using.
    */
-  block: BlockEdges;
+  bar: string;
 }
 
 export interface FertilityMonitorVisual {
@@ -116,30 +96,24 @@ export const FERTILITY_CALENDAR_PHASE_VISUALS: Record<CalendarPhase, CalendarPha
     label: "Before",
     fill: FERTILITY_STATUS_VISUALS["pre-fertile"].fill,
     band: FERTILITY_STATUS_VISUALS["pre-fertile"].band,
-    // Before and After keep their band and are not drawn as regions. The window is the one thing on
-    // the calendar the user scans for, and a region on every phase would compete with it.
-    block: NO_BLOCK_EDGES,
+    // Before and After keep their band and get no bar. The window is the one thing on the calendar
+    // the user scans for, and a bar on every phase would put three in competition for that attention.
+    bar: "",
   },
   fertile: {
     label: "Fertile",
     fill: FERTILITY_STATUS_VISUALS.fertile.fill,
     // No band. A band is a horizontal line along the cell's top edge, and the menses stripe is a
     // horizontal line along the bottom edge of the day above; across a week boundary the two sit 8px
-    // apart and read as one mark. The window is drawn as a region instead, which cannot be confused
-    // with a stripe.
+    // apart and read as one mark. The window is a bar instead, which cannot be confused with a stripe.
     band: "",
-    block: {
-      top: "border-t-fertility-status-fertile-block",
-      right: "border-r-fertility-status-fertile-block",
-      bottom: "border-b-fertility-status-fertile-block",
-      left: "border-l-fertility-status-fertile-block",
-    },
+    bar: "bg-fertility-status-fertile-bar",
   },
   after: {
     label: "After",
     fill: FERTILITY_STATUS_VISUALS["post-peak"].fill,
     band: FERTILITY_STATUS_VISUALS["post-peak"].band,
-    block: NO_BLOCK_EDGES,
+    bar: "",
   },
 };
 
