@@ -146,6 +146,7 @@ describe("CSV file shape", () => {
       "monitor",
       "mucus",
       "bbt_c",
+      "bbt_f",
       "notes",
     ];
     for (const name of dayColumns) {
@@ -222,6 +223,57 @@ describe("CSV temperatures", () => {
         expected,
       ]);
     }
+  });
+
+  // The same reading in both scales on the same row, so a Fahrenheit reader
+  // computes nothing and neither column can drift from the other.
+  const conversions: [number, string, string][] = [
+    [36, "36", "96.8"],
+    [36.5, "36.5", "97.7"],
+    [36.55, "36.55", "97.79"],
+    [36.89, "36.89", "98.4"],
+    [37.02, "37.02", "98.64"],
+    [38, "38", "100.4"],
+  ];
+
+  for (const [stored, expectedC, expectedF] of conversions) {
+    it(`converts ${stored} C to ${expectedF} F on the same row`, () => {
+      const text = buildCsvExport([cycle()], [day({ bbt: stored })]);
+
+      expect(column(text, "bbt_c")).toEqual([expectedC]);
+      expect(column(text, "bbt_f")).toEqual([expectedF]);
+    });
+  }
+
+  it("keeps two decimals so no plausible stored reading is altered", () => {
+    // A 0.01 C step is 0.018 F. At one decimal — the precision the app displays —
+    // 656 of the 801 plausible stored values would not survive the round trip; at
+    // two, every one of them does.
+    const lossy: string[] = [];
+    for (let hundredths = 3400; hundredths <= 4200; hundredths += 1) {
+      const celsius = hundredths / 100;
+      const written = column(buildCsvExport([cycle()], [day({ bbt: celsius })]), "bbt_f")[0];
+      const back = (Number(written) - 32) * (5 / 9);
+      if (Number(back.toFixed(2)) !== celsius) {
+        lossy.push(`${celsius} -> ${written}`);
+      }
+    }
+
+    expect(lossy).toEqual([]);
+  });
+
+  it("leaves both temperature columns empty when no reading was taken", () => {
+    const text = buildCsvExport([cycle()], [day({})]);
+
+    expect(column(text, "bbt_c")).toEqual([""]);
+    expect(column(text, "bbt_f")).toEqual([""]);
+  });
+
+  it("carries no temperature on a cycle-only row", () => {
+    const text = buildCsvExport([cycle()], []);
+
+    expect(column(text, "bbt_c")).toEqual([""]);
+    expect(column(text, "bbt_f")).toEqual([""]);
   });
 });
 

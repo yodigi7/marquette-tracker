@@ -152,6 +152,7 @@ replace the JSON backup, and it exists only to be read.
 | `intercourse`      | `true` or `false`                                               | Never recorded                |
 | `intercourse_time` | The time entered for that act                                   | Not recorded                  |
 | `bbt_c`            | Basal temperature in Celsius                                    | Never recorded, or cleared    |
+| `bbt_f`            | The same reading in Fahrenheit, converted for you               | Never recorded, or cleared    |
 | `symptoms`         | The day's symptoms, separated by `;`                            | None recorded                 |
 | `pregnancy_test`   | `negative` or `positive`                                        | Never recorded                |
 | `notes`            | That day's note                                                 | Empty                         |
@@ -164,8 +165,11 @@ replace the JSON backup, and it exists only to be read.
 record: a monitor or mucus reading of `none`, or `intercourse` of `false`, is written out as the word
 itself, so you can filter on it. Several symptoms share one cell, separated by semicolons.
 
-**Temperatures are always Celsius**, in the column named `bbt_c`, whatever the display unit is set
-to in Settings — the same rule the JSON backup follows, so one column never holds two units.
+**Temperatures come in both scales**, in `bbt_c` and `bbt_f`, on the same row. They are one reading
+in two units, not two readings, and both are present whatever the display unit is set to in Settings
+— so a file exported in June and one exported in November still line up. `bbt_c` is the value as
+stored; `bbt_f` is computed from it at a precision that converts back exactly, so neither is a
+rounded copy of the other. Ignore whichever you do not read.
 
 ### Rollback
 

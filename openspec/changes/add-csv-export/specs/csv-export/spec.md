@@ -54,10 +54,12 @@ The CSV SHALL use a single documented representation for each field. Dates SHALL
 `YYYY-MM-DD`. A field the user never recorded SHALL be written as an empty cell, which is distinct
 from a value the user did record, such as a monitor or mucus reading of `none` or an intercourse
 value of `false`. A field holding several values SHALL be written as one cell with the values
-separated by semicolons. Stored temperatures SHALL be written in Celsius under a column name that
-states the unit, so the file does not change meaning when the user's display preference changes.
-Fields containing a comma, a double quote, or a line break SHALL be quoted so the file parses
-correctly in a spreadsheet.
+separated by semicolons. A stored temperature SHALL be written twice on the same row, once in
+Celsius and once in Fahrenheit, each under a column name that states the unit, so the file does not
+change meaning when the user's display preference changes and neither column can disagree with the
+other. The Fahrenheit column SHALL be a pure conversion of the stored value at a precision that
+preserves it exactly. Fields containing a comma, a double quote, or a line break SHALL be quoted so
+the file parses correctly in a spreadsheet.
 
 The app SHALL ship documentation listing every column name, its meaning, its date format, and how a
 missing value is represented, and that documentation SHALL match the columns the export writes.
@@ -79,11 +81,17 @@ missing value is represented, and that documentation SHALL match the columns the
 - **WHEN** the user exports the CSV
 - **THEN** the row parses in a spreadsheet as a single row with the note intact in one cell
 
-#### Scenario: Temperatures are always Celsius
+#### Scenario: Both temperature scales are present regardless of preference
 
 - **WHEN** the user exports the CSV with a Fahrenheit display preference active
-- **THEN** every temperature cell holds the stored Celsius value
-- **AND** the column name states the unit
+- **THEN** the row carries the stored Celsius value and its Fahrenheit equivalent
+- **AND** each column name states its unit
+
+#### Scenario: The second scale does not alter the reading
+
+- **WHEN** a stored temperature is converted for the Fahrenheit column
+- **THEN** converting that value back yields the stored value exactly
+- **AND** no plausible stored reading is rounded to a different number
 
 #### Scenario: The documentation matches the file
 

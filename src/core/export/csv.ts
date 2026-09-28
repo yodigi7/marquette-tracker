@@ -26,6 +26,7 @@ export const CSV_EXPORT_COLUMNS = [
   "intercourse",
   "intercourse_time",
   "bbt_c",
+  "bbt_f",
   "symptoms",
   "pregnancy_test",
   "notes",
@@ -80,6 +81,22 @@ function number(value: number | null | undefined): string {
   return value == null ? NOTHING_RECORDED : String(value);
 }
 
+/**
+ * The same reading in Fahrenheit, for a spreadsheet user who reads that scale.
+ *
+ * Two decimals, not the one the app displays: a 0.01 °C step is 0.018 °F, so
+ * one decimal silently moves 656 of the 801 plausible stored readings, while two
+ * decimals round-trips every one of them exactly. Trailing zeros are trimmed so
+ * the column reads the way the rest of the file does.
+ */
+function fahrenheit(celsius: number | null | undefined): string {
+  if (celsius == null) {
+    return NOTHING_RECORDED;
+  }
+  const fixed = (celsius * (9 / 5) + 32).toFixed(2);
+  return fixed.includes(".") ? fixed.replace(/\.?0+$/, "") : fixed;
+}
+
 function list(values: string[] | undefined): string {
   return values == null || values.length === 0 ? NOTHING_RECORDED : values.join(LIST_SEPARATOR);
 }
@@ -91,6 +108,14 @@ interface CsvRow {
   rowType: CsvRowType;
   fields: string[];
 }
+
+/**
+ * How many leading columns belong to the day rather than the cycle, taken from
+ * the contract instead of counted by hand. A cycle row has to leave every one of
+ * them empty, and a hand-counted run of empty strings is how the next column
+ * added would silently be missed.
+ */
+const DAY_COLUMN_COUNT = CSV_EXPORT_COLUMNS.indexOf("cycle_number");
 
 function dayRow(record: DayRecordEntity, cycle: CycleEntity | undefined): CsvRow {
   return {
@@ -107,6 +132,7 @@ function dayRow(record: DayRecordEntity, cycle: CycleEntity | undefined): CsvRow
       flag(record.intercourse),
       text(record.intercourseTime),
       number(record.bbt),
+      fahrenheit(record.bbt),
       list(record.symptoms),
       text(record.pregnancyTest),
       text(record.notes),
@@ -124,18 +150,11 @@ function cycleRow(cycle: CycleEntity): CsvRow {
     cycleNo: cycle.cycleNo,
     rowType: "cycle",
     fields: [
+      // A cycle with no logged days has no day to report, so every day column
+      // after `row_type` is empty. Counted from the contract so this cannot fall
+      // behind the writer as columns are added.
       "cycle",
-      NOTHING_RECORDED,
-      NOTHING_RECORDED,
-      NOTHING_RECORDED,
-      NOTHING_RECORDED,
-      NOTHING_RECORDED,
-      NOTHING_RECORDED,
-      NOTHING_RECORDED,
-      NOTHING_RECORDED,
-      NOTHING_RECORDED,
-      NOTHING_RECORDED,
-      NOTHING_RECORDED,
+      ...Array.from({ length: DAY_COLUMN_COUNT - 1 }, () => NOTHING_RECORDED),
       String(cycle.cycleNo),
       cycle.day1,
       text(cycle.closedAt),

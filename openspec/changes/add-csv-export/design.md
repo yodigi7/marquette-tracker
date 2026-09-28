@@ -78,16 +78,25 @@ make the CSV look like a backup it is not.
 
 _Cost._ A user wanting engine output re-derives it. Documented in the README.
 
-### D4 — Temperatures are always Celsius, in a column named `bbt_c`
+### D4 — Both temperature scales, on the same row
 
-The writer takes no unit parameter and passes the stored number through unchanged, so the file cannot
-change meaning when the display preference changes.
+`bbt_c` carries the stored value unchanged and `bbt_f` carries its conversion, so the file never
+changes meaning with the display preference and neither column can drift from the other.
 
-_Alternatives._ Honouring the display preference is friendlier at the moment of reading, but it makes
-the same column hold two different units depending on who exported it, and quietly violates the
-contract the JSON backup already set ("the display preference does not affect the document"). A
-Fahrenheit user reading `36.5` is a one-glance fix; a silently mixed-unit column is a data-quality
-bug. The unit lives in the column name, not in a prose note.
+_Alternatives._ A single Celsius column makes a Fahrenheit user do arithmetic on every value they
+just read on the chart. A single column in whichever unit the display preference names makes the
+same file name carry different columns on different days and breaks any formula written against it.
+A live formula cell (`=C2*9/5+32`) shows its own derivation, but reads as text to anything that is
+not a spreadsheet and puts formula text in the same sheet as the user's free text (see D9). Two
+columns cost one column of redundancy, which is cheap in a file that is only ever read.
+
+_Precision._ The conversion is written at two decimals, not at the one decimal the app displays. A
+0.01 °C step is 0.018 °F, so the displayed precision silently moves 656 of the 801 plausible stored
+readings; two decimals round-trips all 801 exactly. A test asserts the round trip across the whole
+plausible range, which is what makes the second column trustworthy rather than decorative.
+
+_Cost._ Two numbers for one reading, so a user could chart the wrong column. The column names say
+which is which, and the README says plainly that they are one reading in two scales.
 
 ### D5 — Empty cell means "not recorded"; recorded values are written literally
 
@@ -144,19 +153,19 @@ Recorded here because the workflow could not ask. Load-bearing assumptions chang
 or what leaves the app, so they are repeated in the pull request and carry the `needs-confirmation`
 label.
 
-| #   | Assumption                                                                                                                                              | Why it was ambiguous                                                                                                                                     | Load-bearing                                   |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| A1  | The export is a single CSV with one row per day and cycle fields repeated, rather than two files                                                        | "a human-readable CSV export of cycle and daily-record data" does not say whether cycles and days are one table or two; one file means no zip dependency | Yes — the shape of every row in the file       |
-| A2  | A cycle with no logged days gets its own row, marked `row_type = cycle`                                                                                 | The issue does not say; dropping such a cycle would lose data, and a second file is rejected by A1                                                       | Yes — extra rows appear in the file            |
-| A3  | The file carries only user-entered values: no fertile windows, statuses, forecasts, UUIDs, revision flags, or timestamps                                | "useful for common analysis" could justify computed columns; "not a lossless backup" cuts the other way for the metadata                                 | Yes — what data leaves the device              |
-| A4  | Temperatures are always Celsius, in a column named `bbt_c`, regardless of the display preference                                                        | The JSON backup is unit-independent, but a human-readable export could follow the display unit                                                           | Yes — the numbers in the file                  |
-| A5  | "Not recorded" is an empty cell; a recorded `none` or `false` is written as the word                                                                    | The issue asks for missing values to be documented but not how; a sentinel was possible                                                                  | Yes — how the user reads every blank cell      |
-| A6  | The action is a third button in the existing Data & backup section, labelled "Export CSV (spreadsheet)" with a line saying it cannot be imported back   | Placement and copy were unspecified                                                                                                                      | Yes — a new visible control                    |
-| A7  | The `instructor-summary` "SHALL NOT generate a PDF, PNG, CSV, or other export file" sentence is re-scoped to the summary flow rather than left standing | The issue asks for exactly the thing that spec forbids; the sentence reads app-wide but the requirement is about producing a summary                     | Yes — it relaxes a stated app-wide prohibition |
-| A8  | Symptoms are joined with `;` inside one cell                                                                                                            | Separator unspecified                                                                                                                                    | No — mechanical formatting choice              |
-| A9  | UTF-8 with BOM, CRLF record separators, trailing CRLF, RFC 4180 quoting                                                                                 | Dialect unspecified                                                                                                                                      | No — invisible to the user, and documented     |
-| A10 | File name is `marquette-tracker-export-<export-date>.csv`, matching the JSON backup's naming                                                            | The JSON backup sets the precedent; "export" distinguishes it from "backup" in the downloads list                                                        | No — naming, and trivially reversible          |
-| A11 | Multi-value cells, free text, and dates are unchanged from stored values; no unit conversion, reformatting, or truncation anywhere                      | —                                                                                                                                                        | No — covered by A3/A4                          |
+| #   | Assumption                                                                                                                                                                                | Why it was ambiguous                                                                                                                                        | Load-bearing                                   |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| A1  | The export is a single CSV with one row per day and cycle fields repeated, rather than two files                                                                                          | "a human-readable CSV export of cycle and daily-record data" does not say whether cycles and days are one table or two; one file means no zip dependency    | Yes — the shape of every row in the file       |
+| A2  | A cycle with no logged days gets its own row, marked `row_type = cycle`                                                                                                                   | The issue does not say; dropping such a cycle would lose data, and a second file is rejected by A1                                                          | Yes — extra rows appear in the file            |
+| A3  | The file carries only user-entered values: no fertile windows, statuses, forecasts, UUIDs, revision flags, or timestamps                                                                  | "useful for common analysis" could justify computed columns; "not a lossless backup" cuts the other way for the metadata                                    | Yes — what data leaves the device              |
+| A4  | Temperatures are written twice, in `bbt_c` and `bbt_f`, regardless of the display preference                                                                                              | One Celsius column, one column following the display unit, or two were all defensible; two is the only one that is both self-describing and arithmetic-free | Yes — the numbers in the file                  |
+| A5  | "Not recorded" is an empty cell; a recorded `none` or `false` is written as the word                                                                                                      | The issue asks for missing values to be documented but not how; a sentinel was possible                                                                     | Yes — how the user reads every blank cell      |
+| A6  | The action is a third button in the existing Data & backup section, labelled "Export CSV (spreadsheet)" with a line saying it cannot be imported back                                     | Placement and copy were unspecified                                                                                                                         | Yes — a new visible control                    |
+| A7  | The `instructor-summary` "SHALL NOT generate a PDF, PNG, CSV, or other export file" sentence is re-scoped to the summary flow rather than left standing                                   | The issue asks for exactly the thing that spec forbids; the sentence reads app-wide but the requirement is about producing a summary                        | Yes — it relaxes a stated app-wide prohibition |
+| A8  | Symptoms are joined with `;` inside one cell                                                                                                                                              | Separator unspecified                                                                                                                                       | No — mechanical formatting choice              |
+| A9  | UTF-8 with BOM, CRLF record separators, trailing CRLF, RFC 4180 quoting                                                                                                                   | Dialect unspecified                                                                                                                                         | No — invisible to the user, and documented     |
+| A10 | File name is `marquette-tracker-export-<export-date>.csv`, matching the JSON backup's naming                                                                                              | The JSON backup sets the precedent; "export" distinguishes it from "backup" in the downloads list                                                           | No — naming, and trivially reversible          |
+| A11 | Multi-value cells, free text, and dates are unchanged from stored values; no reformatting or truncation anywhere, and the only derived column is the lossless Fahrenheit conversion in A4 | —                                                                                                                                                           | No — covered by A3/A4                          |
 
 ## Risks / Trade-offs
 
