@@ -199,7 +199,7 @@ Input: ordered `DayRecord[]` of one cycle + `Settings` + reference to previous c
 
 ## Out of scope (post-MVP backlog)
 
-- Python FastAPI backend / cloud sync / multi-user / auth; reminders; device import; postpartum/non-cycling protocols; PDF/CSV export.
+- Python FastAPI backend / cloud sync / multi-user / auth; reminders; device import; postpartum/non-cycling protocols; PDF/PNG export.
 
 ---
 

@@ -6,6 +6,7 @@ import {
   type BackupDocument,
   type PreparedBackup,
 } from "@/core/backup";
+import { buildCsvExport } from "@/core/export";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -35,6 +36,23 @@ function downloadBackup(backup: BackupDocument) {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * The spreadsheet export. It reuses the same snapshot the JSON backup is built
+ * from rather than taking a second read, so both files describe the same moment
+ * and neither can drift from the other.
+ */
+function downloadCsv(backup: BackupDocument) {
+  const blob = new Blob([buildCsvExport(backup.data.cycles, backup.data.dayRecords)], {
+    type: "text/csv",
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = window.document.createElement("a");
+  anchor.href = url;
+  anchor.download = `marquette-tracker-export-${backup.exportedAt.slice(0, 10)}.csv`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 export function DataBackupSection() {
   const createBackup = useAppStore((state) => state.createBackup);
   const restoreBackup = useAppStore((state) => state.restoreBackup);
@@ -45,6 +63,7 @@ export function DataBackupSection() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [csvStatus, setCsvStatus] = useState<string | null>(null);
   const [implausibleBbtWarning, setImplausibleBbtWarning] = useState<string | null>(null);
 
   function closeDialog() {
@@ -61,6 +80,23 @@ export function DataBackupSection() {
       downloadBackup(backup);
       setStatus("Backup downloaded locally.");
       toast.success("Backup downloaded locally.");
+    } catch (caught) {
+      const message = errorMessage(caught);
+      setError(message);
+      toast.error(message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleCsvExport() {
+    setBusy(true);
+    setError(null);
+    try {
+      const backup = await createBackup();
+      downloadCsv(backup);
+      setCsvStatus("CSV downloaded locally.");
+      toast.success("CSV downloaded locally.");
     } catch (caught) {
       const message = errorMessage(caught);
       setError(message);
@@ -159,6 +195,15 @@ export function DataBackupSection() {
         >
           Export JSON backup
         </Button>
+        <Button
+          type="button"
+          variant="outline"
+          data-testid="settings-csv-export"
+          disabled={busy}
+          onClick={() => void handleCsvExport()}
+        >
+          Export CSV (spreadsheet)
+        </Button>
         <Label
           htmlFor="settings-backup-file"
           className="inline-flex h-8 cursor-pointer items-center justify-center rounded-lg border border-border bg-background px-2.5 text-sm font-medium hover:bg-muted focus-within:ring-3 focus-within:ring-ring/50"
@@ -180,9 +225,18 @@ export function DataBackupSection() {
         Backups stay on this device. Restoring replaces the current records and settings after
         confirmation.
       </p>
+      <p className="text-sm text-stone-500" data-testid="settings-csv-description">
+        The CSV is a flat spreadsheet file of your cycles and daily entries, for viewing or
+        analysing your own data. It cannot be imported back into the app.
+      </p>
       {status ? (
         <p role="status" data-testid="settings-backup-status" className="text-sm text-stone-600">
           {status}
+        </p>
+      ) : null}
+      {csvStatus ? (
+        <p role="status" data-testid="settings-csv-status" className="text-sm text-stone-600">
+          {csvStatus}
         </p>
       ) : null}
       {implausibleBbtWarning ? (

@@ -46,7 +46,7 @@ Shared rules for both lanes:
 ## Non-negotiable project decisions (as agreed with the user)
 
 - **Audience**: currently personal use (user/partner). Future: possibly open to other users, but NOT in MVP scope.
-- **Fully digital** — no printed chart/export features. No PDF/CSV export for now.
+- **Fully digital** — no printed chart features and no PDF/PNG export. A read-only CSV export exists for spreadsheets and is not a backup.
 - **Algorithm is ON by default** but must have a user-facing toggle to disable computed fertile-window logic (app then logs data without interpreting it).
 - **Normal cycling protocol only** — no postpartum/non-cycling/transitioning rules in MVP.
 - **Current Marquette Institute protocols** (Fehring et al.) — see domain rules below.

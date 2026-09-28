@@ -3,8 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ThemeProvider } from "next-themes";
-import { createBackup, serializeBackup } from "@/core/backup";
+import { BACKUP_FORMAT, createBackup, serializeBackup } from "@/core/backup";
 import { fullSnapshot } from "@/core/backup/__tests__/fixtures";
+import { CSV_EXPORT_COLUMNS } from "@/core/export";
 import { useAppStore } from "@/core/store/useAppStore";
 import { SettingsView } from "../index";
 
@@ -238,5 +239,113 @@ describe("Restore reports implausible temperatures", () => {
     await waitFor(() => expect(store().dayRecords).toHaveLength(2));
     expect(await screen.findByTestId("settings-backup-status")).toHaveTextContent("Restored");
     expect(screen.queryByTestId("settings-backup-bbt-warning")).not.toBeInTheDocument();
+  });
+});
+
+describe("Settings CSV export", () => {
+  function downloadedBlob(): Blob {
+    return vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob;
+  }
+
+  function downloadedName(): string {
+    const click = vi.mocked(HTMLAnchorElement.prototype.click);
+    return (click.mock.instances[0] as HTMLAnchorElement).download;
+  }
+
+  it("offers a spreadsheet export beside the JSON actions", () => {
+    renderSettings();
+
+    expect(screen.getByTestId("settings-csv-export")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-backup-export")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-backup-import")).toBeInTheDocument();
+  });
+
+  it("says the file is for a spreadsheet and cannot be imported back", () => {
+    renderSettings();
+
+    const description = screen.getByTestId("settings-csv-description").textContent ?? "";
+    expect(description).toMatch(/spreadsheet/i);
+    expect(description).toMatch(/cannot be imported|can't be imported/i);
+    expect(description).not.toMatch(/backup|restore/i);
+  });
+
+  it("writes a dated local CSV file without uploading data or changing records", async () => {
+    const user = userEvent.setup();
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    await seedExistingData();
+    renderSettings();
+
+    await user.click(screen.getByTestId("settings-csv-export"));
+
+    await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalledTimes(1));
+    expect(downloadedBlob().type).toBe("text/csv");
+    expect(downloadedName()).toMatch(/^marquette-tracker-export-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(store().cycles).toHaveLength(1);
+    expect(store().dayRecords).toHaveLength(1);
+    expect(await screen.findByTestId("settings-csv-status")).toHaveTextContent(/downloaded/i);
+  });
+
+  it("puts the stored records in the file, not the JSON backup", async () => {
+    const user = userEvent.setup();
+    await seedExistingData();
+    renderSettings();
+
+    await user.click(screen.getByTestId("settings-csv-export"));
+
+    await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalledTimes(1));
+    // `Blob.text()` decodes UTF-8 and drops a leading BOM, so the BOM itself is
+    // asserted in the writer's own tests; what matters here is that the file the
+    // user receives is the CSV projection and not the JSON backup.
+    const text = await downloadedBlob().text();
+    expect(text.split("\r\n")[0]).toBe(CSV_EXPORT_COLUMNS.join(","));
+    expect(text).toContain("day,2026-03-01,1");
+    expect(text).not.toContain("marquette-tracker-backup");
+  });
+
+  it("offers no way to load a CSV back in", () => {
+    renderSettings();
+
+    // The only file control in the section still accepts JSON only, so there is
+    // no surface anywhere that would take a CSV as a restore source.
+    expect(screen.getByTestId("settings-backup-import")).toHaveAttribute(
+      "accept",
+      "application/json,.json",
+    );
+  });
+
+  it("writes Celsius even while the display preference is Fahrenheit", async () => {
+    const user = userEvent.setup();
+    await seedExistingData();
+    await store().addDayRecord("", "2026-03-01", 1, { bbt: 36.5 });
+    await store().updateSettings({ temperatureUnit: "f" });
+    renderSettings();
+
+    await user.click(screen.getByTestId("settings-csv-export"));
+
+    await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalledTimes(1));
+    const text = await downloadedBlob().text();
+    // The seeded records carry no field that needs quoting, so a plain split is
+    // enough to read one cell here.
+    const rows = text.split("\r\n").filter(Boolean);
+    const index = CSV_EXPORT_COLUMNS.indexOf("bbt_c");
+    expect(rows[1].split(",")[index]).toBe("36.5");
+  });
+
+  it("leaves the JSON backup the versioned document it was", async () => {
+    const user = userEvent.setup();
+    await seedExistingData();
+    renderSettings();
+
+    await user.click(screen.getByTestId("settings-csv-export"));
+    await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByTestId("settings-backup-export"));
+
+    await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalledTimes(2));
+    const json = vi.mocked(URL.createObjectURL).mock.calls[1][0] as Blob;
+    expect(json.type).toBe("application/json");
+    const text = await json.text();
+    expect(text).toContain(`"format": "${BACKUP_FORMAT}"`);
+    expect(text).not.toContain("row_type");
   });
 });

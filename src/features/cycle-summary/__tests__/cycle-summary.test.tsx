@@ -137,6 +137,10 @@ describe("SummaryView", () => {
     const cycleId = await closedCycleWithPeak(12);
     const printed = vi.fn();
     vi.stubGlobal("print", printed);
+    // The app can generate a data export from Settings; printing a summary must
+    // still be the browser's own action and produce nothing itself.
+    const objectUrl = vi.fn(() => "blob:summary");
+    Object.defineProperty(URL, "createObjectURL", { writable: true, value: objectUrl });
 
     renderAt(cycleId);
 
@@ -144,6 +148,7 @@ describe("SummaryView", () => {
     await user.click(await screen.findByTestId("summary-print"));
 
     expect(printed).toHaveBeenCalledTimes(1);
+    expect(objectUrl).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
 
