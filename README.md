@@ -139,6 +139,10 @@ replace the JSON backup, and it exists only to be read.
   derivable from `cycle_start`, `cycle_closed`, `day_in_cycle`, and `monitor`.
 - The file is UTF-8 with a byte-order mark, records are separated by CRLF, and a field containing a
   comma, a quote, or a line break is quoted. Excel, LibreOffice, and Google Sheets all open it as-is.
+- A note, symptom list, or cycle note starting with `=`, `+`, `-`, or `@` carries a leading
+  apostrophe, so a spreadsheet shows it as text instead of evaluating it or reading it as a number.
+  Spreadsheets hide that apostrophe; a script reading the file will see it. Numbers the app writes
+  are never marked this way.
 - The file name is `marquette-tracker-export-<export-date>.csv`.
 
 | Column             | What it holds                                                   | When empty                    |

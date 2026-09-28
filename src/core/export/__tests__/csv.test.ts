@@ -304,6 +304,68 @@ describe("CSV quoting", () => {
   });
 });
 
+describe("CSV spreadsheet safety", () => {
+  // A spreadsheet evaluates a cell that starts with one of these instead of
+  // showing it, so a note can arrive as a number or as a formula rather than the
+  // text the user typed.
+  const leads: [string, string][] = [
+    ["=1+1", "an equals sign"],
+    ["+1 555 0100", "a leading plus"],
+    ["-2", "a leading minus"],
+    ["@SUM(A1)", "a leading at sign"],
+    ["\tindented", "a leading tab"],
+  ];
+
+  for (const [note, label] of leads) {
+    it(`marks a day note that starts with ${label} as text`, () => {
+      const text = buildCsvExport([cycle()], [day({ notes: note })]);
+
+      expect(column(text, "notes")).toEqual([`'${note}`]);
+    });
+  }
+
+  it("marks a cycle note the same way", () => {
+    const text = buildCsvExport([cycle({ notes: "=late" })], [day()]);
+
+    expect(column(text, "cycle_notes")).toEqual(["'=late"]);
+  });
+
+  it("marks a symptom list that starts with a formula character", () => {
+    const text = buildCsvExport([cycle()], [day({ symptoms: ["-aching", "tender"] })]);
+
+    expect(column(text, "symptoms")).toEqual(["'-aching;tender"]);
+  });
+
+  it("leaves ordinary text alone", () => {
+    const text = buildCsvExport([cycle({ notes: "quiet week" })], [day({ notes: "slept well" })]);
+
+    expect(column(text, "notes")).toEqual(["slept well"]);
+    expect(column(text, "cycle_notes")).toEqual(["quiet week"]);
+    // A note reading like a number, without a leading sign, is text already.
+    expect(column(buildCsvExport([cycle()], [day({ notes: "3/4 cup" })]), "notes")).toEqual([
+      "3/4 cup",
+    ]);
+  });
+
+  it("leaves an implausible stored temperature as a number", () => {
+    // A Fahrenheit reading typed into a Celsius field is preserved on purpose by
+    // the backup rules, so the guard must not turn a stored number into text.
+    const text = buildCsvExport([cycle()], [day({ bbt: -5 })]);
+
+    expect(column(text, "bbt_c")).toEqual(["-5"]);
+    expect(column(text, "notes")).toEqual([""]);
+  });
+
+  it("still quotes a guarded note that also contains a comma", () => {
+    const note = "-2 days, then better";
+    const text = buildCsvExport([cycle()], [day({ notes: note })]);
+
+    expect(text).toContain(`"'-2 days, then better"`);
+    expect(rows(text)).toHaveLength(2);
+    expect(rows(text)[1][CSV_EXPORT_COLUMNS.indexOf("notes")]).toBe(`'${note}`);
+  });
+});
+
 describe("CSV encoding", () => {
   it("starts with a UTF-8 BOM so spreadsheets read accented notes", () => {
     expect(buildCsvExport([], []).charCodeAt(0)).toBe(0xfeff);

@@ -59,7 +59,10 @@ Celsius and once in Fahrenheit, each under a column name that states the unit, s
 change meaning when the user's display preference changes and neither column can disagree with the
 other. The Fahrenheit column SHALL be a pure conversion of the stored value at a precision that
 preserves it exactly. Fields containing a comma, a double quote, or a line break SHALL be quoted so
-the file parses correctly in a spreadsheet.
+the file parses correctly in a spreadsheet. User-entered free text that a spreadsheet would otherwise
+evaluate, because it begins with a character that marks a formula, SHALL be marked as text so a
+spreadsheet shows the characters the user typed. That guard SHALL NOT be applied to a number the
+system writes, so a stored reading is not turned into text.
 
 The app SHALL ship documentation listing every column name, its meaning, its date format, and how a
 missing value is represented, and that documentation SHALL match the columns the export writes.
@@ -74,6 +77,20 @@ missing value is represented, and that documentation SHALL match the columns the
 - **WHEN** a day records more than one symptom
 - **THEN** that day's cell lists the symptoms separated by semicolons rather than spilling into
   neighbouring cells
+
+#### Scenario: A note that looks like a formula is shown as text
+
+- **GIVEN** a day note beginning with a character a spreadsheet treats as the start of a formula
+- **WHEN** the user opens the exported file in a spreadsheet
+- **THEN** the note is displayed as the text that was entered
+- **AND** it is neither evaluated as a formula nor shown as a number
+
+#### Scenario: A stored number is not turned into text by that guard
+
+- **GIVEN** a stored temperature outside the usual range, which is deliberately preserved
+- **WHEN** the user exports the CSV
+- **THEN** the temperature cell holds a number
+- **AND** the free-text guard does not apply to it
 
 #### Scenario: Free text does not break the file
 

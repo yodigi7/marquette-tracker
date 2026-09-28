@@ -62,6 +62,29 @@ function escapeField(value: string): string {
   return value;
 }
 
+/**
+ * The characters a spreadsheet treats as the start of a formula rather than as
+ * text. A cell beginning with one of these is evaluated on open, which both
+ * changes what the user sees — a note reading `-2` silently becomes the number
+ * -2 — and hands the file a way to run something the reader did not intend.
+ */
+const FORMULA_LEAD = /^[=+\-@\t\r]/;
+
+/**
+ * Prefixes user-entered free text that a spreadsheet would otherwise evaluate,
+ * so it is shown as the text it is. Excel, LibreOffice, and Google Sheets all
+ * treat a leading apostrophe as a text marker and do not display it.
+ *
+ * Applied only to free text, never to a number this module formats: an
+ * implausible stored temperature is preserved on purpose by the backup rules,
+ * and marking it as text would turn a number into a string to protect against a
+ * risk it does not have.
+ */
+function freeText(value: string | null | undefined): string {
+  const text = value ?? NOTHING_RECORDED;
+  return FORMULA_LEAD.test(text) ? `'${text}` : text;
+}
+
 function record(fields: readonly string[]): string {
   return fields.map(escapeField).join(FIELD_SEPARATOR);
 }
@@ -97,8 +120,12 @@ function fahrenheit(celsius: number | null | undefined): string {
   return fixed.includes(".") ? fixed.replace(/\.?0+$/, "") : fixed;
 }
 
-function list(values: string[] | undefined): string {
-  return values == null || values.length === 0 ? NOTHING_RECORDED : values.join(LIST_SEPARATOR);
+function list(values: string[] | undefined, isFreeText = false): string {
+  if (values == null || values.length === 0) {
+    return NOTHING_RECORDED;
+  }
+  const joined = values.join(LIST_SEPARATOR);
+  return isFreeText ? freeText(joined) : joined;
 }
 
 interface CsvRow {
@@ -133,13 +160,13 @@ function dayRow(record: DayRecordEntity, cycle: CycleEntity | undefined): CsvRow
       text(record.intercourseTime),
       number(record.bbt),
       fahrenheit(record.bbt),
-      list(record.symptoms),
+      list(record.symptoms, true),
       text(record.pregnancyTest),
-      text(record.notes),
+      freeText(record.notes),
       cycle ? String(cycle.cycleNo) : NOTHING_RECORDED,
       cycle ? cycle.day1 : NOTHING_RECORDED,
       cycle ? text(cycle.closedAt) : NOTHING_RECORDED,
-      cycle ? text(cycle.notes) : NOTHING_RECORDED,
+      cycle ? freeText(cycle.notes) : NOTHING_RECORDED,
     ],
   };
 }
@@ -158,7 +185,7 @@ function cycleRow(cycle: CycleEntity): CsvRow {
       String(cycle.cycleNo),
       cycle.day1,
       text(cycle.closedAt),
-      text(cycle.notes),
+      freeText(cycle.notes),
     ],
   };
 }
