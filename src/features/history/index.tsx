@@ -64,6 +64,9 @@ function LoggingOnlyCard() {
 function ForecastPanel({ forecast, cycles }: { forecast: Forecast | null; cycles: CycleResult[] }) {
   // Both reconciliation kinds mean the same thing at a glance from here: this cycle's recorded
   // data and its computed window disagree, or the cycle is unfinished past that window.
+  // Deliberately only those two. `no-peak-end` and `high-run` report a fact about the readings
+  // without contradicting anything, and a cycle can carry either in any cycle number, so counting
+  // them would put this notice on screen for ordinary cycles.
   const reconciledCycles = cycles.filter((cycle) =>
     cycle.warnings.some(
       (w) =>

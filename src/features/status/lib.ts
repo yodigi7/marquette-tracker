@@ -23,15 +23,20 @@ export const STATUS_TONES: Record<DayStatus, string> = {
 
 export const BEGIN_RULE_LABELS: Record<FertileWindow["beginRule"], string> = {
   "calendar-day-6": "calendar rule (cycle day 6)",
+  "calendar-day-6-fallback": "calendar rule (cycle day 6) — no Peak history to measure from",
   "calendar-earliest-peak-minus-6": "earliest Peak − 6 days",
   "first-high-or-peak": "first High or Peak reading",
 };
 
+/**
+ * One label per end rule, and each names the rule it stands for rather than a synonym of another:
+ * the two that measure from a Peak differ in *whose* Peak, and the fallback names its composition.
+ * The post-Peak interval is a protocol constant, so a label that carries a day count states it.
+ */
 export const END_RULE_LABELS: Record<FertileWindow["endRule"], string> = {
-  "current-peak-plus-n": "current monitor Peak + 3 days",
-  "historic-peak-plus-n": "latest historical Peak + 3 days",
-  "earliest-end": "earliest of historical vs current Peak",
-  "protocol-default-band": "protocol default band (no Peak history)",
+  "current-peak-plus-n": "this cycle's monitor Peak + 3 days",
+  "lookback-latest-peak-plus-n": "latest Peak of your recent cycles + 3 days",
+  "protocol-fallback-window": "protocol default: earliest possible Peak + 3 days",
   none: "no end (no Peak yet)",
 };
 
@@ -41,42 +46,77 @@ export function endRuleLabel(rule: FertileWindow["endRule"]): string {
 }
 
 /**
- * Wording for the two reconciliation warnings. Each describes the user's own recorded readings
- * and what the computed window said — never error, invalid, or malfunction language, and never a
- * disclaimer.
+ * Heading for each protocol warning this view reports. Each describes the user's own recorded
+ * readings and what the computed window said — never error, invalid, or malfunction language, and
+ * never a disclaimer. The cycle-scoped kinds are declared by `Extract` rather than as a full
+ * `Record<WarningKind, string>` so a new engine warning cannot reach this view by accident: it has
+ * to be added here, with wording, before it can be shown.
  */
 export const WARNING_LABELS: Record<
-  Extract<EngineWarning["kind"], "monitor-evidence-outside-window" | "open-cycle-past-window-end">,
+  Extract<
+    EngineWarning["kind"],
+    "monitor-evidence-outside-window" | "open-cycle-past-window-end" | "no-peak-end" | "high-run"
+  >,
   string
 > = {
   "monitor-evidence-outside-window": "Monitor reading outside the computed window",
   "open-cycle-past-window-end": "Cycle still in progress",
+  "no-peak-end": "No monitor Peak reading for this cycle",
+  "high-run": "A long run of High readings",
 };
 
 /**
- * Text for the most relevant reconciliation warning on a cycle, or null when it has none.
+ * Text for the protocol warnings on a cycle that most affect the selected date, or null when it has
+ * none.
  *
  * The cycle day is named explicitly because the warning belongs to the cycle while this view is
  * date-selectable: someone looking at cycle day 8 still needs to learn their day-15 reading
  * conflicts. `windowEnd` comes from the caller rather than the warning, because the engine
  * deliberately reports only the cycle and the day — the window is the caller's to look up.
  *
- * Evidence outranks still-in-progress: it is the sharper contradiction.
+ * Precedence, sharpest first: evidence outranks still-in-progress, because it is the sharper
+ * contradiction, and both outrank the two observations, which report a fact about the readings
+ * without contradicting anything the model concluded.
+ *
+ * The two observations are orthogonal rather than competing, so a cycle carrying both is given both
+ * sentences. A long run of Highs is the most common reason a cycle has no Peak to measure an end
+ * from, and dropping either half would leave the other unexplained — a peakless cycle whose High run
+ * is the reason would otherwise report an absence and hide its cause.
+ *
+ * The `high-run` copy states the run's length and the monitor's own guidance, and nothing about the
+ * user's body: the run is an observation, not a diagnosis. The `no-peak-end` copy says the cycle is
+ * unresolved rather than implying a fault.
  */
 export function warningBanner(warnings: EngineWarning[], windowEnd: number | null): string | null {
-  for (const warning of warnings) {
-    if (warning.kind === "monitor-evidence-outside-window") {
-      const end = windowEnd === null ? "an undetermined day" : `day ${windowEnd}`;
-      return `${WARNING_LABELS[warning.kind]}. Your monitor shows High or Peak on cycle day ${warning.day}, but the computed window ended on ${end}. The window has not changed.`;
-    }
+  const evidence = warnings.find((w) => w.kind === "monitor-evidence-outside-window");
+  if (evidence && evidence.kind === "monitor-evidence-outside-window") {
+    const end = windowEnd === null ? "an undetermined day" : `day ${windowEnd}`;
+    return `${WARNING_LABELS[evidence.kind]}. Your monitor shows High or Peak on cycle day ${evidence.day}, but the computed window ended on ${end}. The window has not changed.`;
   }
-  for (const warning of warnings) {
-    if (warning.kind === "open-cycle-past-window-end") {
-      const end = windowEnd === null ? "an undetermined day" : `day ${windowEnd}`;
-      return `${WARNING_LABELS[warning.kind]}. The computed window ended on ${end}, and this cycle has not closed yet.`;
-    }
+
+  const inProgress = warnings.find((w) => w.kind === "open-cycle-past-window-end");
+  if (inProgress) {
+    const end = windowEnd === null ? "an undetermined day" : `day ${windowEnd}`;
+    return `${WARNING_LABELS["open-cycle-past-window-end"]}. The computed window ended on ${end}, and this cycle has not closed yet.`;
   }
-  return null;
+
+  const observations: string[] = [];
+
+  const noPeak = warnings.find((w) => w.kind === "no-peak-end");
+  if (noPeak) {
+    observations.push(
+      `${WARNING_LABELS["no-peak-end"]}. The protocol ends the fertile window three full days after a monitor Peak reading, and this cycle has no monitor Peak reading to measure that end from. Every day from the start of the window onward is treated as fertile, and the cycle is unresolved rather than settled.`,
+    );
+  }
+
+  const run = warnings.find((w) => w.kind === "high-run");
+  if (run && run.kind === "high-run") {
+    observations.push(
+      `${WARNING_LABELS["high-run"]}. Your monitor has read High on ${run.run} consecutive cycle days, which is the point at which its guidance is to stop testing for a Peak. No Peak has been inferred from these readings.`,
+    );
+  }
+
+  return observations.length > 0 ? observations.join(" ") : null;
 }
 
 export function windowDescription(window: FertileWindow, peakKnown: boolean): string {

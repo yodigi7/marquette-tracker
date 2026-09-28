@@ -1,5 +1,10 @@
 import { addDays, diffDays } from "./dateUtils";
-import { computeCycle, statusForCycleDay } from "./marquette";
+import {
+  computeCycle,
+  DEFAULT_EARLIEST_PEAK,
+  DEFAULT_POST_PEAK_DAYS,
+  statusForCycleDay,
+} from "./marquette";
 import type { CycleHistory, CycleResult, DateKey, EngineSettings, FertileWindow } from "./types";
 
 /** Minimum eligible samples before the conditioned estimate is trusted. */
@@ -12,13 +17,21 @@ const MIN_ELIGIBLE_SAMPLES = 2;
  */
 const CALENDAR_RULE_THRESHOLD = 6;
 
+/** Cycle days before the lookback's earliest Peak at which the window opens. */
+const CALENDAR_BEGINS_BEFORE_EARLIEST_PEAK = 6;
+
 /**
- * Window used when there is no Peak history at all, so the calendar rule has
- * no edges to work from. Mirrors the next-fertile-window fallback; both
+ * Window used only when the lookback holds no Peak at all, so the calendar rule
+ * has no edges to work from. Mirrors the next-fertile-window fallback; both
  * surfaces must agree on the same protocol default.
+ *
+ * The end is composed from the protocol's own constants — the earliest possible
+ * Peak day plus the post-Peak interval — rather than written as a literal, so it
+ * cannot drift away from the rules it stands for. `predict.ts` consumes this same
+ * constant, which is what keeps the forecast and the projection from disagreeing.
  */
 export const PROTOCOL_DEFAULT_WINDOW_BEGIN = 6;
-export const PROTOCOL_DEFAULT_WINDOW_END = 21;
+export const PROTOCOL_DEFAULT_WINDOW_END = DEFAULT_EARLIEST_PEAK + DEFAULT_POST_PEAK_DAYS;
 
 /** Ids for projected cycles are synthetic and must never collide with stored ones. */
 const PROJECTED_CYCLE_ID_PREFIX = "projected-";
@@ -76,8 +89,9 @@ export function estimateProjectedLength(
  * extrapolating past the band the Marquette method is defined over.
  *
  * A projected cycle is computed, never stored: it carries a synthetic id and
- * is not a `CycleEntity`. Its window comes from `computeCycle`, so it is the
- * same calendar rule the engine already applies to a cycle with no readings.
+ * is not a `CycleEntity`. Its window is the calendar rule over the lookback's
+ * Peaks, which `deriveProjectedWindow` computes — the engine supplies no window
+ * for a cycle with no readings of its own, because such a cycle has no end.
  *
  * Pure: no I/O, no framework imports.
  */
@@ -130,7 +144,7 @@ export function projectCycles(
       settings,
       today,
     );
-    projected.push(boundWindow(result));
+    projected.push(projectedCycle(result, history, settings));
 
     day1 = addDays(day1, length);
     userCycleNo += 1;
@@ -140,23 +154,44 @@ export function projectCycles(
 }
 
 /**
- * Gives a projected cycle a window that ends.
+ * A projected cycle's window, derived from the lookback's monitor Peaks.
  *
- * With no Peak history the calendar rule has no edges, so the engine reports
- * an open window, which would paint every remaining day of the cycle fertile
- * forever. The protocol's standard first-cycle band is used instead, and the
- * derived days are recomputed with the engine's own status function.
+ * A projection is computed with an empty record array, so it holds no Peak of its own — and a cycle
+ * with no Peak has no window end. The calendar rule over the lookback is therefore what gives a
+ * projection its window: six days before the earliest Peak in the window, three days after the
+ * latest. With no Peak anywhere in the window the rule has no edges, so the composed protocol
+ * default stands in — for a projection only. A cycle the user recorded is never given this window,
+ * because for that cycle the absence of a Peak is reported rather than filled in.
  */
-function boundWindow(result: CycleResult): CycleResult {
-  if (result.fertileWindow.end !== null) {
-    return result;
+function deriveProjectedWindow(history: CycleHistory, settings: EngineSettings): FertileWindow {
+  const lookback = history.peaksByCycle
+    .slice(-Math.max(1, settings.historyWindow))
+    .filter((peak): peak is number => peak !== null);
+
+  if (lookback.length === 0) {
+    return {
+      begin: PROTOCOL_DEFAULT_WINDOW_BEGIN,
+      end: PROTOCOL_DEFAULT_WINDOW_END,
+      beginRule: "calendar-day-6",
+      endRule: "protocol-fallback-window",
+    };
   }
-  const window: FertileWindow = {
-    begin: PROTOCOL_DEFAULT_WINDOW_BEGIN,
-    end: PROTOCOL_DEFAULT_WINDOW_END,
-    beginRule: "calendar-day-6",
-    endRule: "protocol-default-band",
+
+  return {
+    begin: Math.min(...lookback) - CALENDAR_BEGINS_BEFORE_EARLIEST_PEAK,
+    end: Math.max(...lookback) + DEFAULT_POST_PEAK_DAYS,
+    beginRule: "calendar-earliest-peak-minus-6",
+    endRule: "lookback-latest-peak-plus-n",
   };
+}
+
+/** Applies the derived window and re-derives every day's status from it. */
+function projectedCycle(
+  result: CycleResult,
+  history: CycleHistory,
+  settings: EngineSettings,
+): CycleResult {
+  const window = deriveProjectedWindow(history, settings);
   return {
     ...result,
     fertileWindow: window,

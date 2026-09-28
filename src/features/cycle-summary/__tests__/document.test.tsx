@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
+import { END_RULE_LABELS } from "@/features/status/lib";
 import { SummaryDocument } from "../document";
 import type { SummaryModel } from "../lib";
 
@@ -23,7 +24,7 @@ function model(overrides: Partial<SummaryModel> = {}): SummaryModel {
       beginRule: "calendar rule (cycle day 6)",
       endBasis:
         "Set by your own reading — three full days after the monitor Peak you recorded on cycle day 14.",
-      endRule: "current monitor Peak + 3 days",
+      endRule: END_RULE_LABELS["current-peak-plus-n"],
     },
     days: Array.from({ length: 28 }, (_, index) => ({
       day: index + 1,
@@ -76,7 +77,7 @@ describe("SummaryDocument", () => {
     expect(window).toHaveTextContent(/cycle day 6 to cycle day 17 \(12 days\)/i);
     expect(window).toHaveTextContent("calendar rule, not by a reading");
     expect(window).toHaveTextContent("Rule: calendar rule (cycle day 6)");
-    expect(window).toHaveTextContent("Rule: current monitor Peak + 3 days");
+    expect(window).toHaveTextContent(`Rule: ${END_RULE_LABELS["current-peak-plus-n"]}`);
   });
 
   it("prints the monitor reading as a word per day, which is what survives black and white", () => {

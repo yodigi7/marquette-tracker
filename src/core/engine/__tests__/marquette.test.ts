@@ -12,6 +12,7 @@ import type {
   CycleHistory,
   CycleInput,
   DayRecordInput,
+  DayStatus,
   EngineSettings,
   EngineWarning,
 } from "../types";
@@ -59,6 +60,8 @@ interface WindowExpectation {
   end: number | null;
   beginRule: string;
   endRule: string;
+  /** `[day, status]` pairs the day results must carry, checked against the computed window. */
+  statusByDay?: [number, DayStatus][];
 }
 
 interface Case {
@@ -169,39 +172,51 @@ const CASES: Case[] = [
     expect: { begin: 4, end: 17, beginRule: "first-high-or-peak", endRule: "current-peak-plus-n" },
   },
   {
-    name: "cycle 9: historic latest peak 16+3=19 ends before current 20+3=23 → earliest-end",
+    name: "cycle 9: a Peak later than every historical Peak ends three days after itself",
     cycleNo: 9,
     history: historyWithPeaks([12, 16, 14, 15, 13, 14]),
     records: [record(9, 20, { monitor: "peak" })],
     expect: {
       begin: 6,
-      end: 19,
+      end: 23,
       beginRule: "calendar-earliest-peak-minus-6",
-      endRule: "earliest-end",
+      endRule: "current-peak-plus-n",
+      statusByDay: [
+        [20, "fertile"],
+        [21, "fertile"],
+        [22, "fertile"],
+        [23, "fertile"],
+        [24, "post-peak"],
+      ],
     },
   },
   {
-    name: "cycle 9: current peak end 13 beats historic end 19",
+    name: "cycle 9: a Peak earlier than every historical Peak ends three days after itself",
     cycleNo: 9,
-    history: historyWithPeaks([12, 16, 14, 15, 13, 14]),
+    history: historyWithPeaks([12, 16, 13, 14, 16, 15]),
     records: [record(9, 10, { monitor: "peak" })],
     expect: {
       begin: 6,
       end: 13,
       beginRule: "calendar-earliest-peak-minus-6",
       endRule: "current-peak-plus-n",
+      statusByDay: [
+        [10, "fertile"],
+        [13, "fertile"],
+        [14, "post-peak"],
+      ],
     },
   },
   {
-    name: "cycle 9 without peak falls back to historic latest peak + 3",
+    name: "cycle 9 with no Peak of its own reports no end, whatever the history holds",
     cycleNo: 9,
-    history: historyWithPeaks([12, 16, 14, 15, 13, 14]),
+    history: historyWithPeaks([12, 16, 13, 14, 16, 15]),
     records: [record(9, 10, { monitor: "high" })],
     expect: {
       begin: 6,
-      end: 19,
+      end: null,
       beginRule: "calendar-earliest-peak-minus-6",
-      endRule: "historic-peak-plus-n",
+      endRule: "none",
     },
   },
   {
@@ -232,8 +247,21 @@ const CASES: Case[] = [
     expect: { begin: 3, end: 17, beginRule: "first-high-or-peak", endRule: "current-peak-plus-n" },
   },
   {
-    name: "cycle 9 without history at all: falls back to peak-12 minus 6 (day 6), ends peak+3",
+    name: "cycle 9 with an empty lookback: begin is day 6, reported as the day-6 fallback",
     cycleNo: 9,
+    history: emptyHistory(),
+    records: [record(9, 15, { monitor: "peak" })],
+    expect: {
+      begin: 6,
+      end: 18,
+      beginRule: "calendar-day-6-fallback",
+      endRule: "current-peak-plus-n",
+    },
+  },
+  {
+    name: "cycle 9 with a Peak in the lookback: the same begin day, but as earliest Peak minus 6",
+    cycleNo: 9,
+    history: historyWithPeaks([12, 16]),
     records: [record(9, 15, { monitor: "peak" })],
     expect: {
       begin: 6,
@@ -282,8 +310,40 @@ describe("marquette computeCycle", () => {
       if (testCase.expect.end === null) {
         expect(result.warnings).toContainEqual({ kind: "no-peak-end", cycleNo: testCase.cycleNo });
       }
+      for (const [day, status] of testCase.expect.statusByDay ?? []) {
+        expect(result.days.find((entry) => entry.day === day)?.status, testCase.name).toBe(status);
+      }
     });
   }
+
+  it("never reports a window end earlier than the cycle's own monitor Peak", () => {
+    // The invariant the deleted historical branch broke: the end is measured from the cycle's own
+    // Peak, so it can never land before it, whatever the lookback holds. Stated over every table
+    // case that carries a Peak rather than as one more hand-written row.
+    const withPeak = CASES.filter((testCase) => testCase.records.some((r) => r.monitor === "peak"));
+    expect(withPeak.length).toBeGreaterThan(0);
+
+    for (const testCase of withPeak) {
+      const result = computeCycle(
+        cycle(testCase.cycleNo),
+        testCase.records.map((r) => ({ ...r, cycleId: "c" + testCase.cycleNo })),
+        testCase.cycleNo,
+        testCase.expect.length ?? 28,
+        testCase.history ?? emptyHistory(),
+        testCase.settings ?? settings(),
+        TODAY,
+      );
+      // `computePeak` keeps the last Peak in cycle-day order, so the anchoring day is the latest.
+      const peakDay = Math.max(
+        ...testCase.records.filter((r) => r.monitor === "peak").map((r) => r.dayInCycle),
+      );
+      expect(result.peakDay, testCase.name).toBe(peakDay);
+      expect(
+        result.fertileWindow.end ?? Number.NEGATIVE_INFINITY,
+        testCase.name,
+      ).toBeGreaterThanOrEqual(peakDay);
+    }
+  });
 
   it("uses a fixed three-day post-Peak protocol constant", () => {
     expect(DEFAULT_POST_PEAK_DAYS).toBe(3);
@@ -603,6 +663,30 @@ describe("out-of-window monitor evidence", () => {
     expect(withEvidence.days.map((d) => d.status)).toEqual(without.days.map((d) => d.status));
     expect(evidenceWarnings(without.warnings)).toEqual([]);
   });
+
+  it("does not fire on a merely late cycle once the end follows its own Peak", () => {
+    // Historical Peaks 12..16, so the latest of them plus three is day 19. This cycle's own Peak is
+    // on day 20, so the window ends on 23 and every High here sits inside it. Before the end was
+    // measured from the cycle's own Peak, day 19 ended the window and the day-20 reading was
+    // reported as a contradiction the user had not actually made.
+    const result = computeCycle(
+      cycle(9),
+      [
+        record(9, 16, { monitor: "high" }),
+        record(9, 17, { monitor: "high" }),
+        record(9, 18, { monitor: "high" }),
+        record(9, 20, { monitor: "peak" }),
+      ],
+      9,
+      28,
+      historyWithPeaks([12, 13, 14, 15, 16]),
+      settings(),
+      TODAY,
+    );
+
+    expect(result.fertileWindow.end).toBe(23);
+    expect(evidenceWarnings(result.warnings)).toEqual([]);
+  });
 });
 
 describe("open cycle past its computed end", () => {
@@ -657,6 +741,90 @@ describe("open cycle past its computed end", () => {
     expect(inProgress(openPast(13).warnings)).toEqual([]);
     // current day before the computed end
     expect(inProgress(openPast(10).warnings)).toEqual([]);
+  });
+});
+
+describe("run of consecutive High readings", () => {
+  /** `high` on `startDay`..`startDay + length - 1`, plus whatever the case adds. */
+  function highs(startDay: number, length: number, extra: DayRecordInput[] = []) {
+    const run = Array.from({ length }, (_, i) => record(1, startDay + i, { monitor: "high" }));
+    return [...run, ...extra];
+  }
+
+  function compute(records: DayRecordInput[]) {
+    return computeCycle(cycle(1), records, 1, 28, emptyHistory(), settings(), TODAY);
+  }
+
+  /**
+   * The same days logged, with `low` where the run had `high`: identical cycle days, same span, no
+   * run. What a run must not change is what this comparison shows.
+   */
+  function withoutHighs(records: DayRecordInput[]): DayRecordInput[] {
+    return records.map((r) => (r.monitor === "high" ? { ...r, monitor: "low" as const } : r));
+  }
+
+  function highRuns(warnings: EngineWarning[]): EngineWarning[] {
+    return warnings.filter((w) => w.kind === "high-run");
+  }
+
+  it("reports a run of nine High readings and names its length", () => {
+    const result = compute(highs(6, 9));
+
+    expect(highRuns(result.warnings)).toEqual([{ kind: "high-run", cycleNo: 1, run: 9 }]);
+    // The run is an observation, never a Peak: it must not become one.
+    expect(result.peakDay).toBeNull();
+    expect(result.fertileWindow.endRule).toBe("none");
+  });
+
+  it("reports nothing for a run of eight High readings", () => {
+    expect(highRuns(compute(highs(6, 8)).warnings)).toEqual([]);
+  });
+
+  it("does not join two runs across a Low into one long run", () => {
+    // Highs on days 6..13, a Low on 14, Highs again on 15 and 16. Read as one run those eleven
+    // High readings span days 6..16; read as two they are 8 and 2, both under the threshold.
+    const result = compute(highs(6, 8, [record(1, 14, { monitor: "low" }), ...highs(15, 2)]));
+
+    expect(highRuns(result.warnings)).toEqual([]);
+  });
+
+  it("measures the longest run of a split, not the total of the High readings", () => {
+    // Highs on 6..14, a Low on 15, Highs on 16 and 17: eleven High readings, but the longest run is 9.
+    const result = compute(highs(6, 9, [record(1, 15, { monitor: "low" }), ...highs(16, 2)]));
+
+    expect(highRuns(result.warnings)).toEqual([{ kind: "high-run", cycleNo: 1, run: 9 }]);
+  });
+
+  it("treats a Peak as the end of the run", () => {
+    // Highs on 6..13, a Peak on 14, Highs on 15 and 16. Ignored as a terminator those would be one
+    // run of 11 across days 6..16; the Peak ends it, leaving 8 and 2.
+    const result = compute(highs(6, 8, [record(1, 14, { monitor: "peak" }), ...highs(15, 2)]));
+
+    expect(highRuns(result.warnings)).toEqual([]);
+    expect(result.peakDay).toBe(14);
+  });
+
+  it("treats a day with no High reading as the end of the run", () => {
+    // Highs on 6..13, nothing logged on 14, Highs on 15 and 16. An unlogged day is not a `high`.
+    const result = compute(highs(6, 8, highs(15, 2)));
+
+    expect(highRuns(result.warnings)).toEqual([]);
+  });
+
+  it("leaves the window untouched, run or no run", () => {
+    const withRun = compute(highs(6, 9));
+    const withoutRun = compute(withoutHighs(highs(6, 9)));
+
+    expect(withRun.fertileWindow).toEqual(withoutRun.fertileWindow);
+    expect(withRun.days.map((d) => d.status)).toEqual(withoutRun.days.map((d) => d.status));
+  });
+
+  it("leaves the window untouched when a run sits beside a Peak", () => {
+    const records = highs(6, 8, [record(1, 14, { monitor: "peak" }), ...highs(15, 2)]);
+    const withRun = compute(records);
+    const withoutRun = compute(withoutHighs(records));
+
+    expect(withRun.fertileWindow).toEqual(withoutRun.fertileWindow);
   });
 });
 

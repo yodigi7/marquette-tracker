@@ -60,8 +60,10 @@ function computeBegin(
     calendarBegin = 6;
     calendarRule = "calendar-day-6";
   } else if (historic.length === 0) {
+    // Same day as the cycles-1-6 rule, reached by falling back to it. Reported under its own value
+    // so the rule a surface names is the rule that was applied.
     calendarBegin = DEFAULT_EARLIEST_PEAK - 6;
-    calendarRule = "calendar-earliest-peak-minus-6";
+    calendarRule = "calendar-day-6-fallback";
   } else {
     calendarBegin = Math.min(...historic) - 6;
     calendarRule = "calendar-earliest-peak-minus-6";
@@ -75,38 +77,47 @@ function computeBegin(
   return { begin: calendarBegin, rule: calendarRule };
 }
 
-function computeEnd(
-  cycleNo: number,
-  peakDay: number | null,
-  history: CycleHistory,
-  settings: EngineSettings,
-): { end: number | null; rule: EndRule } {
-  const windowSize = Math.max(1, settings.historyWindow);
-  const historic = history.peaksByCycle.slice(-windowSize).filter((p): p is number => p !== null);
-
-  if (cycleNo <= 6) {
-    if (peakDay === null) {
-      return { end: null, rule: "none" };
-    }
-    return { end: peakDay + DEFAULT_POST_PEAK_DAYS, rule: "current-peak-plus-n" };
+/**
+ * The fertile window's end, measured from this cycle's own monitor Peak and from nothing else.
+ *
+ * The protocol defines the end only through a Peak, so a cycle holding none has no end at all. The
+ * alternative — measuring from a Peak in an earlier cycle, or from whichever of the two ends first —
+ * is what let an end land on a day before the Peak that defines it. `DEFAULT_POST_PEAK_DAYS` is a
+ * protocol constant (see its own doc comment), so no input to this function can move it.
+ */
+function computeEnd(peakDay: number | null): { end: number | null; rule: EndRule } {
+  if (peakDay === null) {
+    return { end: null, rule: "none" };
   }
+  return { end: peakDay + DEFAULT_POST_PEAK_DAYS, rule: "current-peak-plus-n" };
+}
 
-  if (peakDay !== null) {
-    const currentEnd = peakDay + DEFAULT_POST_PEAK_DAYS;
-    if (historic.length === 0) {
-      return { end: currentEnd, rule: "current-peak-plus-n" };
-    }
-    const historicEnd = Math.max(...historic) + DEFAULT_POST_PEAK_DAYS;
-    if (historicEnd < currentEnd) {
-      return { end: historicEnd, rule: "earliest-end" };
-    }
-    return { end: currentEnd, rule: "current-peak-plus-n" };
-  }
+/**
+ * Consecutive `high` readings at which the monitor's own guidance is to stop testing, because a Peak
+ * is no longer expected. A protocol threshold, not a preference.
+ */
+const HIGH_RUN_WARNING_DAYS = 9;
 
-  if (historic.length > 0) {
-    return { end: Math.max(...historic) + DEFAULT_POST_PEAK_DAYS, rule: "historic-peak-plus-n" };
+/**
+ * The longest run of consecutive cycle days carrying a user-entered `high` reading.
+ *
+ * A `peak` ends the run, and so does any day that is not a `high` — including a day with no reading
+ * at all, which is not a High. Over records already sorted by cycle day, so contiguity is a single
+ * comparison per record.
+ */
+function longestHighRun(records: DayRecordInput[]): number {
+  let longest = 0;
+  let current = 0;
+  for (const [index, record] of records.entries()) {
+    const previous = index > 0 ? records[index - 1] : null;
+    const consecutive =
+      previous !== null &&
+      previous.monitor === "high" &&
+      previous.dayInCycle + 1 === record.dayInCycle;
+    current = record.monitor === "high" ? (consecutive ? current + 1 : 1) : 0;
+    longest = Math.max(longest, current);
   }
-  return { end: null, rule: "none" };
+  return longest;
 }
 
 function statusForDay(day: number, window: FertileWindow, peakKnown: boolean): DayStatus {
@@ -166,7 +177,7 @@ export function computeCycle(
   const { peakDay, source } = computePeak(sorted);
 
   const begin = computeBegin(cycleNo, sorted, history, settings);
-  const end = computeEnd(cycleNo, peakDay, history, settings);
+  const end = computeEnd(peakDay);
   const fertileWindow: FertileWindow = {
     begin: begin.begin,
     end: end.end,
@@ -214,6 +225,14 @@ export function computeCycle(
     if (offendingDay !== null) {
       warnings.push({ kind: "monitor-evidence-outside-window", cycleNo, day: offendingDay });
     }
+  }
+
+  // Deliberately outside the split above: a run of Highs is a fact about the readings, so it holds
+  // whether or not an end was found. It is an observation rather than a contradiction — it never
+  // becomes a Peak and never moves a boundary, the window above is already fixed.
+  const highRun = longestHighRun(sorted);
+  if (highRun >= HIGH_RUN_WARNING_DAYS) {
+    warnings.push({ kind: "high-run", cycleNo, run: highRun });
   }
 
   return {

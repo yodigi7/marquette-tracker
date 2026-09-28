@@ -189,11 +189,16 @@ function buildWindow(result: CycleResult): SummaryWindow {
  * The two things the requirement asks the document to make explicit, stated as a category. The exact
  * rule is printed separately, from the Status view's own rule labels, so precision is not restated here.
  *
+ * `calendar-day-6` and `calendar-day-6-fallback` deliberately share one sentence: they are the same
+ * rule and the same day, reached two different ways, and the difference between them is *why* the
+ * calendar rule had nothing to measure from — which the rule label beside this already says.
+ *
  * A `Record` over the engine's unions rather than a `switch`: a rule value added to the engine becomes
  * a type error here instead of silently rendering a blank basis.
  */
 const BEGIN_BASIS: Record<BeginRule, string> = {
   "calendar-day-6": "Set by the calendar rule, not by a reading.",
+  "calendar-day-6-fallback": "Set by the calendar rule, not by a reading.",
   "calendar-earliest-peak-minus-6": "Set by the calendar rule, not by a reading.",
   "first-high-or-peak": "Set by your own reading — the first High or Peak of this cycle.",
 };
@@ -201,12 +206,10 @@ const BEGIN_BASIS: Record<BeginRule, string> = {
 const END_BASIS: Record<EndRule, (peakDay: number | null) => string> = {
   "current-peak-plus-n": (peakDay) =>
     `Set by your own reading — three full days after the monitor Peak you recorded on cycle day ${peakDay}.`,
-  "earliest-end": (peakDay) =>
-    `Set by your own reading — the window closed three full days after whichever came first, your monitor Peak on cycle day ${peakDay} or the latest Peak recorded in your earlier cycles.`,
-  "historic-peak-plus-n": () =>
-    "Set by Peaks you recorded in earlier cycles — this cycle has no monitor Peak reading of its own, so the end falls three full days after the latest of those earlier Peaks.",
-  "protocol-default-band": () =>
-    "Set by the protocol's default band, because no Peak readings are on record to derive it from.",
+  "lookback-latest-peak-plus-n": () =>
+    "Set by the Peaks in your recent cycles — three full days after the latest of them.",
+  "protocol-fallback-window": () =>
+    "Set by the protocol's earliest possible Peak day — three full days after it, because no Peak readings are on record to derive a window from.",
   none: () =>
     "No end can be set. The protocol ends the fertile window three full days after a monitor Peak reading, and this cycle has none.",
 };
@@ -238,8 +241,8 @@ export interface WarningContext {
  * One plain-language line per warning the app raised for this cycle.
  *
  * The two reconciliation kinds reuse `warningBanner` so the document says exactly what the Status view
- * says about the same contradiction. The other two have no wording in the Status vocabulary, which is
- * narrowed to the two it reconciles on a date-selectable view, so they are phrased here.
+ * says about the same contradiction. The other three have no wording in the Status vocabulary, which
+ * is narrowed to the kinds it reconciles on a date-selectable view, so they are phrased here.
  *
  * The document reports the warnings the app raised and raises none of its own — so an out-of-band line
  * appears only when the engine raised one, which it does only once at least two cycles are out of band.
@@ -265,6 +268,14 @@ export function warningLines(
     if (warning.kind === "no-peak-end") {
       lines.push(
         "No monitor Peak reading in this cycle. The protocol ends the fertile window three full days after a Peak reading, so no end can be set for this cycle.",
+      );
+      continue;
+    }
+    if (warning.kind === "high-run") {
+      // Names the run and its length, and says plainly that it is not a Peak reading — a document
+      // handed to an instructor must not let a run of Highs be read as evidence of one.
+      lines.push(
+        `Monitor High on ${warning.run} consecutive cycle days of this cycle, which is the point at which the monitor's guidance is to stop testing. No Peak is recorded from these days.`,
       );
       continue;
     }

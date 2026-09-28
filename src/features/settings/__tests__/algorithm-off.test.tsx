@@ -77,7 +77,7 @@ describe("Algorithm off = logging only (US2)", () => {
     // Interpretation is visible again. Which phase today falls in depends on the
     // fixed three-day interval, so assert the window line rather than a status.
     expect(screen.getByText(/Fertile from cycle day/i)).toBeInTheDocument();
-    expect(screen.getByText(/current monitor Peak \+ 3 days/)).toBeInTheDocument();
+    expect(screen.getByText(/this cycle's monitor Peak \+ 3 days/)).toBeInTheDocument();
   });
 
   it("Status shows the logging-only card when the algorithm is off", async () => {

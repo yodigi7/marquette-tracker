@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import type { EndRule, Forecast } from "@/core/engine/types";
+import type { BeginRule, EndRule, Forecast } from "@/core/engine/types";
 import {
+  BEGIN_RULE_LABELS,
   END_RULE_LABELS,
   STATUS_LABELS,
   WARNING_LABELS,
@@ -12,12 +13,30 @@ import {
   warningBanner,
 } from "../lib";
 
-const RULES: EndRule[] = ["current-peak-plus-n", "historic-peak-plus-n", "earliest-end", "none"];
+const RULES: EndRule[] = [
+  "current-peak-plus-n",
+  "lookback-latest-peak-plus-n",
+  "protocol-fallback-window",
+  "none",
+];
 
 describe("endRuleLabel", () => {
-  it("names the fixed three-day interval in the rules that carry a day count", () => {
-    expect(endRuleLabel("current-peak-plus-n")).toBe("current monitor Peak + 3 days");
-    expect(endRuleLabel("historic-peak-plus-n")).toBe("latest historical Peak + 3 days");
+  it("names the fixed three-day interval in the rules that measure from a Peak", () => {
+    expect(endRuleLabel("current-peak-plus-n")).toBe(END_RULE_LABELS["current-peak-plus-n"]);
+    expect(endRuleLabel("lookback-latest-peak-plus-n")).toBe(
+      END_RULE_LABELS["lookback-latest-peak-plus-n"],
+    );
+  });
+
+  it("names whose Peak each rule measures from, so the two are not read as one", () => {
+    expect(endRuleLabel("current-peak-plus-n")).toMatch(/this cycle/i);
+    expect(endRuleLabel("lookback-latest-peak-plus-n")).not.toMatch(/this cycle/i);
+    expect(endRuleLabel("lookback-latest-peak-plus-n")).toMatch(/recent cycles/i);
+  });
+
+  it("gives every end rule distinct text", () => {
+    const labels = RULES.map((rule) => endRuleLabel(rule));
+    expect(new Set(labels).size).toBe(labels.length);
   });
 
   it("never leaves an N placeholder in any rule label", () => {
@@ -27,8 +46,40 @@ describe("endRuleLabel", () => {
   });
 
   it("keeps rules that carry no day count unchanged", () => {
-    expect(endRuleLabel("earliest-end")).toBe(END_RULE_LABELS["earliest-end"]);
+    expect(endRuleLabel("protocol-fallback-window")).toBe(
+      END_RULE_LABELS["protocol-fallback-window"],
+    );
     expect(endRuleLabel("none")).toBe(END_RULE_LABELS.none);
+  });
+
+  it("hard-codes no cycle-length band, which the fallback window is not", () => {
+    // The old value was a hand-written 21 that read as a band floor. The composed window is a
+    // calendar window, so no label may quote a number the rules did not produce.
+    for (const rule of RULES) {
+      expect(endRuleLabel(rule)).not.toMatch(/\b21\b|\b42\b/);
+    }
+  });
+});
+
+describe("BEGIN_RULE_LABELS", () => {
+  it("distinguishes the first-cycle day-6 rule from the day-6 fallback", () => {
+    expect(BEGIN_RULE_LABELS["calendar-day-6"]).toBe("calendar rule (cycle day 6)");
+    expect(BEGIN_RULE_LABELS["calendar-day-6-fallback"]).not.toBe(
+      BEGIN_RULE_LABELS["calendar-day-6"],
+    );
+    // Same day, different reason: the fallback says there was nothing to measure from.
+    expect(BEGIN_RULE_LABELS["calendar-day-6-fallback"]).toMatch(/no Peak history/i);
+  });
+
+  it("gives every begin rule distinct text", () => {
+    const rules: BeginRule[] = [
+      "calendar-day-6",
+      "calendar-day-6-fallback",
+      "calendar-earliest-peak-minus-6",
+      "first-high-or-peak",
+    ];
+    const labels = rules.map((rule) => BEGIN_RULE_LABELS[rule]);
+    expect(new Set(labels).size).toBe(labels.length);
   });
 });
 
@@ -61,7 +112,7 @@ describe("windowDescription", () => {
 
   it("describes the fixed interval in the window line", () => {
     expect(windowDescription(window, true)).toBe(
-      "Fertile from cycle day 6 (calendar rule (cycle day 6)); until day 17 (current monitor Peak + 3 days).",
+      `Fertile from cycle day 6 (calendar rule (cycle day 6)); until day 17 (${END_RULE_LABELS["current-peak-plus-n"]}).`,
     );
   });
 
@@ -77,30 +128,26 @@ describe("windowDescription", () => {
   it("names the rule behind every finite window end", () => {
     // The two post-window statuses must stay tellable apart, which means the line
     // has to carry the rule that produced the end — not just the status label.
-    const finiteRules = [
-      "current-peak-plus-n",
-      "historic-peak-plus-n",
-      "earliest-end",
-      "protocol-default-band",
-    ] as const;
-
-    for (const rule of finiteRules) {
+    for (const rule of RULES.filter((r) => r !== "none")) {
       // peakKnown only affects the undetermined-end branch, so it is irrelevant here.
       const line = windowDescription({ ...window, end: 17, endRule: rule }, true);
       expect(line).toContain(END_RULE_LABELS[rule]);
     }
   });
 
-  it("gives the two post-window rules distinct text", () => {
-    const byPeak = windowDescription({ ...window, end: 17, endRule: "current-peak-plus-n" }, true);
+  it("gives the two rules that measure from a Peak distinct text", () => {
+    const byThisPeak = windowDescription(
+      { ...window, end: 17, endRule: "current-peak-plus-n" },
+      true,
+    );
     const byHistory = windowDescription(
-      { ...window, end: 17, endRule: "historic-peak-plus-n" },
+      { ...window, end: 17, endRule: "lookback-latest-peak-plus-n" },
       false,
     );
 
-    expect(byPeak).not.toBe(byHistory);
-    expect(byPeak).toContain(END_RULE_LABELS["current-peak-plus-n"]);
-    expect(byHistory).toContain(END_RULE_LABELS["historic-peak-plus-n"]);
+    expect(byThisPeak).not.toBe(byHistory);
+    expect(byThisPeak).toContain(END_RULE_LABELS["current-peak-plus-n"]);
+    expect(byHistory).toContain(END_RULE_LABELS["lookback-latest-peak-plus-n"]);
   });
 
   it("carries no rule name when the end is undetermined", () => {
@@ -112,6 +159,8 @@ describe("windowDescription", () => {
 describe("warningBanner", () => {
   const evidence = { kind: "monitor-evidence-outside-window", cycleNo: 1, day: 15 } as const;
   const inProgress = { kind: "open-cycle-past-window-end", cycleNo: 1 } as const;
+  const noPeak = { kind: "no-peak-end", cycleNo: 1 } as const;
+  const run = { kind: "high-run", cycleNo: 1, run: 9 } as const;
 
   it("names the reading, the offending cycle day, and the computed window end", () => {
     const banner = warningBanner([evidence], 13)!;
@@ -136,8 +185,45 @@ describe("warningBanner", () => {
     expect(warningBanner([inProgress, evidence], 13)).toBe(warningBanner([evidence], 13));
   });
 
+  it("reports a cycle with no Peak as unresolved, without a referral or a fault", () => {
+    const banner = warningBanner([noPeak], null)!;
+
+    expect(banner).toMatch(/no monitor Peak reading/i);
+    expect(banner).toMatch(/unresolved/i);
+    // Factual, and nothing beyond it: no instruction to see anyone, no claim a device misbehaved.
+    expect(banner).not.toMatch(/invalid|error|malfunction|fault|incorrect/i);
+    expect(banner).not.toMatch(/disclaimer|medical advice|consult (a|your|with)/i);
+  });
+
+  it("reports a run of High readings with its length and the monitor's own guidance", () => {
+    const banner = warningBanner([run], null)!;
+
+    expect(banner).toMatch(/\b9\b/);
+    expect(banner).toMatch(/stop testing/i);
+    // The run is never presented as a Peak.
+    expect(banner).not.toMatch(/peak reading/i);
+  });
+
+  it("names the run's length, not a fixed one", () => {
+    expect(warningBanner([{ kind: "high-run", cycleNo: 1, run: 12 }], null)).toMatch(/\b12\b/);
+  });
+
+  it("gives both observations when a peakless cycle also has a long run", () => {
+    // A run of Highs is the reason a cycle has no Peak, so reporting either alone would hide a fact.
+    const banner = warningBanner([noPeak, run], null)!;
+
+    expect(banner).toMatch(/no monitor Peak reading/i);
+    expect(banner).toMatch(/\b9\b/);
+  });
+
+  it("keeps the two observations behind both reconciliation kinds", () => {
+    for (const reconciliation of [evidence, inProgress]) {
+      const banner = warningBanner([noPeak, run, reconciliation], 13)!;
+      expect(banner).toBe(warningBanner([reconciliation], 13));
+    }
+  });
+
   it("returns nothing for warnings it does not render", () => {
-    expect(warningBanner([{ kind: "no-peak-end", cycleNo: 1 }], null)).toBeNull();
     expect(warningBanner([{ kind: "cycle-out-of-band", cycleNo: 1, length: 60 }], null)).toBeNull();
     expect(warningBanner([], 13)).toBeNull();
   });
@@ -148,13 +234,21 @@ describe("warningBanner", () => {
   });
 
   it("uses no error, invalid, malfunction, or disclaimer language", () => {
-    for (const banner of [warningBanner([evidence], 13)!, warningBanner([inProgress], 13)!]) {
+    for (const banner of [
+      warningBanner([evidence], 13)!,
+      warningBanner([inProgress], 13)!,
+      warningBanner([noPeak], null)!,
+      warningBanner([run], null)!,
+      warningBanner([noPeak, run], null)!,
+    ]) {
       expect(banner).not.toMatch(/invalid|error|malfunction|fault|incorrect/i);
       expect(banner).not.toMatch(/disclaimer|medical advice|consult (a|your)/i);
     }
   });
 
   it("gives each warning kind distinct label text", () => {
+    const labels = Object.values(WARNING_LABELS);
+    expect(new Set(labels).size).toBe(labels.length);
     expect(WARNING_LABELS["monitor-evidence-outside-window"]).not.toBe(
       WARNING_LABELS["open-cycle-past-window-end"],
     );

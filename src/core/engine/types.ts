@@ -45,12 +45,31 @@ export interface DayRecordInput {
 
 export type DayStatus = "pre-fertile" | "fertile" | "post-peak" | "post-calendar";
 
-export type BeginRule = "calendar-day-6" | "calendar-earliest-peak-minus-6" | "first-high-or-peak";
+export type BeginRule =
+  /** Cycles 1-6: day 6 is the rule itself. */
+  | "calendar-day-6"
+  /**
+   * A cycle beyond the first six whose history window holds no monitor Peak to measure from, so day
+   * 6 is reached by falling back to the cycles-1-6 rule rather than by applying the earliest-Peak one.
+   * The begin *day* is 6 either way; only the rule that produced it differs.
+   */
+  | "calendar-day-6-fallback"
+  | "calendar-earliest-peak-minus-6"
+  | "first-high-or-peak";
+
+/**
+ * The fertile window's end, and the rule that produced it.
+ *
+ * Only `current-peak-plus-n` applies to a cycle the user has recorded: the protocol defines the end
+ * solely through a monitor Peak, so a recorded cycle's end is its own Peak plus the fixed interval,
+ * and a cycle holding no Peak has none. The two projection rules name a projected cycle's window,
+ * which is computed from the lookback because a projection has no readings of its own — they are
+ * never produced for a recorded cycle.
+ */
 export type EndRule =
   | "current-peak-plus-n"
-  | "historic-peak-plus-n"
-  | "earliest-end"
-  | "protocol-default-band"
+  | "lookback-latest-peak-plus-n"
+  | "protocol-fallback-window"
   | "none";
 
 export interface FertileWindow {
@@ -97,7 +116,13 @@ export type EngineWarning =
    * progress, so its days past that end are not settled and are reported as such. A closed cycle
    * with an end in the past is ordinary and never produces this.
    */
-  | { kind: "open-cycle-past-window-end"; cycleNo: number };
+  | { kind: "open-cycle-past-window-end"; cycleNo: number }
+  /**
+   * The cycle's longest run of consecutive `high` readings reached the length at which the monitor's
+   * own guidance is to stop testing, because a Peak is no longer expected. An observation about the
+   * readings, not a contradiction: the run is never treated as a Peak and never moves a boundary.
+   */
+  | { kind: "high-run"; cycleNo: number; run: number };
 
 /** Previous-cycle peak days (oldest → newest) used by the calendar rules. */
 export interface CycleHistory {

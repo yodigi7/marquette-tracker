@@ -1,7 +1,13 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { addDays } from "../dateUtils";
-import { CYCLE_LENGTH_MAX, CYCLE_LENGTH_MIN, DEFAULT_HISTORY_WINDOW } from "../marquette";
+import {
+  CYCLE_LENGTH_MAX,
+  CYCLE_LENGTH_MIN,
+  DEFAULT_EARLIEST_PEAK,
+  DEFAULT_HISTORY_WINDOW,
+  DEFAULT_POST_PEAK_DAYS,
+} from "../marquette";
 import { computeCycle } from "../marquette";
 import { computePredictions } from "../predict";
 import {
@@ -97,6 +103,27 @@ function eightClosedCycles(): CycleResult[] {
     day1 = addDays(day1, CLOSED_LENGTHS[i]);
   }
   return cycles;
+}
+
+/** `peaks.length` closed 28-day cycles from 2026-01-01, carrying exactly the given Peak days. */
+function closedCyclesWith(peaks: (number | null)[]): CycleResult[] {
+  const cycles: CycleResult[] = [];
+  let day1 = "2026-01-01";
+  for (let [index, peak] of peaks.entries()) {
+    cycles.push(closedCycle(index + 1, day1, 28, peak));
+    day1 = addDays(day1, 28);
+  }
+  return cycles;
+}
+
+/**
+ * Eight closed cycles ending in the five given Peak days, so that with one open cycle after them
+ * those five are exactly the configured lookback window. Three older cycles stand in front so the
+ * window lands on the five given, rather than on the tail of a shorter list where the open cycle's
+ * own absent Peak would take a slot.
+ */
+function withLookbackPeaks(peaks: number[]): CycleResult[] {
+  return closedCyclesWith([11, 11, 11, ...peaks]);
 }
 
 const OPEN_DAY1 = "2026-09-01";
@@ -280,8 +307,39 @@ describe("projectCycles fertile window", () => {
     const projected = projectCycles(cycles, settings(), TODAY, "2026-10-31");
 
     // lookback min peak 12 -> begin 6; max peak 17 + 3 -> end 20
-    expect(projected[0].fertileWindow.begin).toBe(6);
-    expect(projected[0].fertileWindow.end).toBe(20);
+    expect(projected[0].fertileWindow).toMatchObject({
+      begin: 6,
+      end: 20,
+      beginRule: "calendar-earliest-peak-minus-6",
+      endRule: "lookback-latest-peak-plus-n",
+    });
+  });
+
+  it("moves the projected end with the lookback's latest Peak", () => {
+    const endWith = (latest: number) =>
+      projectCycles(
+        [...withLookbackPeaks([12, 13, 14, 15, latest]), openCycle(9, OPEN_DAY1, null, TODAY)],
+        settings(),
+        TODAY,
+        "2026-10-31",
+      )[0].fertileWindow.end;
+
+    // The post-Peak interval is the protocol's, so the end is the latest lookback Peak plus three.
+    expect(endWith(17)).toBe(17 + DEFAULT_POST_PEAK_DAYS);
+    expect(endWith(19)).toBe(19 + DEFAULT_POST_PEAK_DAYS);
+  });
+
+  it("moves the projected begin with the lookback's earliest Peak", () => {
+    const beginWith = (earliest: number) =>
+      projectCycles(
+        [...withLookbackPeaks([earliest, 16, 17, 18, 20]), openCycle(9, OPEN_DAY1, null, TODAY)],
+        settings(),
+        TODAY,
+        "2026-10-31",
+      )[0].fertileWindow.begin;
+
+    expect(beginWith(12)).toBe(6);
+    expect(beginWith(14)).toBe(8);
   });
 
   it("gives a projected cycle no Peak evidence and no ovulation point estimate", () => {
@@ -304,7 +362,7 @@ describe("projectCycles fertile window", () => {
     expect(day21.status).not.toBe("fertile");
   });
 
-  it("falls back to the protocol default band when no Peak history exists", () => {
+  it("falls back to the composed protocol window when the lookback holds no Peak", () => {
     // closed cycles but the user never logged a monitor Peak
     const noPeaks: CycleResult[] = [];
     let day1 = "2026-01-01";
@@ -316,19 +374,44 @@ describe("projectCycles fertile window", () => {
 
     const projected = projectCycles(noPeaks, settings(), TODAY, "2026-10-31");
     expect(projected.length).toBeGreaterThan(0);
-    // the protocol's standard first-cycle band, pinned exactly: these are
-    // exported constants, so assert the values rather than just "bounded"
+
+    // The end is the composition, asserted from the constants rather than as a literal, so a change
+    // to either protocol constant moves the expectation instead of silently diverging from it.
+    const composed = DEFAULT_EARLIEST_PEAK + DEFAULT_POST_PEAK_DAYS;
+    expect(PROTOCOL_DEFAULT_WINDOW_END).toBe(composed);
     expect(projected[0].fertileWindow).toMatchObject({
       begin: PROTOCOL_DEFAULT_WINDOW_BEGIN,
-      end: PROTOCOL_DEFAULT_WINDOW_END,
-      endRule: "protocol-default-band",
+      end: composed,
+      endRule: "protocol-fallback-window",
     });
-    // bounded band, not fertile to the end of the cycle
+    // bounded window, not fertile to the end of the cycle
     expect(projected[0].fertileWindow.end).not.toBeNull();
     expect(projected[0].fertileWindow.end!).toBeLessThan(projected[0].length!);
-    // days past the default band are no longer painted fertile
-    const day22 = projected[0].days.find((d) => d.day === PROTOCOL_DEFAULT_WINDOW_END + 1);
-    expect(day22?.status).not.toBe("fertile");
+    // days past the window are no longer painted fertile
+    const past = projected[0].days.find((d) => d.day === PROTOCOL_DEFAULT_WINDOW_END + 1);
+    expect(past?.status).not.toBe("fertile");
+  });
+
+  it("matches the real open cycle's end, because its own Peak is the last lookback entry", () => {
+    // `projected[0]` re-derives the open cycle from no readings, so its window is the calendar rule
+    // over a lookback whose last element is the open cycle's own Peak. That makes the derived end
+    // the real one, so a projection cannot contradict the cycle it stands in for.
+    const cycles = [...eightClosedCycles(), openCycle(9, OPEN_DAY1, 20, TODAY)];
+    const real = cycles[cycles.length - 1];
+
+    const projected = projectCycles(cycles, settings(), TODAY, "2026-10-31");
+
+    expect(real.peakDay).toBe(20);
+    expect(real.fertileWindow.end).toBe(20 + DEFAULT_POST_PEAK_DAYS);
+    expect(projected[0].fertileWindow).toMatchObject({
+      begin: 6,
+      end: 20 + DEFAULT_POST_PEAK_DAYS,
+      beginRule: "calendar-earliest-peak-minus-6",
+      endRule: "lookback-latest-peak-plus-n",
+    });
+    // And the real cycle is untouched by the projection call.
+    expect(cycles[cycles.length - 1].fertileWindow).toBe(real.fertileWindow);
+    expect(real.fertileWindow.endRule).toBe("current-peak-plus-n");
   });
 });
 
@@ -353,6 +436,9 @@ describe("the bounded fallback does not reach recorded cycles", () => {
       expect(cycle.fertileWindow).toEqual(before[index]);
       expect(cycle.fertileWindow.end).toBeNull();
       expect(cycle.fertileWindow.endRule).toBe("none");
+      // Neither projection-only end rule reaches a cycle the user recorded.
+      expect(cycle.fertileWindow.endRule).not.toBe("protocol-fallback-window");
+      expect(cycle.fertileWindow.endRule).not.toBe("lookback-latest-peak-plus-n");
     });
   });
 });

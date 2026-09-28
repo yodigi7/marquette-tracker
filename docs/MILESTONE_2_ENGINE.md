@@ -1,5 +1,18 @@
 # Milestone 2 — Marquette Engine (Pure TS) + Table-Driven Tests
 
+> ## ⚠️ Superseded — this is a historical milestone record, not current behaviour
+>
+> This file records what was planned and built at Milestone 2. Several rules below have since
+> changed, and the sections are kept as written so the milestone's state can be read. **Do not read
+> this file as the specification of the engine.** The current domain rules are in `AGENTS.md`
+> ("Marquette domain rules"), the current unions are in `src/core/engine/types.ts`, and the current
+> behaviour is pinned by `src/core/engine/__tests__/`.
+>
+> Known since superseded, corrected where the correction is short and left as history where it is
+> not: the end rule (rows 9–11 of the test matrix and the "End" rule list — see below), the
+> configurable `postPeakDays` setting, mucus as Peak evidence, and the `source: confirmed | predicted`
+> day field.
+
 The heart of the project. A framework-agnostic algorithm module that computes the fertile window per the current Marquette Institute protocols, plus a forecasting module. All pure TypeScript — no React, no Dexie, no browser APIs, no enums (`erasableSyntaxOnly`), no `any` (strict).
 
 > Scope rule: all computed statuses are **derived at read time** from raw records, never stored. The engine recomputes on every data change (store calls it on write).
@@ -46,7 +59,8 @@ export type PregnancyResult = "negative" | "positive";
 ```ts
 export type DayStatus = "pre-fertile" | "fertile" | "post-peak" | "post-calendar";
 export type BeginRule = "calendar-day-6" | "calendar-earliest-peak-minus-6" | "first-high-or-peak";
-export type EndRule = "current-peak-plus-n" | "historic-peak-plus-n" | "earliest-end" | "none";
+export type EndRule =
+  "current-peak-plus-n" | "lookback-latest-peak-plus-n" | "protocol-fallback-window" | "none";
 export interface FertileWindow {
   begin: number;
   end: number | null;
@@ -80,11 +94,23 @@ export type EngineWarning =
    - cycleNo 1–6 → `calendar-day-6`: begin = 6.
    - Any first monitor `high` or `peak` on day d → begin = min(begin, d), `beginRule: 'first-high-or-peak'` when it wins.
    - cycleNo ≥ 7 → calendar begin = (earliest peakDay of the previous `historyWindow` cycles) − 6, defaulting earliest = 12 when history lacks peaks (yields day 6). Combined with the first-high rule via min.
-3. **End** (inclusive last day):
-   - Peak known, cycles 1–6: end = peakDay + `postPeakDays` (`current-peak-plus-n`); default 4 ⇒ fertile through P+4, first assumed Low at P+5.
-   - Peak known, cycleNo ≥ 7: end = min(current end, historic end) — "whichever ends first"; `endRule` records the winner (`earliest-end` when historic is earlier, `current-peak-plus-n` when current wins).
-   - No peak, cycleNo ≥ 7: fallback end = latest historic peak + `postPeakDays` (`historic-peak-plus-n`).
-   - No peak, cyclesNo 1–6: `end: null`, `endRule: 'none'` (+ warning `no-peak-end`).
+3. **End** (inclusive last day) — **corrected, the earlier-of-two rule no longer exists:**
+
+   - Peak known, any cycle number: end = peakDay + 3 (`current-peak-plus-n`). The end is measured from
+     the cycle's own monitor Peak and from no other reading, so it is never earlier than that Peak.
+   - No peak, any cycle number: `end: null`, `endRule: 'none'` (+ warning `no-peak-end`). The protocol
+     defines the end only through a Peak, so a peakless cycle has no end and every day from the
+     window's begin onward stays `fertile`.
+   - The two remaining rules belong to **projected** cycles only, which are computed from the lookback
+     rather than from readings: `lookback-latest-peak-plus-n` (end = latest lookback Peak + 3) and
+     `protocol-fallback-window` (end = earliest possible Peak day + 3, used when the lookback holds no
+     Peak at all). Neither is ever produced for a cycle the user recorded.
+   - Superseded, kept for the record: the rule at this milestone was "Peak known, cycleNo ≥ 7: end =
+     min(current end, historic end) — whichever ends first" (`earliest-end` when the historic end was
+     earlier, `historic-peak-plus-n` for a peakless cycle ≥ 7). That comparison could place a window's
+     end on a day **before** the Peak that defines it — a cycle 9 whose Peak fell on day 20 could be
+     reported as ending on day 19 — so it was removed.
+
 4. **Statuses per day** (only for recorded days): day < begin → `pre-fertile`; begin..end → `fertile`; end < day → `post-peak` if peak known else `post-calendar`.
 5. **Warnings**: cycle length outside 21–42 and ≥2 such cycles totally → `cycle-out-of-band` (per protocol: consult teacher).
 
@@ -118,25 +144,25 @@ Forecast — all labeled predicted:
 
 Builder helpers: `cy(id, day1, closedAt?)`, `rec(cycleId, day, ovr?)`, `sett(ovr?)`.
 
-| #   | Scenario                                                    | Expect                                                      |
-| --- | ----------------------------------------------------------- | ----------------------------------------------------------- |
-| 1   | First cycle, Peak day 14                                    | begin 6 (`calendar-day-6`), end 17, `post-peak` from 18     |
-| 2   | First cycle, High day 3 (earlier than 6)                    | begin 3 (`first-high-or-peak`)                              |
-| 3   | First cycle, peak on day 6                                  | begin 6                                                     |
-| 4   | Monitor peak d12, mucus peak d14                            | peakDay 14, `both`, end 17                                  |
-| 5   | Muc peak later                                              | peakDay = mucus day; end shifts                             |
-| 6   | Mucus-only peak (no monitor)                                | peak counts, `mucus` source                                 |
-| 7   | No peak, cycle 1                                            | end null, `none`, `no-peak-end` warning                     |
-| 8   | Cycle 9, history peaks [14,16,12,15,13,14]                  | calendar begin = 12−6=6, unless first High d4 → begin 4     |
-| 9   | Cycle 9, current peak d20, historic latest 16+3             | end = min(20+3, 19) → 19 (`earliest-end`, historic wins)    |
-| 10  | Cycle 9, current peak d10, historic latest 16               | end = min(13, 19) → 13 (current wins)                       |
-| 11  | No peak cycle ≥7 with history                               | fallback end = latest+3                                     |
-| 12  | Mixed high/peak repeats                                     | last peak used; multiple highs don't change begin after set |
-| 13  | 21-day cycle ×2 out of band                                 | 2 out-of-band warnings                                      |
-| 14  | Cycle length = next day difference (open cycle length null) | 23                                                          |
-| 15  | postPeakDays 2 (settings)                                   | end = peak+2                                                |
-| 16  | Records out of order                                        | same result as ordered input                                |
-| 17  | Day statuses full sequence                                  | pre F: 1–5, F 6..17, post 18+                               |
+| #   | Scenario                                                    | Expect                                                                                                                                               |
+| --- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | First cycle, Peak day 14                                    | begin 6 (`calendar-day-6`), end 17, `post-peak` from 18                                                                                              |
+| 2   | First cycle, High day 3 (earlier than 6)                    | begin 3 (`first-high-or-peak`)                                                                                                                       |
+| 3   | First cycle, peak on day 6                                  | begin 6                                                                                                                                              |
+| 4   | Monitor peak d12, mucus peak d14                            | peakDay 14, `both`, end 17                                                                                                                           |
+| 5   | Muc peak later                                              | peakDay = mucus day; end shifts                                                                                                                      |
+| 6   | Mucus-only peak (no monitor)                                | peak counts, `mucus` source                                                                                                                          |
+| 7   | No peak, cycle 1                                            | end null, `none`, `no-peak-end` warning                                                                                                              |
+| 8   | Cycle 9, history peaks [14,16,12,15,13,14]                  | calendar begin = 12−6=6, unless first High d4 → begin 4                                                                                              |
+| 9   | Cycle 9, current peak d20, historic latest 16+3             | **corrected:** end = 20+3 = 23, `current-peak-plus-n`. Was `min(20+3, 19) → 19` (`earliest-end`), which ended the window one day before its own Peak |
+| 10  | Cycle 9, current peak d10, historic latest 16               | end = 10+3 = 13, `current-peak-plus-n`. No comparison is made against the historic end                                                               |
+| 11  | No peak cycle ≥7 with history                               | **corrected:** no end at all (`none`) + `no-peak-end` warning. Was `latest+3` (`historic-peak-plus-n`)                                               |
+| 12  | Mixed high/peak repeats                                     | last peak used; multiple highs don't change begin after set                                                                                          |
+| 13  | 21-day cycle ×2 out of band                                 | 2 out-of-band warnings                                                                                                                               |
+| 14  | Cycle length = next day difference (open cycle length null) | 23                                                                                                                                                   |
+| 15  | postPeakDays 2 (settings)                                   | end = peak+2                                                                                                                                         |
+| 16  | Records out of order                                        | same result as ordered input                                                                                                                         |
+| 17  | Day statuses full sequence                                  | pre F: 1–5, F 6..17, post 18+                                                                                                                        |
 
 `predict.test.ts`:
 

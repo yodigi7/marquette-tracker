@@ -13,6 +13,7 @@ import {
   windowBasis,
   type ProtocolBand,
 } from "../lib";
+import { END_RULE_LABELS } from "@/features/status/lib";
 
 /**
  * The words the document must never produce. A narrower set than the Status view's: an out-of-band
@@ -282,21 +283,25 @@ describe("buildSummaryModel", () => {
  */
 const BEGIN_RULES: BeginRule[] = [
   "calendar-day-6",
+  "calendar-day-6-fallback",
   "calendar-earliest-peak-minus-6",
   "first-high-or-peak",
 ];
 
 const END_RULES: EndRule[] = [
   "current-peak-plus-n",
-  "historic-peak-plus-n",
-  "earliest-end",
-  "protocol-default-band",
+  "lookback-latest-peak-plus-n",
+  "protocol-fallback-window",
   "none",
 ];
 
 describe("windowBasis", () => {
   it("calls the calendar rule a calendar rule and a reading a reading, for every begin rule", () => {
-    const calendar: BeginRule[] = ["calendar-day-6", "calendar-earliest-peak-minus-6"];
+    const calendar: BeginRule[] = [
+      "calendar-day-6",
+      "calendar-day-6-fallback",
+      "calendar-earliest-peak-minus-6",
+    ];
 
     for (const beginRule of calendar) {
       const basis = windowBasis({ beginRule, endRule: "none" }, null);
@@ -324,23 +329,18 @@ describe("windowBasis", () => {
     expect(basis.end).toMatch(/three full days/i);
   });
 
-  it("states the comparison when the end came from whichever came first", () => {
-    const basis = windowBasis({ beginRule: "calendar-day-6", endRule: "earliest-end" }, 12);
-
-    expect(basis.end).toContain("cycle day 12");
-    expect(basis.end).toMatch(/whichever came first/i);
-    expect(basis.end).toMatch(/earlier cycles/i);
-  });
-
-  it("credits earlier cycles when this cycle has no Peak of its own", () => {
-    const basis = windowBasis(
-      { beginRule: "calendar-day-6", endRule: "historic-peak-plus-n" },
-      null,
-    );
-
-    expect(basis.end).toMatch(/earlier cycles/i);
-    expect(basis.end).toMatch(/no monitor Peak reading of its own/i);
-    expect(basis.end).not.toMatch(/cycle day \d/);
+  it("never names an earlier cycle's Peak as the reason a recorded window ended", () => {
+    // A cycle's end is its own Peak plus the fixed interval, or there is no end. The deleted
+    // earlier-of-two and historical-fallback rules are the only ways this sentence could have gone
+    // wrong, so every rule is checked for it.
+    for (const endRule of END_RULES) {
+      for (const peakDay of [null, 12]) {
+        const basis = windowBasis({ beginRule: "calendar-day-6", endRule }, peakDay);
+        expect(basis.end, `${endRule}/${peakDay}`).not.toMatch(/earlier cycles/i);
+        expect(basis.end, `${endRule}/${peakDay}`).not.toMatch(/whichever came first/i);
+        expect(basis.end, `${endRule}/${peakDay}`).not.toMatch(/historic/i);
+      }
+    }
   });
 
   it("says plainly that no end can be set when the protocol could not set one", () => {
@@ -348,22 +348,35 @@ describe("windowBasis", () => {
 
     expect(basis.end).toMatch(/no end can be set/i);
     expect(basis.end).toMatch(/three full days/i);
+    // No date is offered from any other cycle in place of the missing end.
+    expect(basis.end).not.toMatch(/cycle day \d/);
   });
 
-  it("has wording for the projection-only rule rather than falling through", () => {
-    // The document never sees this — projection is excluded — but a Record must still cover it.
-    const basis = windowBasis(
-      { beginRule: "calendar-day-6", endRule: "protocol-default-band" },
+  it("has wording for the projection-only rules rather than falling through", () => {
+    // The document never sees these — projections are excluded — but a Record must still cover them.
+    const lookback = windowBasis(
+      { beginRule: "calendar-day-6", endRule: "lookback-latest-peak-plus-n" },
       null,
     );
+    expect(lookback.end).toMatch(/recent cycles/i);
 
-    expect(basis.end).toMatch(/default band/i);
+    const fallback = windowBasis(
+      { beginRule: "calendar-day-6", endRule: "protocol-fallback-window" },
+      null,
+    );
+    // The old wording called this a "default band"; the window is composed, not a band.
+    expect(fallback.end).toMatch(/earliest possible Peak day/i);
+    expect(fallback.end).not.toMatch(/band/i);
   });
 
   it("states the post-Peak interval as three full days wherever a Peak sets the end", () => {
     // The post-Peak interval is a protocol constant, so a basis that measures from a Peak must carry
-    // the number. `historic-peak-plus-n` also measures from a Peak; `none` explains the missing interval.
-    const fromAPeak: EndRule[] = ["current-peak-plus-n", "earliest-end", "historic-peak-plus-n"];
+    // the number. `none` explains the missing interval.
+    const fromAPeak: EndRule[] = [
+      "current-peak-plus-n",
+      "lookback-latest-peak-plus-n",
+      "protocol-fallback-window",
+    ];
 
     for (const endRule of fromAPeak) {
       expect(windowBasis({ beginRule: "calendar-day-6", endRule }, 12).end).toMatch(
@@ -402,20 +415,21 @@ describe("window rules on the model", () => {
     const summary = model(closedCycle());
 
     expect(summary.window?.beginRule).toBe("calendar rule (cycle day 6)");
-    expect(summary.window?.endRule).toBe("current monitor Peak + 3 days");
+    expect(summary.window?.endRule).toBe(END_RULE_LABELS["current-peak-plus-n"]);
     expect(summary.window?.endRule).toContain("3");
   });
 
   it("pairs a basis sentence with a rule for every rule the engine can produce", () => {
     const beginRules: Record<BeginRule, EndRule> = {
       "calendar-day-6": "current-peak-plus-n",
-      "calendar-earliest-peak-minus-6": "earliest-end",
-      "first-high-or-peak": "historic-peak-plus-n",
+      "calendar-day-6-fallback": "current-peak-plus-n",
+      "calendar-earliest-peak-minus-6": "lookback-latest-peak-plus-n",
+      "first-high-or-peak": "none",
     };
     for (const [beginRule, endRule] of Object.entries(beginRules) as [BeginRule, EndRule][]) {
       const summary = model(
         closedCycle({
-          fertileWindow: { begin: 8, end: 17, beginRule, endRule },
+          fertileWindow: { begin: 8, end: endRule === "none" ? null : 17, beginRule, endRule },
         }),
       );
       expect(summary.window?.beginBasis).not.toBe("");
@@ -434,6 +448,7 @@ describe("warningLines", () => {
       { kind: "monitor-evidence-outside-window", cycleNo: 3, day: 22 },
       { kind: "open-cycle-past-window-end", cycleNo: 3 },
       { kind: "no-peak-end", cycleNo: 3 },
+      { kind: "high-run", cycleNo: 3, run: 9 },
       { kind: "cycle-out-of-band", cycleNo: 3, length: 50 },
     ];
 
@@ -480,6 +495,22 @@ describe("warningLines", () => {
     expect(line).toMatch(/no end can be set/i);
   });
 
+  it("reports the length of a long run of High readings without calling it a Peak", () => {
+    const [line] = warningLines([{ kind: "high-run", cycleNo: 3, run: 9 }], context);
+
+    expect(line).toMatch(/\b9\b/);
+    expect(line).toMatch(/high/i);
+    // The run is not a Peak reading, and a document handed to an instructor must not imply it is.
+    expect(line).not.toMatch(/peak reading/i);
+    expect(line).not.toMatch(FORBIDDEN);
+  });
+
+  it("names the run's own length rather than a fixed one", () => {
+    const [line] = warningLines([{ kind: "high-run", cycleNo: 3, run: 14 }], context);
+
+    expect(line).toMatch(/\b14\b/);
+  });
+
   it("states the length and the band for an out-of-band cycle", () => {
     const [line] = warningLines([{ kind: "cycle-out-of-band", cycleNo: 3, length: 50 }], context);
 
@@ -508,6 +539,7 @@ describe("warningLines", () => {
       { kind: "monitor-evidence-outside-window", cycleNo: 3, day: 22 },
       { kind: "open-cycle-past-window-end", cycleNo: 3 },
       { kind: "no-peak-end", cycleNo: 3 },
+      { kind: "high-run", cycleNo: 3, run: 9 },
       { kind: "cycle-out-of-band", cycleNo: 3, length: 50 },
     ];
 

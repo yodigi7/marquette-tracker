@@ -333,7 +333,7 @@ const PROJECTED: CycleResult = {
     begin: 6,
     end: 16,
     beginRule: "calendar-earliest-peak-minus-6",
-    endRule: "historic-peak-plus-n",
+    endRule: "lookback-latest-peak-plus-n",
   },
 };
 

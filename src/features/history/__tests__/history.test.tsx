@@ -150,6 +150,65 @@ describe("HistoryView", () => {
     expect(screen.queryByTestId("history-reconciliation-warning")).toBeNull();
   });
 
+  it("counts only the reconciliation kinds, not the observations", () => {
+    // A cycle can now be peakless in any cycle number and can carry a long run of Highs, so those
+    // two warnings are ordinary rather than something to look at. Only a contradiction between the
+    // user's data and a computed window — or a cycle unfinished past it — belongs in this count.
+    const output = store().output;
+    if (!output) {
+      throw new Error("Expected seeded engine output");
+    }
+
+    const cycles = output.cycles.map((cycle, index) => ({
+      ...cycle,
+      warnings:
+        index === 0
+          ? [{ kind: "monitor-evidence-outside-window" as const, cycleNo: cycle.cycleNo, day: 15 }]
+          : [
+              { kind: "no-peak-end" as const, cycleNo: cycle.cycleNo },
+              { kind: "high-run" as const, cycleNo: cycle.cycleNo, run: 9 },
+            ],
+    }));
+
+    useAppStore.setState({ output: { ...output, cycles } });
+
+    render(
+      <MemoryRouter>
+        <HistoryView />
+      </MemoryRouter>,
+    );
+
+    // One reconciliation among every other cycle carrying both observations: still one.
+    expect(screen.getByTestId("history-reconciliation-warning")).toHaveTextContent(
+      /1 cycle has a monitor reading/i,
+    );
+  });
+
+  it("shows no reconciliation notice when every cycle carries only observations", () => {
+    const output = store().output;
+    if (!output) {
+      throw new Error("Expected seeded engine output");
+    }
+
+    const cycles = output.cycles.map((cycle) => ({
+      ...cycle,
+      warnings: [
+        { kind: "no-peak-end" as const, cycleNo: cycle.cycleNo },
+        { kind: "high-run" as const, cycleNo: cycle.cycleNo, run: 9 },
+      ],
+    }));
+
+    useAppStore.setState({ output: { ...output, cycles } });
+
+    render(
+      <MemoryRouter>
+        <HistoryView />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByTestId("history-reconciliation-warning")).toBeNull();
+  });
+
   it("hides computed summaries in logging-only mode and restores them when re-enabled", async () => {
     await store().clearAllData();
     const start = addDays(todayKey(), -20);

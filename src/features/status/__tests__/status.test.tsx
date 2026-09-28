@@ -125,7 +125,12 @@ describe("StatusView", () => {
   });
 
   it("shows no warning for an ordinary cycle", async () => {
-    await bootWithCycle();
+    // A High on day 1 and a Peak on day 3: a real window, no contradiction, no run, and no absent end.
+    const start = addDays(todayKey(), -4);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { monitor: "high" });
+    await store().addDayRecord(cycle.id, addDays(start, 2), 3, { monitor: "peak" });
+
     render(<StatusView />);
 
     await screen.findByText("Fertile");
@@ -258,7 +263,7 @@ describe("StatusView", () => {
 
     render(<StatusView />);
     expect(
-      await screen.findByText(/until day 17 \(current monitor Peak \+ 3 days\)/),
+      await screen.findByText(/until day 17 \(this cycle's monitor Peak \+ 3 days\)/),
     ).toBeInTheDocument();
   });
 
@@ -306,6 +311,109 @@ describe("StatusView", () => {
 
     expect(screen.getByText(/no cycle/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /set day 1/i })).toBeNull();
+  });
+});
+
+/**
+ * The two observations a cycle can raise without anything contradicting a computed window: no monitor
+ * Peak to measure an end from, and a run of High readings long enough that the monitor's own guidance
+ * is to stop testing. Both are ordinary outcomes, not faults, and both belong to the cycle rather than
+ * to a date, so they show for any date in it.
+ */
+describe("StatusView: observations about the user's own readings", () => {
+  const FORBIDDEN =
+    /disclaimer|medical advice|not a substitute|consult (a|your|with)|medical device|marquette-certified instructor|seek (medical|professional)|invalid|error|malfunction/i;
+
+  it("reports a cycle with no monitor Peak as unresolved", async () => {
+    // Open cycle at cycle day 8, a High logged, no Peak: the protocol defines the end only through a
+    // Peak, so this cycle has none and is not settled.
+    const start = addDays(todayKey(), -7);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+    await store().addDayRecord(cycle.id, addDays(start, 5), 6, { monitor: "high" });
+
+    render(<StatusView />);
+
+    const banner = await screen.findByTestId("status-warning");
+    expect(banner).toHaveTextContent(/no monitor Peak reading/i);
+    expect(banner).toHaveTextContent(/unresolved/i);
+    // Factual about the data, and nothing else: no referral, no disclaimer, no fault language.
+    expect(document.body.textContent ?? "").not.toMatch(FORBIDDEN);
+  });
+
+  it("shows the missing-Peak notice for a date earlier in the cycle, with no dismiss control", async () => {
+    const start = addDays(todayKey(), -7);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+
+    render(<StatusView />);
+    await screen.findByTestId("status-warning");
+
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("date-trigger"));
+    const earlier = await pickDateButton(user, addDays(start, 1));
+    expect(earlier).not.toBeNull();
+    await user.click(earlier!);
+
+    const after = screen.getByTestId("status-warning");
+    expect(after).toHaveTextContent(/no monitor Peak reading/i);
+    expect(after.querySelector("button")).toBeNull();
+  });
+
+  it("reports a run of nine High readings with its length, and never as a Peak", async () => {
+    // Nine consecutive Highs and no Peak: long enough that a Peak is no longer expected.
+    const start = addDays(todayKey(), -11);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+    for (let day = 4; day <= 12; day++) {
+      await store().addDayRecord(cycle.id, addDays(start, day - 1), day, { monitor: "high" });
+    }
+
+    render(<StatusView />);
+
+    const banner = await screen.findByTestId("status-warning");
+    const text = banner.textContent ?? "";
+    // Both observations are reported: a run of Highs is the reason this cycle has no Peak, so
+    // reporting one without the other would leave a fact unexplained.
+    expect(text).toMatch(/no monitor Peak reading/i);
+
+    const runClause = text.slice(text.indexOf("A long run of High readings"));
+    expect(runClause).toMatch(/\b9\b/);
+    expect(runClause).toMatch(/stop testing/i);
+    // The run is not a Peak reading, and the copy must not present it as one.
+    expect(runClause).not.toMatch(/peak reading/i);
+    expect(runClause).not.toMatch(FORBIDDEN);
+    expect(text).not.toMatch(FORBIDDEN);
+    // Nor does it become one: the cycle still has no Peak to measure an end from.
+    expect(screen.getByTestId("status-peak-count")).toHaveTextContent(/no peak reading logged/i);
+  });
+
+  it("reports nothing for a run of eight High readings", async () => {
+    const start = addDays(todayKey(), -12);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+    for (let day = 4; day <= 11; day++) {
+      await store().addDayRecord(cycle.id, addDays(start, day - 1), day, { monitor: "high" });
+    }
+    await store().addDayRecord(cycle.id, addDays(start, 11), 12, { monitor: "peak" });
+
+    render(<StatusView />);
+
+    // The Peak on day 12 ends the run at 8, and with a Peak on record there is no missing-end notice.
+    await screen.findByText("Fertile");
+    expect(screen.queryByTestId("status-warning")).toBeNull();
+  });
+
+  it("suppresses the missing-Peak notice when interpretation is disabled", async () => {
+    const start = addDays(todayKey(), -7);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+
+    await store().updateSettings({ algorithmEnabled: false });
+    render(<StatusView />);
+
+    expect(await screen.findByText(/algorithm is off/i)).toBeInTheDocument();
+    expect(screen.queryByTestId("status-warning")).toBeNull();
   });
 });
 
@@ -374,7 +482,9 @@ describe("StatusView: days since the Peak reading", () => {
     // Measured from day 15, not day 12 -- the same reading the window end is measured from.
     expect(line).toHaveTextContent(/2 days since your Peak reading on cycle day 15/);
     expect(line).toHaveTextContent(/last of 2 peak readings this cycle/i);
-    expect(screen.getByText(/until day 18 \(current monitor Peak \+ 3 days\)/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/until day 18 \(this cycle's monitor Peak \+ 3 days\)/),
+    ).toBeInTheDocument();
   });
 
   it("refuses to count elapsed days for a date that has not happened yet", async () => {
