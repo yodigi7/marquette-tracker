@@ -188,19 +188,21 @@
 
     /* Two quiet phase fills, and two constraints fight over them.
        A fill is capped in lightness by the monitor marker painted on it -- 0.0435 luminance here, set by
-       the Low reading -- so it cannot be made bright without costing a reading its legibility. And
+       the Low reading -- and every warm hue in this band lands at 0.032-0.034, so that cap is the whole
+       of the available headroom. There is no value that is both bright and far from the window; the pair
+       is a straight trade and the two problems actually reported get the better of it.
        Before used to be amber at hue 46 while the window is rose at hue 14, thirty degrees apart, so
        every step of lift walked it toward the window: brightening it made the two look more alike, which
-       is the opposite of what was asked for.
-       So Before is indigo now, ninety-four degrees from the window and further from it than amber ever
-       was, and both fills sit below the window in lightness and chroma so the window is still the most
-       prominent surface on the calendar. A cool fill spends its whole luminance budget on being cool and
-       is capped harder than a warm one, which is the price of the hue separation. Light mode is
+       is the opposite of what was asked for. Before is a warm gold at hue 79 now, sixty-five degrees from
+       the window. An indigo was tried and rejected -- a cool fill spends its luminance budget on being
+       cool, is capped harder, and came out darker than the amber it replaced, which is the very thing
+       the review had complained about. Both fills sit below the window in lightness and chroma, so the
+       window is still the most prominent surface on the calendar. Light mode is
        unchanged: it has the same shape of problem but the markers there are darker and nobody has
        reported it. See scripts/__tests__/fertility-palette.test.mjs. */
-    --fertility-status-pre-bg: #282465;
+    --fertility-status-pre-bg: #4a3200;
     --fertility-status-pre-fg: #fef3c7;
-    --fertility-status-pre-border: #818cf8;
+    --fertility-status-pre-border: #f59e0b;
     --fertility-status-fertile-bg: #4c0519;
     --fertility-status-fertile-fg: #ffe4e6;
     --fertility-status-fertile-border: #fb7185;

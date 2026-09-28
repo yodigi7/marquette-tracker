@@ -86,16 +86,30 @@ thirty-two degrees apart. Brightening amber therefore walked it _toward_ the win
 and "make it look less like the window" were the same request pointed in opposite directions. An earlier
 attempt lifted the tints and the review came back saying `Before` was now similar to the window. It was.
 
-`Before` is indigo at hue `280` now, ninety-four degrees from the window and further from it than amber
-ever was, and `After` stays teal. Both are lifted: `0.105 → 0.151` and `0.075 → 0.125` measured from the
-card, which is the surface the Calendar actually renders on. Both sit below the window in lightness _and_
-chroma, so the window is still the most prominent surface on the calendar.
+`Before` is a warm gold at hue `79` now, sixty-five degrees from the window instead of thirty-one, and
+`After` stays teal. Both are lifted: `0.105 -> 0.149` and `0.075 -> 0.125` measured from the card, which is
+the surface the Calendar actually renders on. Both sit below the window in lightness _and_ chroma, so the
+window is still the most prominent surface on the calendar.
 
-**What the hue change costs.** A cool fill spends its whole luminance budget on being cool, so it is
-capped harder than a warm one — indigo clears the Low reading at `3.66:1` where amber managed `4.00:1`
-at a lower lightness. The visible result is that `Before` is about as light as it can be and no lighter.
-That is the price of the separation, and it is the right price: mistaking the window for a `Before` day is
-the complaint, and a slightly darker `Before` is not.
+**Indigo was tried and rejected**, and the reason is worth keeping. A cool fill spends its whole luminance
+budget on being cool, so it is capped harder than a warm one -- indigo cleared the Low reading at `3.66:1`
+where amber managed `4.00:1`, and landed at `0.151` against the card against gold's `0.149`, at a lower
+lightness and with more chroma. A cooler hue bought separation and paid for it in exactly the dimension
+the review had complained about. Warm, moved away from rose rather than across the wheel, is the answer
+that does not cost the thing that was asked for.
+
+**The remaining trade, stated rather than buried.** In the warm band, moving the hue from amber toward gold
+is a straight line: visibility stays flat, distance from the window improves, distance from `After`
+degrades. The two problems actually reported -- too dark, and too close to the window -- get the better of
+it, and `Before`/`After` give back ground, from `0.112` to `0.094`. That is still well above the `0.057`
+this started at, so it is a partial give-back and not a return to the problem. If `Before` and `After` turn
+out to be hard to tell apart on a device, the honest place to fix that is the summary or the legend rather
+than another mark on every day.
+
+**The ceiling, plainly.** The Low reading permits `0.0435` luminance and every warm hue in this band lands
+at `0.032-0.034`. There is no value that is both bright and far from the window; that is what the cap
+means. Two review rounds have each taken the available headroom and this one is nearly exhausted, which is
+itself the argument for the mark the band used to carry and no longer does.
 
 **Two things the search got wrong, recorded because they nearly shipped.** A search that maximises
 distance from the window will always run to the widest gap on the colour wheel, and on this palette the
