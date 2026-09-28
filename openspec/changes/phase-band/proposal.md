@@ -16,20 +16,23 @@ obeys that cap reaches a worst-pair separation of `0.0616` — against `0.0572` 
 fills cannot be told apart in dark mode; that is a property of the constraint, not of the values
 chosen.
 
-A first pass at this put the same kind of mark on all three phases and fixed the reported problem. It
-then failed a second test: a band is a horizontal line along a day's **top** edge and the menses stripe
-is a horizontal line along the **bottom** edge of the day above, so across a week boundary the two sit
-8px apart and read as a single stripe. No adjustment to a band fixes that, because a band is the same
-kind of mark as the stripe. The window is therefore drawn as a **bar** instead.
+A first pass at this put a 4px band along the top edge of all three phases and fixed the reported
+problem. It then failed a second test: a band is a horizontal line along a day's **top** edge and the
+menses stripe is a horizontal line along the **bottom** edge of the day above, so across a week boundary
+the two sit 8px apart and read as a single stripe. No adjustment to a band fixes that, because a band is
+the same kind of mark as the stripe. The bands are therefore gone from every phase, and the window is
+drawn as a **bar** instead.
 
 ## What Changes
 
-- **Every phase keeps a painted treatment.** The two phases outside the window are identified by a
-  **band along the top edge of the day**; the window is drawn as a **solid bar at full cell height**, so
-  it is the only filled shape on the Calendar and the phases either side of it stay quiet. Worst-pair
-  separation of the quiet phases' bands goes from `0.0572` to `0.2118` in dark mode and `0.1721` in
-  light. This is the shape every mainstream calendar uses for a multi-day span: a solid bar, rounded at
-  the ends, no outline.
+- **All three phases keep a painted treatment, and nothing is dropped.** The two phases outside the
+  window are identified by the tints they already had; the window is drawn as a **solid bar at full cell
+  height**, so it is the only filled shape on the Calendar and the phases either side stay quiet. This is
+  the shape every mainstream calendar uses for a multi-day span: a solid bar, rounded at the ends, no
+  outline.
+- **No day cell draws a line along its top edge, on any phase.** A strip there and the menses stripe at
+  the bottom edge of the day above are 8px apart across a week boundary, where they read as a single
+  mark — and a month of them is a great deal of line to read past.
 - **The bar carries its own colour**, because a full-height shape at the cell tint's lightness is not a
   surface. In dark it is a `0.209` OKLab lightness step above the page against the tint's `0.106`, taken
   as far as the reading markers allow: the binding reading is **Low**, at `0.0435` luminance, not the
@@ -47,8 +50,8 @@ kind of mark as the stripe. The window is therefore drawn as a **bar** instead.
 - A run that wraps weeks is **two runs**, because the last day of one row is in the final column and
   the next is in the first. The bar does not pretend to join them.
 
-- The Cycle-chart fertile band is aligned to the same hue.
-- The palette guard keeps the marker and text rules, **gains** rules for the bands and the bar, and
+- The Cycle-chart fertile window is aligned to the same hue.
+- The palette guard keeps the marker and text rules, **gains** rules for the bar, and
   reads its values from the stylesheet instead of hand-copying them.
 
 Not in scope: any change to the engine, the window computation, or the status semantics; the Status
@@ -63,29 +66,28 @@ None.
 
 ### Modified Capabilities
 
-- `fertility-visuals`: each status treatment is composed of parts with different obligations. A band is
-  the element that distinguishes the quiet statuses and is mutually separable; the fill is not, because a
-  marker is painted on it. The window is drawn as a bar, which is a surface like a fill and is held to
-  the marker rules, and is told from the page and the neighbouring fills by colour distance rather than
-  by a contrast ratio.
-- `calendar`: the day cell paints a band for the two quiet phases and a bar for the window; the bar's
+- `fertility-visuals`: a status treatment is a fill, and a fill is capped in lightness by the reading
+  marker painted on it, so fills cannot distinguish the statuses from one another. The window is therefore
+  not a fill but a bar spanning the whole day — a surface like a fill, held to the same marker rules, and
+  told from the page and the neighbouring fills by colour distance rather than by a contrast ratio. No
+  surface adds a strip or stroke along a cell edge to make the distinction instead.
+- `calendar`: the day cell paints a tint for the two quiet phases and a bar for the window; the bar's
   shape is derived from the whole month with every day positioned rather than counted; the bar spans day
   gaps and never week gaps; the window's two true ends are the only rounded ones; and the legend shows
   each phase's actual mark.
 
 ## Impact
 
-- `src/index.css` — per-phase band tokens in both themes and a bar token for the window; the chart band
-  hue.
-- `src/lib/fertility-visuals.ts` — a band class per status and phase, and a bar class on the fertile
-  phase.
-- `src/features/calendar/day-cell.tsx` — paints the band and the bar, and shapes the run's ends.
+- `src/index.css` — a window token in both themes; the chart window hue.
+- `src/lib/fertility-visuals.ts` — a bar class on the fertile phase, and the window colour the Calendar
+  paints a window day in.
+- `src/features/calendar/day-cell.tsx` — paints the bar and shapes the run's ends.
 - `src/features/calendar/grid.ts` — the window's two end days, and `windowEdgesByDay`, which derives
   every day's bar shape from the whole displayed month.
-- `src/features/calendar/layers.ts` — the band and the bar as first-class paint slots; the legend
-  swatch and each phase key's footprint.
+- `src/features/calendar/layers.ts` — the bar as a first-class paint slot; the legend swatch, and each
+  phase key's declared footprint.
 - `scripts/__tests__/fertility-palette.test.mjs` — rewritten guard: reads the stylesheet, asserts the
-  markers, the text, the bands, and the bar.
+  markers, the text, and the bar.
 
 No new dependencies. No engine change. No data-model or storage change. No change to the tile fills or
 to the menses stripe, so nothing about the reading markers or the recorded menses cue moves.

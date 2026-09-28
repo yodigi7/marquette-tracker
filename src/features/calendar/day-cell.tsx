@@ -55,14 +55,10 @@ export function DayCell({
   const phaseLabel = phase ? FERTILITY_CALENDAR_PHASE_VISUALS[phase].label : null;
   const phaseShown = phase !== null && shown(phase);
   const phaseFill = phaseShown ? LAYER_PAINT[phase!].fill : undefined;
-  // The band is what tells the two quiet phases apart, so it is painted independently of the fill and
-  // follows the same layer. A hidden phase layer suppresses both and nothing else. The fertile phase
-  // has no band: the window is a bar, and a band on top of it would put a horizontal line back along
-  // the cell's top edge, which is the mark the bar exists to replace.
-  const phaseBand = phaseShown ? LAYER_PAINT[phase!].band : undefined;
   // The window is a solid bar spanning the whole cell, not a strip on its top edge. A strip and the
   // menses stripe are both horizontal lines at opposite cell edges and read as one mark across a week
-  // boundary. Only a fertile day is part of a run, so another phase is never given the bar.
+  // boundary, and a strip on every day of a month is a lot of horizontal lines to read past. Only a
+  // fertile day is part of a run, so another phase is never given the bar.
   const windowBar = phaseShown && phase === "fertile" ? LAYER_PAINT.fertile.bar : undefined;
   const predictedShown = shown("predicted");
   const hasMonitor = !!monitor && monitor !== "none";
@@ -140,19 +136,6 @@ export function DayCell({
             // bars, one per row, and the gap between them is the calendar's own.
             roundStart && "rounded-l-2xl",
             roundEnd && "rounded-r-2xl",
-          )}
-        />
-      )}
-      {phaseBand && (
-        <span
-          data-testid="calendar-phase-band"
-          aria-hidden="true"
-          className={cn(
-            // A full-bleed strip 4px wider than the cell on each side, so the band bridges the grid
-            // gap. The square ends deliberately overhang the cell's rounded corners: the band is a
-            // stroke across the top of the calendar, not a fill clipped to the tile.
-            "absolute inset-x-[-4px] top-0 h-1",
-            phaseBand,
           )}
         />
       )}

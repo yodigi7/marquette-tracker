@@ -517,37 +517,39 @@ describe("CalendarView", () => {
     };
 
     it.each([
-      ["pre-fertile" as const, "bg-fertility-status-pre-band"],
-      ["post-peak" as const, "bg-fertility-status-post-peak-band"],
-      // `post-calendar` collapses into the `after` phase on a Calendar, so it wears the post-peak
-      // band. The Status view is where it is distinguished, and it has its own band token for that.
-      ["post-calendar" as const, "bg-fertility-status-post-peak-band"],
-    ])("paints a %s day with that phase's band", (info, cls) => {
-      // The two quiet phases get a band. Painting only one phase was implemented and withdrawn: it
-      // fixed the reported problem more thoroughly but it decides which information the Calendar offers
-      // rather than how to render it, and all three phases are wanted.
+      ["pre-fertile" as const, "bg-fertility-status-pre"],
+      ["post-peak" as const, "bg-fertility-status-post-peak"],
+      // `post-calendar` collapses into the `after` phase on a Calendar, so it wears the post-peak tint.
+      // The Status view is where it is distinguished, and it has its own fill token for that.
+      ["post-calendar" as const, "bg-fertility-status-post-peak"],
+    ])("paints a %s day as a tint and nothing else", (info, cls) => {
+      // The two quiet phases are tints, and they were tints before this change. What is new is that they
+      // stay that way while the window becomes the loudest thing on the calendar, so all three phases
+      // are still on screen and none of them is dropped to make room for the window.
       const { container } = renderCell(info);
-      expect(container.querySelector(band)?.className).toContain(cls);
+      expect(screen.getByTestId("day-cell").className).toContain(cls);
+      expect(container.querySelector(bar), "a tint is not a bar").toBeNull();
     });
 
-    it("paints the band alongside the fill, not instead of it", () => {
-      // The fill keeps the phase's hue so the month still reads as tinted. It simply is no longer what
-      // separates one phase from another, which is the band's job.
-      const { container } = renderCell("post-peak");
-      expect(screen.getByTestId("day-cell").className).toContain("bg-fertility-status-post-peak");
-      expect(container.querySelector(band)).not.toBeNull();
+    it("draws no horizontal line along any day's top edge", () => {
+      // The withdrawn version of this change put a 4px band on every phase. It fixed the reported
+      // problem and it is the reason a second report arrived: the band and the menses stripe are both
+      // horizontal lines at opposite cell edges, 8px apart across a week boundary, where they read as a
+      // single mark. Nothing on a day cell draws one now, on any phase.
+      for (const info of ["pre-fertile", "fertile", "post-peak", "post-calendar"] as const) {
+        const { container, unmount } = renderCell(info, { windowEdges: FIRST_DAY });
+        expect(
+          container.querySelector('[data-testid="calendar-phase-band"]'),
+          `${info} must not paint a band`,
+        ).toBeNull();
+        unmount();
+      }
     });
 
-    it("paints no band on a day with no phase", () => {
+    it("paints nothing but the tint on a day with no phase", () => {
       const { container } = renderCell(null);
+      expect(container.querySelector(bar)).toBeNull();
       expect(container.querySelector(band)).toBeNull();
-    });
-
-    it("bridges the grid gap so a run reads as one band", () => {
-      // The grid separates cells by 4px. A band inset to the cell would break every run into
-      // separate marks, which is the failure the band exists to fix.
-      const { container } = renderCell("post-peak");
-      expect(container.querySelector(band)?.className).toContain("inset-x-[-4px]");
     });
 
     it("draws the window as a solid bar at full cell height, and gives it no band", () => {
@@ -651,9 +653,8 @@ describe("CalendarView", () => {
       if (lacks) expect(className, `expected no ${lacks}`).not.toContain(lacks);
     });
 
-    it("is not clipped by the cell", () => {
-      const { container } = renderCell("post-peak");
-      expect(container.querySelector(band)?.className).not.toContain("overflow");
+    it("is not clipped by the cell, so the bar can reach across the grid gap", () => {
+      renderCell("fertile", { windowEdges: FIRST_DAY });
       expect(screen.getByTestId("day-cell").className).not.toContain("overflow-hidden");
       expect(barClasses("fertile", FIRST_DAY)).not.toContain("overflow");
     });

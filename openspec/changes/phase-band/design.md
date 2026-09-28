@@ -44,34 +44,38 @@ failure message.
 
 ## Decisions
 
-### The window is a solid bar; the two quiet phases keep a band
+### The window is a solid bar; the quiet phases are tints
 
 The first pass at this change put a 4px band on the top edge of every day, in the phase's full-chroma
-colour. It worked on the reported problem and it was built and verified. It then failed on a second
-complaint, which is the one that decided the final shape:
+colour. It separated the three phases cleanly — worst-pair separation went from `0.0572` to `0.2118` in
+dark mode — and it was built and verified. It then failed on a second report, which is what decided the
+final shape:
 
 > the fertile window band and the menses stripe get confused with the next week being close vertically
 
 That is a real defect and it is structural rather than cosmetic. A band is a horizontal line along a
 cell's **top** edge; the menses stripe is a horizontal line along the **bottom** edge of the cell above.
-The grid separates rows by 4px, so across a week boundary the two are 8px apart and both horizontal.
-They read as one stripe. No change to a band can fix that, because a band is the same kind of mark as the
+The grid separates rows by 4px, so across a week boundary the two are 8px apart and both horizontal. They
+read as one stripe. No change to a band can fix that, because a band is the same kind of mark as the
 stripe; only changing the kind of mark fixes it.
 
-So the window is now a solid bar at full cell height, and the two quiet phases keep their bands:
+So the bands are gone from every phase and the window is a solid bar at full cell height:
 
-| mark                | shape                        |
-| ------------------- | ---------------------------- |
-| fills               | large background             |
-| band (before/after) | 4px bar along a cell's top   |
-| bar (window)        | solid fill, full cell height |
+| mark         | shape                        |
+| ------------ | ---------------------------- |
+| fills        | large background             |
+| bar (window) | solid fill, full cell height |
 
 This is the model Google Calendar and FullCalendar use for a multi-day span: a solid bar, rounded at the
 ends, no outline. An outline around a filled bar is redundant, and on a 48px cell a 2px wire reads as a
 box rather than a bar — which is what the intermediate revision looked like.
 
-The two quiet phases keeping their bands is a deliberate asymmetry: the window is the thing the user
-scans for, and a bar on every phase would put three in competition for that attention.
+The two quiet phases going back to being plain tints is a second, smaller call, and the honest summary of
+it is what the numbers say: `Before` and `After` are now told apart only by their hue, and those two
+hues are `0.057` apart. That is the original complaint from issue #41, narrowed to the pair that matters
+least. It is a reasonable trade — the window is now unmissable, and both of the quiet phases mean "not
+trying" — but it is a trade, not a fix. The precise status is always one glance away in the Status view,
+the calendar summary, and each day's accessible text.
 
 ### The window day is painted in the window's own colour, cell and all
 
@@ -164,6 +168,9 @@ having two near-white things on it.
 
 ## Rejections worth recording
 
+- **A band on every phase.** It separated the three phases better than anything else here, and it is the
+  reason a second report arrived. A strip along a cell's top edge and the menses stripe along the cell
+  above's bottom edge are 8px apart across a week boundary and read as one mark.
 - **A backing disc behind the reading marker.** Invisible at the size the marker is drawn, and it does
   not help: the marker already clears 3:1 against every fill.
 - **Lifting all three reading markers** so the fills could be lighter. Raises the fill cap by 1.6x but
@@ -188,10 +195,13 @@ having two near-white things on it.
   Calendar resolves every cell once and derives the shape from that. The cost is that the shape is no
   longer local to a cell; the mitigation is that it is a pure function with its own tests, including
   tests for a padded month.
-- **The bar is intrinsically close to the amber `Before` band in hue.** The two are told apart by shape
-  and position long before hue — a full-height filled bar against a 4px stroke along the top edge of a
-  single day. The guard asserts the pair per theme anyway, because the risk is worth watching even when
-  the margin is thin.
+- **`Before` and `After` are told apart only by hue**, and those two hues are `0.057` apart. This is the
+  original complaint narrowed to the pair that matters least, and it is the cost of not drawing a mark on
+  every day. The window is unmissable, and both quiet phases mean "not trying"; the precise status is in
+  the Status view, the summary, and each day's accessible text. → Accepted, and named here rather than left
+  to be discovered.
+- **The bar is intrinsically close to the amber `Before` tint in hue.** The two are told apart by shape
+  long before hue — a full-height filled bar against a tinted day with nothing on it.
 - **Dark's bar clears its worst reading by 0.18:1.** That is the price of being the loudest thing on a
   dark calendar, and it is thin. The guard asserts it, and names which reading binds, so a later
   brightening is made against the right number rather than the wrong one.

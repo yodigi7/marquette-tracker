@@ -45,12 +45,6 @@ export interface LayerPaint {
   /** Border of a layer that outlines the day cell. */
   border: string;
   /**
-   * Colour of a layer drawn as the thin strip along the cell's top edge. Separate from `fill` because
-   * the two carry different obligations: a marker is painted on the fill and caps its lightness, so only
-   * the band is required to distinguish one layer from another.
-   */
-  band: string;
-  /**
    * The fill of a layer drawn as a solid bar spanning the cell. Separate from `fill`, which tints the
    * cell behind the day number, because the bar is the mark a run of days is recognised by and it is
    * allowed to be brighter than the cell's own tint — up to the limit the reading markers place on it.
@@ -60,25 +54,23 @@ export interface LayerPaint {
   marker: string;
 }
 
-const NO_PAINT: LayerPaint = { fill: "", border: "", band: "", bar: "", marker: "" };
+const NO_PAINT: LayerPaint = { fill: "", border: "", bar: "", marker: "" };
 
 export const LAYER_PAINT: Record<CalendarLayerId, LayerPaint> = {
   before: {
     ...NO_PAINT,
     fill: FERTILITY_CALENDAR_PHASE_VISUALS.before.fill,
-    band: FERTILITY_CALENDAR_PHASE_VISUALS.before.band,
   },
   fertile: {
     ...NO_PAINT,
     fill: FERTILITY_CALENDAR_PHASE_VISUALS.fertile.fill,
     bar: FERTILITY_CALENDAR_PHASE_VISUALS.fertile.bar,
-    // Only the fertile phase is drawn as a bar. The other two keep their band, so the window is the
-    // only solid shape on the calendar and the phases around it stay quiet.
+    // Only the fertile phase is drawn as a bar. The other two are tints, so the window is the only
+    // solid shape on the calendar and the phases around it stay quiet.
   },
   after: {
     ...NO_PAINT,
     fill: FERTILITY_CALENDAR_PHASE_VISUALS.after.fill,
-    band: FERTILITY_CALENDAR_PHASE_VISUALS.after.band,
   },
   predicted: {
     ...NO_PAINT,
@@ -93,18 +85,16 @@ export const LAYER_PAINT: Record<CalendarLayerId, LayerPaint> = {
 };
 
 /**
- * The classes a shown key's swatch carries, taken from the same paint record.
+ * The colour a shown key's swatch carries, taken from the same paint record the day cell reads.
  *
- * A band or a block wins over the fill, so the key shows the mark the day cells actually use to tell
- * the phases apart. A sample built from the fill would describe a treatment the user cannot rely on,
- * because the fills are too close together to distinguish and only the band and the block are meant to
- * be. A block is sampled as an outlined region on the phase's own fill, because that is the shape the
- * day cell draws: a closed run, not a stroke.
+ * Colour only, never shape: the shape is the layer's own `footprint`, which the legend applies. The two
+ * were once chosen independently here and in the layer declaration, which is exactly the drift this file
+ * exists to prevent — a key showing a bar for a tint, or a stroke for a block, would misdescribe the
+ * calendar while still passing every test on the record it read from.
  */
 export function swatchSample(layer: CalendarLayer): string {
   const paint = LAYER_PAINT[layer.id];
-  if (paint.band) return cn(paint.band, BAND_FOOTPRINT);
-  if (paint.bar) return cn(paint.bar, BAR_FOOTPRINT);
+  if (paint.bar) return paint.bar;
   return paint.fill ? cn(paint.border, paint.fill) : paint.marker;
 }
 
@@ -124,16 +114,15 @@ export const LAYER_GROUP_LABELS: Record<LayerGroup, string> = {
 const SQUARE = "h-2.5 w-2.5 rounded";
 
 /**
- * A phase key shows the shape its day cells draw. Before and After draw a band, so their key is a bar.
- * Fertile draws the window as a full-height region, so its key is a bordered box. The legend applies
- * the footprint itself, so `swatchSample` carries the colour and this records the shape on the layer as
- * well, so the two cannot disagree.
+ * A phase key shows the shape its day cells draw. The window is drawn as a full-height bar, so its key is
+ * a tall block. Before and After are tints, so their key is a small square tile — the shape a tinted day
+ * actually reads as now that there is no band on it.
  */
-const BAND_FOOTPRINT = "h-1 w-6 rounded-full";
-const BAR_FOOTPRINT = "h-3 w-5 rounded-md";
+const BAR_FOOTPRINT = "h-3.5 w-3.5 rounded-sm";
+const TINT_FOOTPRINT = "h-2.5 w-2.5 rounded";
 
 function phaseLayer(id: CalendarPhase, label: string): CalendarLayer {
-  const footprint = LAYER_PAINT[id].bar ? BAR_FOOTPRINT : BAND_FOOTPRINT;
+  const footprint = LAYER_PAINT[id].bar ? BAR_FOOTPRINT : TINT_FOOTPRINT;
   return { id, label, group: "status", needs: "algorithm", footprint };
 }
 

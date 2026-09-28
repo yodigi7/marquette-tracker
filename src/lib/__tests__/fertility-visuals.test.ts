@@ -55,28 +55,27 @@ describe("fertility visual mappings", () => {
     expect(FERTILITY_CALENDAR_PHASE_VISUALS.after.label).toBe("After");
   });
 
-  it("gives every status a band, and the two quiet phases a distinct one each", () => {
-    // The band is what tells the two quiet phases apart, so a status without one is a treatment the
-    // Calendar cannot distinguish.
-    for (const status of Object.keys(FERTILITY_STATUS_VISUALS) as DayStatus[]) {
-      expect(FERTILITY_STATUS_VISUALS[status].band, `${status} band`).not.toBe("");
+  it("paints no band on any phase, so no horizontal line is drawn across the calendar", () => {
+    // A band is a 4px strip along a day's top edge, and there is a version of this change that put one on
+    // every phase. It was withdrawn: the strip and the menses stripe are both horizontal lines at
+    // opposite cell edges, 8px apart across a week boundary, where they read as one mark -- and three
+    // hundred of them down a month is a lot of lines to read past. The window is a bar instead, which
+    // cannot be confused with a stripe, and the two quiet phases are tints.
+    for (const phase of ["before", "fertile", "after"] as const) {
+      const record = FERTILITY_CALENDAR_PHASE_VISUALS[phase] as { band?: string };
+      expect(record.band, `${phase} must not declare a band`).toBeUndefined();
     }
-    const bands = (["before", "after"] as const).map(
-      (phase) => FERTILITY_CALENDAR_PHASE_VISUALS[phase].band,
-    );
-    expect(new Set(bands).size, `bands were ${bands.join(", ")}`).toBe(2);
+    for (const status of Object.keys(FERTILITY_STATUS_VISUALS) as DayStatus[]) {
+      const record = FERTILITY_STATUS_VISUALS[status] as { band?: string };
+      expect(record.band, `${status} must not declare a band`).toBeUndefined();
+    }
   });
 
-  it("draws the window as a solid bar and the quiet phases as a band, never both", () => {
-    // The window is a bar because a band and the menses stripe are both horizontal lines at opposite
-    // cell edges, 8px apart across a week boundary, where they read as one mark. The other two phases
-    // keep their band, which is what leaves the window as the only solid shape on the calendar.
+  it("draws the window as a solid bar and the quiet phases as tints, never both", () => {
     for (const phase of ["before", "after"] as const) {
       expect(FERTILITY_CALENDAR_PHASE_VISUALS[phase].bar, `${phase} bar`).toBe("");
     }
-    const fertile = FERTILITY_CALENDAR_PHASE_VISUALS.fertile;
-    expect(fertile.band, "the window carries no band").toBe("");
-    expect(fertile.bar, "the window carries a bar").not.toBe("");
+    expect(FERTILITY_CALENDAR_PHASE_VISUALS.fertile.bar, "the window carries a bar").not.toBe("");
   });
 
   it("paints the Calendar's window day in the window's own colour, not the status tint", () => {

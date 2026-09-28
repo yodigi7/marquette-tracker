@@ -51,11 +51,7 @@
     --color-fertility-status-post-calendar: var(--fertility-status-post-calendar-bg);
     --color-fertility-status-post-calendar-fg: var(--fertility-status-post-calendar-fg);
     --color-fertility-status-post-calendar-border: var(--fertility-status-post-calendar-border);
-    --color-fertility-status-pre-band: var(--fertility-status-pre-band);
-    --color-fertility-status-fertile-band: var(--fertility-status-fertile-band);
     --color-fertility-status-fertile-window: var(--fertility-status-fertile-window);
-    --color-fertility-status-post-peak-band: var(--fertility-status-post-peak-band);
-    --color-fertility-status-post-calendar-band: var(--fertility-status-post-calendar-band);
     --color-fertility-marker-menses: var(--fertility-marker-menses);
     --color-fertility-marker-intercourse: var(--fertility-marker-intercourse);
     --color-fertility-monitor-none: var(--fertility-monitor-none);
@@ -117,29 +113,21 @@
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.708 0 0);
 
-    /* A band is the 4px strip a Calendar day carries along its top edge, and it is what tells one
-       phase from another. Nothing is painted on it, so the marker contrast rule that caps a *fill*
-       does not apply: the band is free of that cap and carries full chroma. Light-mode bands are
-       darker than their border steps because a 4px strip on white still has to clear 3:1. */
     --fertility-status-pre-bg: #fef3c7;
     --fertility-status-pre-fg: #78350f;
     --fertility-status-pre-border: #d97706;
-    --fertility-status-pre-band: #a16207; /* amber-700; the border step is 2.86:1 on this fill */
     --fertility-status-fertile-bg: #fecdd3;
     --fertility-status-fertile-fg: #881337;
     --fertility-status-fertile-border: #e11d48;
-    --fertility-status-fertile-band: #e11d48;
     /* In light the status tint is already the loudest thing on a white page, so the window and the tint
        are the same value here and no second pink is needed. */
     --fertility-status-fertile-window: #fecdd3;
     --fertility-status-post-peak-bg: #d1fae5;
     --fertility-status-post-peak-fg: #064e3b;
     --fertility-status-post-peak-border: #059669;
-    --fertility-status-post-peak-band: #0f766e; /* teal-700; the border step is 3.16:1 on this fill */
     --fertility-status-post-calendar-bg: #f5f5f4;
     --fertility-status-post-calendar-fg: #292524;
     --fertility-status-post-calendar-border: #78716c;
-    --fertility-status-post-calendar-band: #78716c;
     --fertility-marker-menses: #ef4444;
     --fertility-marker-intercourse: #be123c;
     --fertility-monitor-none: #a8a29e;
@@ -152,7 +140,7 @@
     --fertility-forecast-bg: #ede9fe;
     --fertility-forecast-border: #7c3aed;
     --fertility-forecast-fg: #4c1d95;
-    --fertility-window-fill: rgb(225 29 72 / 0.14); /* the fertile band's hue */
+    --fertility-window-fill: rgb(225 29 72 / 0.14); /* the window's hue */
     --fertility-window-border: #e11d48;
     --fertility-overlay-bbt: #64748b;
     --fertility-overlay-mucus-none: #c026d3;
@@ -198,19 +186,17 @@
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
 
-    /* A fill is capped in lightness by the monitor marker painted on it, which is why all four sit
-       within 0.017 OKLab lightness of one another and why the fills cannot be the thing that tells
-       the phases apart. The band is not painted under a marker, so it carries the phase instead, at
-       full chroma. The dark band values are the border steps, which already clear 3:1 on their own
-       fills; see scripts/__tests__/fertility-palette.test.mjs, which guards all of it. */
+    /* A fill is capped in lightness by the monitor marker painted on it, which is why the three phase
+       fills sit within 0.017 OKLab lightness of one another and why they cannot be the thing that tells
+       the phases apart. The window is not a fill: it spans the whole day in its own colour, and
+       --fertility-status-fertile-window below is what makes it the loudest thing on the page. See
+       scripts/__tests__/fertility-palette.test.mjs, which guards all of it. */
     --fertility-status-pre-bg: #451a03;
     --fertility-status-pre-fg: #fef3c7;
     --fertility-status-pre-border: #fbbf24;
-    --fertility-status-pre-band: #fbbf24;
     --fertility-status-fertile-bg: #4c0519;
     --fertility-status-fertile-fg: #ffe4e6;
     --fertility-status-fertile-border: #fb7185;
-    --fertility-status-fertile-band: #fb7185;
     /* The window's own surface, and the colour of the day cell behind it as well. A full-height shape at
        the cell tint's lightness is not distinguishable from the page, so the Calendar does not use the
        tint here; the status tint above stays the right value for every surface with no bar, which is the
@@ -221,11 +207,9 @@
     --fertility-status-post-peak-bg: #022c22;
     --fertility-status-post-peak-fg: #d1fae5;
     --fertility-status-post-peak-border: #34d399;
-    --fertility-status-post-peak-band: #34d399;
     --fertility-status-post-calendar-bg: #292524;
     --fertility-status-post-calendar-fg: #e7e5e4;
     --fertility-status-post-calendar-border: #a8a29e;
-    --fertility-status-post-calendar-band: #a8a29e;
     --fertility-marker-menses: #f87171;
     --fertility-marker-intercourse: #fb7185;
     --fertility-monitor-none: #44403c;
@@ -237,9 +221,7 @@
     --fertility-forecast-bg: #2e1065;
     --fertility-forecast-border: #c4b5fd;
     --fertility-forecast-fg: #ede9fe;
-    --fertility-window-fill: rgb(
-        251 113 133 / 0.2
-    ); /* the fertile band's hue, not a near-miss rose */
+    --fertility-window-fill: rgb(251 113 133 / 0.2); /* the window's hue, not a near-miss rose */
     --fertility-window-border: #fb7185;
     --fertility-overlay-bbt: #94a3b8;
     --fertility-overlay-mucus-none: #f0abfc;

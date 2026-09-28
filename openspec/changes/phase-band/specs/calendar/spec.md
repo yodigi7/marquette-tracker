@@ -2,53 +2,50 @@
 
 ## ADDED Requirements
 
-### Requirement: Calendar paints a band for the quiet phases and a solid bar for the fertile window
+### Requirement: Calendar paints the window as a bar and the quiet phases as tints
 
-The Calendar day cell SHALL distinguish the three collapsed phases by mark. The two phases outside the
-window — before it and after it — SHALL be marked with a band along the cell's top edge, in that
-phase's full-chroma colour, in every theme. The fertile window SHALL be marked with a solid bar at full cell
-height instead of a band, so that the window is the only filled shape on the Calendar and the two phases
-either side of it stay quiet. A day with no phase SHALL paint neither. The bar SHALL carry its own
-colour, which MAY be brighter than the cell's own tint because the bar is the mark the window is
-recognised by; the tint behind it remains the treatment every surface without a bar uses.
+The Calendar day cell SHALL mark the fertile window with a solid bar at full cell height, so that the
+window is the only filled shape on the Calendar. The two phases outside the window — before it and after
+it — SHALL be marked by their tint alone, which is the treatment they had before this change. A day with
+no phase SHALL paint neither.
 
-Each mark SHALL be painted independently of the cell's background fill, and the fill SHALL continue to
-carry the phase's hue. A day whose phase layer is hidden SHALL paint neither mark, while the day's
-accessible description SHALL still name the phase, exactly as it does today.
+The bar SHALL carry its own colour, which MAY be brighter than the status tint because the bar is the
+mark the window is recognised by. A Calendar day inside the window SHALL be painted in the bar's own
+colour rather than the status tint, because a rounded bar end cannot paint itself and whatever lies
+behind its corner shows through. The status tint remains the right value for every surface that has no
+bar. The bar SHALL NOT be lightened past what the reading markers painted on it allow.
 
-A band SHALL span the full width of the cell and SHALL continue across the gap between adjacent cells,
-so that consecutive days in the same phase read as one continuous run rather than as separate marks.
+No day cell SHALL draw a horizontal line along the top edge of a day, on any phase. A strip there and the
+menses stripe at the bottom edge of the day above are 8px apart across a week boundary and read as a
+single mark, and three hundred of them down a month is a great deal of line to read past.
 
-#### Scenario: The two phases outside the window are marked with a band
-
-- **WHEN** the Calendar renders a day before the window or after it
-- **THEN** that day carries a band in its own phase's colour along its top edge
-- **AND** a day with no phase carries neither a band nor a bar
-
-#### Scenario: The window is marked as a solid bar, not a band
+#### Scenario: The window is marked as a solid bar
 
 - **WHEN** a Calendar day falls inside the fertile window
 - **THEN** the cell shows a solid bar at full cell height in the window's own colour
-- **AND** the cell carries no band
 - **AND** the bar is the fill rather than a wire around one, so the shape is carried by its own colour
 - **AND** the day cell behind the bar carries the same colour, so a rounded end cannot reveal a
   different one through its own corner
 
-#### Scenario: A contiguous phase reads as one continuous mark
+#### Scenario: The two quiet phases are tints and nothing more
 
-- **WHEN** a Calendar month contains consecutive days in the same phase
-- **THEN** their marks are continuous across the cells between them
-- **AND** no visible break appears between two adjacent days of the same phase
+- **WHEN** the Calendar renders a day before the window or after it
+- **THEN** that day carries its phase's tint
+- **AND** it carries no bar and no line along its top edge
+- **AND** all three phases are still on screen: none is dropped to make room for the window
+
+#### Scenario: No day in a month has a line along its top edge
+
+- **WHEN** a Calendar month is rendered
+- **THEN** no day cell in any phase draws a strip along its top edge
 
 #### Scenario: The bar is held to the marker rules, because a marker is painted on it
 
 - **WHEN** the window is drawn in either theme
 - **THEN** the bar's colour meets the same 3:1 against every reading marker as any other Calendar fill
 - **AND** it is never brightened past that to make the window more prominent
-- **AND** in the dark theme it is brighter than the cell tint it covers, because the tint alone is too
+- **AND** in the dark theme it is brighter than the status tint it covers, because the tint alone is too
   close to the page for a full-height bar to read as a surface
-
-## ADDED Requirements
 
 ### Requirement: The window's bar spans the gap between days and stops at the gap between weeks
 
@@ -156,10 +153,10 @@ the edge of the month on screen SHALL NOT be rounded as though the window ended 
 
 ### Requirement: The window's bar and the menses stripe are different kinds of mark
 
-A band and the menses stripe are both horizontal lines along opposite edges of a day cell, and across a
-Calendar row boundary they are close enough to read as a single mark. The window SHALL therefore be
-marked as a filled bar, which cannot be confused with a stripe, and the menses stripe SHALL keep its
-existing position, shape, and colour. No menses day falls inside the fertile window under the current
+The menses stripe is a horizontal line along the bottom edge of a day cell, and any other horizontal
+line along a cell edge is 8px from it across a row boundary, where the two read as a single mark. No day
+cell SHALL draw such a line. The window SHALL therefore be marked as a filled bar, which cannot be
+confused with a stripe, and the menses stripe SHALL keep its existing position, shape, and colour. No menses day falls inside the fertile window under the current
 protocol, so the bar never sits under the stripe; the requirement is on the marks being different in
 kind, not on a coincidence of the data.
 
@@ -221,7 +218,7 @@ The Calendar SHALL represent recorded menses with a visible stripe along the bot
 
 The Calendar legend SHALL match the colors, borders, line styles, and marker shapes used in the active presentation. The default legend SHALL be grouped around the simplified status categories, the predictive treatment, the menses stripe, and the color-coded monitor readings. The predictive treatment SHALL be described by a single entry covering both the next-window forecast and projected cycle days, because both use the same predictive cue. A full-detail legend SHALL additionally offer the secondary indicator that the full-detail presentation exposes.
 
-Each entry SHALL describe exactly one layer that the day cells can paint, and every layer the day cells can paint SHALL have an entry. An entry's sample SHALL render the same mark the day cells draw for that layer: a band for a phase the day cells paint as a band, and a bar for a phase the day cells paint as a bar, so the key cannot disagree with the cell. A hidden entry SHALL render a hollow swatch rather than the colour sample, so a hidden entry is distinguishable from a shown one without relying on colour alone, and its label SHALL remain unchanged.
+Each entry SHALL describe exactly one layer that the day cells can paint, and every layer the day cells can paint SHALL have an entry. An entry's sample SHALL render the same mark the day cells draw for that layer, so the key cannot disagree with the cell. A sample's colour SHALL come from the same paint the day cell uses and its shape from the layer's own declared footprint, so the two cannot be chosen independently and drift apart. A hidden entry SHALL render a hollow swatch rather than the colour sample, so a hidden entry is distinguishable from a shown one without relying on colour alone, and its label SHALL remain unchanged.
 
 #### Scenario: Simplified legend covers the default vocabulary
 
@@ -232,7 +229,7 @@ Each entry SHALL describe exactly one layer that the day cells can paint, and ev
 #### Scenario: A phase sample shows the mark the day cells draw
 
 - **WHEN** a legend entry describes a phase
-- **THEN** its sample renders that phase's mark: a band where the day cells draw a band, and a bar where the day cells draw a bar
+- **THEN** its sample renders that phase's mark: a bar for the window, a tint tile for the quiet phases
 - **AND** the sample is recognisably the same mark the day cells draw
 
 #### Scenario: Post-calendar state is explained
@@ -274,7 +271,7 @@ Each entry SHALL describe exactly one layer that the day cells can paint, and ev
 #### Scenario: Hiding a phase hides its mark and keeps the text
 
 - **WHEN** the user hides a phase layer from the legend
-- **THEN** days in that phase paint neither a band nor a bar, and lose the phase's colour
+- **THEN** days in that phase paint no bar, and lose the phase's colour
 - **AND** no other layer's mark on those days is affected
 - **AND** each such day's accessible label still names its phase
 

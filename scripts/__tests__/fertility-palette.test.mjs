@@ -6,21 +6,21 @@ import { describe, expect, it } from "vitest";
  * The palette guard for the fertility visuals.
  *
  * A **fill** is the large background of a Calendar day, and a monitor marker is painted on top of it.
- * That caps how light a fill may be: in the dark theme the cap is 0.0922 relative luminance, set by
- * the Peak reading, and every fill has to sit under it. The consequence is that fills cannot be the
- * thing that tells two phases apart -- all four sit within 0.017 OKLab lightness of one another, and a
- * search for a better-separated trio inside the cap does not find one worth having.
+ * That caps how light a fill may be: in the dark theme the cap is 0.0435 relative luminance, set by the
+ * **Low** reading, and every fill has to sit under it. The consequence is that fills cannot be the thing
+ * that tells two phases apart -- all three sit within 0.017 OKLab lightness of one another, and a search
+ * for a better-separated trio inside the cap does not find one worth having.
  *
- * A **band** is the thin strip a day carries along its top edge, in the phase's full-chroma colour.
- * Nothing is painted on it, so the marker cap does not apply and it is free to carry the phase. That
- * is why this file asserts the bands are mutually distinguishable and deliberately does not assert the
- * same of the fills: the assertion for the fills is not satisfiable, and the check at the foot of this
- * file fails if one is added back without a new argument for it.
+ * The **window** is the exception, and it is not a fill. It spans the whole day, so it is a surface like a
+ * fill and is held to the same marker rule; it is allowed to be brighter because it is the one mark on the
+ * calendar that has to be found at a glance, and the cell behind it is painted in the same colour so a
+ * rounded end cannot reveal anything else through its own corner. The two quiet phases are plain tints.
  *
- * There is no rule here requiring the fills to be distinguishable from one another, because for the
- * fills the assertion is not satisfiable: the marker caps how light a fill can be, and no set of values
- * inside that cap separates far enough to be worth asserting. The band carries the distinction, and the
- * check at the foot of this file fails if a fill rule is added back without a new argument for it.
+ * That is why this file asserts the window is distinguishable and deliberately does not assert the fills
+ * are mutually distinguishable: that assertion is not satisfiable inside the marker cap, and the check at
+ * the foot of this file fails if one is added back without a new argument for it. A large filled area is
+ * also not a 3:1 non-text case -- that rule is about boundaries and indicator shapes, and no fill in
+ * either theme meets it against its page -- so the window is checked by colour distance instead.
  *
  * Everything checked here is read out of `index.css`, the stylesheet the app actually loads, including
  * the theme surfaces, which are authored in `oklch`. The previous version of this test hand-copied the
@@ -45,7 +45,6 @@ const THEMES = ["light", "dark"];
  * The floors the rules in `fertility-visuals` set, with no slack: these are the rules themselves.
  */
 const MARKER_CONTRAST = 3;
-const BAND_CONTRAST = 3;
 const TEXT_CONTRAST = 4.5;
 
 /**
@@ -56,14 +55,8 @@ const TEXT_CONTRAST = 4.5;
  * be lightened: lifting all three readings to a comparable brightness raises the fill cap by 1.6x but
  * drops their own separation to 0.197, so lightening the readings to free the fills would mean
  * relaxing this floor. Two accessibility rules in direct conflict, and this one should not give.
- *
- * `BAND_SEPARATION` is per theme because the two cannot both reach one number. A 4px band on a white
- * page has to clear 3:1 against white, and the values that satisfy that are dark enough to crowd each
- * other: dark reaches 0.212 and light only 0.172. A single aspirational floor would fail light mode by
- * construction, so each theme is held to what it can actually deliver.
  */
 const MARKER_SEPARATION = 0.25;
-const BAND_SEPARATION = { light: 0.15, dark: 0.2 };
 
 /**
  * Minimum OKLab distance between the window's bar and the surfaces it has to be told from.
@@ -209,7 +202,6 @@ function readPalette() {
     const entry = {
       markers: {},
       fill: {},
-      band: {},
       foreground: {},
       surfaces: { base: readColour(block, "background"), card: readColour(block, "card") },
       predicted: readColour(block, "fertility-forecast-bg"),
@@ -224,7 +216,6 @@ function readPalette() {
     }
     for (const status of STATUSES) {
       entry.fill[status] = readColour(block, `fertility-status-${status}-bg`);
-      entry.band[status] = readColour(block, `fertility-status-${status}-band`);
       entry.foreground[status] = readColour(block, `fertility-status-${status}-fg`);
     }
     palette[theme] = entry;
@@ -259,12 +250,11 @@ describe("palette is read from the stylesheet the app loads", () => {
     expect(palette.dark.surfaces.base).toBe("#0a0a0a");
   });
 
-  it("finds a distinct hex for every fill, band, and foreground it guards", () => {
+  it("finds a distinct hex for every fill and foreground it guards", () => {
     for (const theme of THEMES) {
       for (const status of STATUSES) {
         for (const [part, values] of Object.entries({
           fill: palette[theme].fill,
-          band: palette[theme].band,
           foreground: palette[theme].foreground,
         })) {
           expect(values[status], `${theme} ${status} ${part}`).toMatch(/^#[0-9a-f]{6}$/i);
@@ -310,91 +300,13 @@ describe("monitor marker separation", () => {
   }
 });
 
-describe("status band visibility", () => {
-  for (const theme of THEMES) {
-    for (const phase of PHASES) {
-      it(`${theme} ${phase} band clears ${BAND_CONTRAST}:1 against its own fill`, () => {
-        const band = palette[theme].band[phase];
-        const ratio = contrast(band, palette[theme].fill[phase]);
-        expect(
-          ratio,
-          `${theme} ${phase} band ${band} on ${palette[theme].fill[phase]}`,
-        ).toBeGreaterThanOrEqual(BAND_CONTRAST);
-      });
-
-      it(`${theme} ${phase} band clears ${BAND_CONTRAST}:1 against the surface behind the cell`, () => {
-        const band = palette[theme].band[phase];
-        for (const [name, surface] of Object.entries(palette[theme].surfaces)) {
-          const ratio = contrast(band, surface);
-          expect(
-            ratio,
-            `${theme} ${phase} band ${band} on ${name} ${surface}`,
-          ).toBeGreaterThanOrEqual(BAND_CONTRAST);
-        }
-      });
-    }
-  }
-});
-
-describe("status band separation", () => {
-  const PAIRS = [
-    ["pre", "fertile"],
-    ["fertile", "post-peak"],
-    ["pre", "post-peak"],
-  ];
-
-  for (const theme of THEMES) {
-    for (const [a, b] of PAIRS) {
-      it(`${theme} ${a} and ${b} bands are distinguishable`, () => {
-        const floor = BAND_SEPARATION[theme];
-        const distance = separation(palette[theme].band[a], palette[theme].band[b]);
-        expect(
-          distance,
-          `${theme} ${a}/${b} band separation is ${distance.toFixed(4)}, floor ${floor}`,
-        ).toBeGreaterThanOrEqual(floor);
-      });
-    }
-  }
-
-  it("holds light and dark to their own floors rather than one aspirational number", () => {
-    for (const theme of THEMES) {
-      const worst = Math.min(
-        ...PAIRS.map(([a, b]) => separation(palette[theme].band[a], palette[theme].band[b])),
-      );
-      expect(worst, `${theme} worst band pair ${worst.toFixed(4)}`).toBeGreaterThanOrEqual(
-        BAND_SEPARATION[theme],
-      );
-    }
-  });
-
-  it("separates the phases far better than the fills they sit on", () => {
-    // The point of the change. The fills cannot be pushed apart -- the marker caps them -- so the
-    // band has to do the work, and this is the number that says it does.
-    for (const theme of THEMES) {
-      const worstBand = Math.min(
-        ...PAIRS.map(([a, b]) => separation(palette[theme].band[a], palette[theme].band[b])),
-      );
-      const worstFill = Math.min(
-        ...PAIRS.map(([a, b]) => separation(palette[theme].fill[a], palette[theme].fill[b])),
-      );
-      // The only place in this file the fills are compared to each other, and it asserts just that
-      // the bands win. The rule it stands in for asserted the opposite, which is the one that cannot be
-      // satisfied, so this is deliberately a comparison rather than a floor.
-      expect(
-        worstBand,
-        `${theme} bands ${worstBand.toFixed(4)} against fills ${worstFill.toFixed(4)}`,
-      ).toBeGreaterThan(worstFill);
-    }
-  });
-});
-
 describe("the window's bar", () => {
   /**
    * The bar is the window's own surface. Unlike the outline it replaced, it is painted *under* the
    * reading markers, so it is held to the same 3:1 as any other fill -- the rule above already covers
    * it. What it has to earn on top of that is the shape: it is the only solid surface on a Calendar
    * month, so it has to be plainly visible against the page and clearly the window's own, and it has to
-   * be far enough from the two quiet phases' bands that a window is never read as one of them.
+   * be far enough from the page and the two quiet phase fills that it reads as its own shape.
    *
    * The values that reach those bars are worth recording, because they are the whole reason the bar
    * exists. In dark, the binding reading is LOW, which permits a fill up to 0.0435 luminance -- not the
@@ -450,17 +362,6 @@ describe("the window's bar", () => {
         `${theme} window ${palette[theme].bar} is darker than the tint ${palette[theme].fill.fertile}`,
       ).toBeGreaterThanOrEqual(lightness(palette[theme].fill.fertile));
     });
-
-    for (const phase of ["pre", "post-peak"]) {
-      it(`${theme} window bar is not read as the ${phase} band`, () => {
-        const distance = separation(palette[theme].bar, palette[theme].band[phase]);
-        const floor = BAND_SEPARATION[theme];
-        expect(
-          distance,
-          `${theme} window/${phase} separation is ${distance.toFixed(4)}, floor ${floor}`,
-        ).toBeGreaterThanOrEqual(floor);
-      });
-    }
   }
 
   it.each(THEMES)("%s window bar survives its worst reading", (theme) => {
@@ -513,8 +414,8 @@ describe("guard has no fill-separation rule", () => {
    * The omission is deliberate, and this is what keeps it deliberate. A monitor marker is painted on a
    * Calendar day's fill, which caps the fill's lightness, and no set of fill values inside that cap
    * separates far enough for the assertion to be worth making. A rule written against that cap would
-   * either fail against a correct palette or force an illegible one. The band carries the distinction
-   * instead, and `status band separation` above is where that is actually checked.
+   * either fail against a correct palette or force an illegible one. The window carries the distinction
+   * instead, and the bar rules above are where that is actually checked.
    *
    * Code shapes only, deliberately: this file has to be free to *explain* why fills are not compared,
    * and an earlier version of this list matched its own explanation.
@@ -525,7 +426,7 @@ describe("guard has no fill-separation rule", () => {
     "separation(fills",
     "MIN_FILL_SEPARATION",
   ];
-  const REQUIRED = "the assertion is not satisfiable";
+  const REQUIRED = "that assertion is not satisfiable inside the marker cap";
 
   /**
    * The guard's own body, minus this block. The needles have to appear literally in order to be

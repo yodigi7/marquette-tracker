@@ -6,20 +6,12 @@ export interface FertilityStatusVisual {
   fill: string;
   foreground: string;
   border: string;
-  /**
-   * The thin full-width strip a Calendar day carries along its top edge, in the status's full-chroma
-   * colour. The band, not the fill, is what tells one status from another: a monitor marker is painted
-   * on the fill, which caps how light the fill may be, so fills cannot separate far enough to carry the
-   * distinction. The band has no marker on it and is free of that cap.
-   */
-  band: string;
   badge: string;
 }
 
 export interface CalendarPhaseVisual {
   label: string;
   fill: string;
-  band: string;
   /**
    * The solid bar the Calendar draws the fertile window with, spanning the whole day. The bar carries
    * its own colour rather than reusing the cell's tint, because it is the mark a run of window days is
@@ -60,28 +52,24 @@ export const FERTILITY_STATUS_VISUALS: Record<DayStatus, FertilityStatusVisual> 
     fill: "bg-fertility-status-pre",
     foreground: "text-fertility-status-pre-fg",
     border: "border-fertility-status-pre-border",
-    band: "bg-fertility-status-pre-band",
     badge: "bg-fertility-status-pre text-fertility-status-pre-fg",
   },
   fertile: {
     fill: "bg-fertility-status-fertile",
     foreground: "text-fertility-status-fertile-fg",
     border: "border-fertility-status-fertile-border",
-    band: "bg-fertility-status-fertile-band",
     badge: "bg-fertility-status-fertile text-fertility-status-fertile-fg",
   },
   "post-peak": {
     fill: "bg-fertility-status-post-peak",
     foreground: "text-fertility-status-post-peak-fg",
     border: "border-fertility-status-post-peak-border",
-    band: "bg-fertility-status-post-peak-band",
     badge: "bg-fertility-status-post-peak text-fertility-status-post-peak-fg",
   },
   "post-calendar": {
     fill: "bg-fertility-status-post-calendar",
     foreground: "text-fertility-status-post-calendar-fg",
     border: "border-fertility-status-post-calendar-border",
-    band: "bg-fertility-status-post-calendar-band",
     badge: "bg-fertility-status-post-calendar text-fertility-status-post-calendar-fg",
   },
 };
@@ -95,7 +83,6 @@ export const FERTILITY_CALENDAR_PHASE_VISUALS: Record<CalendarPhase, CalendarPha
   before: {
     label: "Before",
     fill: FERTILITY_STATUS_VISUALS["pre-fertile"].fill,
-    band: FERTILITY_STATUS_VISUALS["pre-fertile"].band,
     // Before and After keep their band and get no bar. The window is the one thing on the calendar
     // the user scans for, and a bar on every phase would put three in competition for that attention.
     bar: "",
@@ -109,10 +96,11 @@ export const FERTILITY_CALENDAR_PHASE_VISUALS: Record<CalendarPhase, CalendarPha
     // window's colour behind it means a rounded end reveals nothing but the window. The status tint is
     // still the right value for every surface that has no bar, which is why it is unchanged.
     fill: "bg-fertility-status-fertile-window",
-    // No band. A band is a horizontal line along the cell's top edge, and the menses stripe is a
-    // horizontal line along the bottom edge of the day above; across a week boundary the two sit 8px
-    // apart and read as one mark. The window is a bar instead, which cannot be confused with a stripe.
-    band: "",
+    // No band, deliberately. A band is a horizontal line along the cell's top edge and the menses
+    // stripe is one along the bottom edge of the day above; across a week boundary the two sit 8px
+    // apart and read as a single mark. That is the same reason the two quiet phases have none either:
+    // three hundred horizontal lines down a month is noise, and the window is the only thing on the
+    // calendar that needs to be found at a glance.
     // The same colour as the fill, deliberately: the cell and the bar are one surface, and the bar is
     // the same colour bleeding across the gap to the days either side of it.
     bar: "bg-fertility-status-fertile-window",
@@ -120,7 +108,6 @@ export const FERTILITY_CALENDAR_PHASE_VISUALS: Record<CalendarPhase, CalendarPha
   after: {
     label: "After",
     fill: FERTILITY_STATUS_VISUALS["post-peak"].fill,
-    band: FERTILITY_STATUS_VISUALS["post-peak"].band,
     bar: "",
   },
 };

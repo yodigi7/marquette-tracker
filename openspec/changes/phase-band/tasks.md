@@ -2,30 +2,28 @@
 
 ## 1. Palette guard (tests first)
 
-- [x] 1.1 Rewrite `scripts/__tests__/fertility-palette.test.mjs` to read the monitor colours, the status fills, the status bands, the window's bar, and the theme surfaces out of `src/index.css` for both `:root` and `.dark`, including `oklch` for the surfaces, and delete the hand-copied `CELL_FILLS` table. Verify it reports the new tokens as missing against today's stylesheet.
+- [x] 1.1 Rewrite `scripts/__tests__/fertility-palette.test.mjs` to read the monitor colours, the status fills, the window's bar, and the theme surfaces out of `src/index.css` for both `:root` and `.dark`, including `oklch` for the surfaces, and delete the hand-copied `CELL_FILLS` table. Verify it reports the new token as missing against today's stylesheet.
 - [x] 1.2 Assert per theme that every monitor reading clears 3:1 against every surface a Calendar day cell can present — including the window's bar, because a reading on a window day sits on the bar — reading each surface from the stylesheet. Verify a marker pushed below the ratio fails.
 - [x] 1.3 Assert per theme that the three monitor readings stay mutually distinguishable at the existing `0.25` floor, so a future attempt to lighten them together to free the fills fails.
-- [x] 1.4 Assert per theme that each band's contrast against its own fill and against the surface behind the element clears 3:1, and that the bands are mutually distinguishable against a per-theme floor. Verify a band darkened toward its own fill fails.
 - [x] 1.5 Assert that the window's bar is a distinguishable large area in both themes, by colour distance from the page and from the fills it sits beside — deliberately not by a contrast ratio, because 3:1 is a rule about boundaries and indicator shapes and no fill in this palette meets it against the page. Verify the bar pushed toward the page fails.
 - [x] 1.6 Assert that the bar survives its worst reading in both themes, and that the failure message names the reading that binds it. The binding reading is Low, not Peak; getting that backwards is how the bar ends up brighter than a reading can survive.
 - [x] 1.7 Add a check on the test file's own source asserting it contains no rule requiring status fills to be mutually distinguishable, and that the reason is stated in a comment. This is what stops a future maintainer re-adding an unsatisfiable rule.
 
 ## 2. Palette values
 
-- [x] 2.1 Add per-phase band tokens in both themes, with their theme aliases, and a bar token for the fertile phase. Reuse the existing border values in dark; darken the light values so the marks clear 3:1 on white and against their own fills. Verify tasks 1.4 and 1.5 pass.
-- [x] 2.2 Settle the dark bar at `#700b25`: the brightest rose at `0.0382` luminance that clears all three readings, with Low binding at `3.18:1`. A step of `0.209` OKLab L above the page, against the cell tint's `0.106`.
-- [x] 2.3 Settle the light bar on the existing fertile tint. It is already the loudest thing on a white page, so the bar and the tint are deliberately the same value there rather than a second arbitrary pink.
-- [x] 2.4 Paint a Calendar window day in the bar's own colour, cell and bar alike, so a rounded end cannot reveal the status tint through its own corner. Verify the cell behind each rounded end is the window's colour.
-- [x] 2.5 Align the cycle-chart fertile band fill hue to the window's hue, leaving its border and alpha approach as they are. Verify the chart still renders and its reference area is unchanged in geometry.
-- [x] 2.6 Confirm the status fills are unchanged, so every reading marker's contrast is exactly what it is today and the cell behind the bar is the value the marker rules were already satisfied against.
+- [x] 2.1 Add a window token in both themes, with its theme aliases. Dark is the value the readings allow; light is the existing fertile tint, which is already the loudest thing on a white page.
+- [x] 2.2 Settle the dark window at `#700b25`: the brightest rose at `0.0382` luminance that clears all three readings, with Low binding at `3.18:1`. A step of `0.209` OKLab L above the page, against the cell tint's `0.106`.
+- [x] 2.3 Align the cycle-chart fertile window fill hue to the window's hue, leaving its border and alpha approach as they are. Verify the chart still renders and its reference area is unchanged in geometry.
+- [x] 2.4 Confirm the status fills are unchanged, so every reading marker's contrast is exactly what it is today and the Status view is untouched.
+- [x] 2.5 Remove the per-phase band tokens in both themes. The band was withdrawn: it and the menses stripe are both horizontal lines at opposite cell edges, 8px apart across a week boundary, where they read as one mark.
 
 ## 3. Visual plumbing
 
-- [x] 3.1 Add a band class to each status visual and to each collapsed Calendar phase in `src/lib/fertility-visuals.ts`, so the collapsed view cannot drift from the Status view's palette. Verify the records stay total over the status and the phase.
-- [x] 3.2 Add a `bar` slot to the phase visual, populated for the fertile phase only, and record that it is allowed to differ from the cell's tint because it is the mark the window is recognised by.
-- [x] 3.3 Give the fertile phase a bar and no band, and the two quiet phases a band and no bar, so no phase carries both and the window is the only filled shape on the calendar.
-- [x] 3.4 Add a `bar` slot to the layer paint record, populate it for the fertile layer, and confirm every other layer leaves it empty.
-- [x] 3.5 Make the legend swatch render the mark its day cells draw — a stroke for a band, a filled block for a bar — and give each phase key the matching footprint. Verify the existing legend tests pass and the hollow-swatch path is unchanged.
+- [x] 3.1 Add a `bar` slot to the phase visual, populated for the fertile phase only, and record that it is allowed to differ from the status fill because it is the mark the window is recognised by.
+- [x] 3.2 Give the Calendar's fertile phase the window colour as its fill as well as its bar, so a rounded bar end cannot reveal the darker status tint through its own corner.
+- [x] 3.3 Add a `bar` slot to the layer paint record, populate it for the fertile layer, and confirm every other layer leaves it empty.
+- [x] 3.4 Make a legend swatch take its colour from the paint and its shape from the layer's own declared footprint, so the two can no longer be chosen independently and drift apart. Give the window a tall block and the two tints a small tile.
+- [x] 3.5 Remove the band from the status and phase records and from the paint record, and drop the day cell's band element. Verify no day cell in any phase draws a strip along its top edge.
 
 ## 4. Grid
 
@@ -50,5 +48,5 @@
 
 - [x] 6.1 Update the existing Calendar tests that assert where a phase's colour sits on the cell, since the marks are descendants rather than classes on the cell itself, and confirm the rest of the Calendar suite is unaffected.
 - [x] 6.2 Run `pnpm check` and confirm format, lint, tests, and build are green, and that `openspec validate --all` passes with these artifacts present.
-- [x] 6.3 Confirm in the running app, in both themes, that the bar's geometry is right. Read the rendered result back out of the DOM on a month whose window wraps two row boundaries: confirmed zero tabs outside the grid's first and last columns, zero holes between bars in a row, zero bars bleeding vertically, a rounded left end on the window's first day and a rounded right end on its last, and `rgb(112, 11, 37)` dark / `rgb(254, 205, 211)` light. Confirmed the cell behind each rounded end is that same colour, so the corner reveals nothing but the window. Confirmed the two quiet phases still carry their bands, the window carries none, and no day carries both a bar and a menses stripe.
-- [ ] 6.4 Confirm on a real device, in both themes, that the three phases are told apart at a glance, that the window reads as one thing, that its two ends are identifiable and show no trace of the old tint, that the calendar's week rows stay legible across the window, and that the menses stripe is no longer confused with it. Review from `pnpm dev` in the issue worktree. Record any visual finding as an issue comment rather than expanding this change.
+- [x] 6.3 Confirm in the running app, in both themes, that the bar's geometry is right and the bands are gone. Read the rendered result back out of the DOM on a month whose window wraps two row boundaries: confirmed zero tabs outside the grid's first and last columns, zero holes between bars in a row, zero bars bleeding vertically, a rounded left end on the window's first day and a rounded right end on its last, and `rgb(112, 11, 37)` dark / `rgb(254, 205, 211)` light. Confirmed the cell behind each rounded end is that same colour, so the corner reveals nothing but the window, and zero bands anywhere in the month with the two quiet phases still tinted at `rgb(69, 26, 3)` and `rgb(2, 44, 34)`. Confirmed the two quiet phases still carry their bands, the window carries none, and no day carries both a bar and a menses stripe.
+- [ ] 6.4 Confirm on a real device, in both themes, that the window reads as one thing at a glance, that its two ends are identifiable and show no trace of the old tint, that the calendar's week rows stay legible across it, that the menses stripe is no longer confused with it, and that `Before` and `After` are still told apart by tint alone. That last one is the known weak point and is worth checking first. Review from `pnpm dev` in the issue worktree. Record any visual finding as an issue comment rather than expanding this change.

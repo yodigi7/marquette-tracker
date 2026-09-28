@@ -54,43 +54,38 @@ describe("the layer declaration", () => {
     expect(swatchSample(predicted)).toContain("border-fertility-forecast-border");
   });
 
-  it("paints a band for the two quiet phases, and a bar for the window", () => {
-    // The window is a bar and the phases around it are strokes. A phase with neither would be a phase
-    // the Calendar draws a fill for and cannot distinguish; a phase with both would put a horizontal
-    // line back along the top edge of a bar that exists to replace that line.
+  it("paints a bar for the window and only a tint for the two quiet phases", () => {
     for (const id of ["before", "after"] as const) {
-      expect(LAYER_PAINT[id].band, `${id} band`).not.toBe("");
       expect(LAYER_PAINT[id].bar, `${id} bar`).toBe("");
-      expect(swatchSample({ id } as never), `${id} sample`).toContain(LAYER_PAINT[id].band);
+      expect(swatchSample(phase(id)), `${id} sample`).toContain(LAYER_PAINT[id].fill);
     }
-    expect(LAYER_PAINT.fertile.band, "the window carries no band").toBe("");
-    expect(swatchSample(phase("fertile")), "the key shows the bar").toContain(
-      LAYER_PAINT.fertile.bar,
-    );
+    expect(swatchSample(phase("fertile")), "the key shows the bar").toBe(LAYER_PAINT.fertile.bar);
   });
 
   it("gives each phase key the shape its day cells draw", () => {
-    // A key that shows a stroke for a bar, or a block for a stroke, misdescribes the calendar.
+    // A key that shows a tall block for a tint, or a tile for the window, misdescribes the calendar.
     for (const id of ["before", "after"] as const) {
-      expect(phase(id).footprint, `${id} footprint`).toBe("h-1 w-6 rounded-full");
+      expect(phase(id).footprint, `${id} footprint`).toBe("h-2.5 w-2.5 rounded");
     }
-    expect(phase("fertile").footprint, "fertile footprint").toBe("h-3 w-5 rounded-md");
+    expect(phase("fertile").footprint, "fertile footprint").toBe("h-3.5 w-3.5 rounded-sm");
   });
 
-  it("never draws a band or a bar on a layer that is not a phase", () => {
-    // The predictive, menses, and reading-marker layers are not phases, and a mark on any of them would
-    // read as a window edge where there is none.
+  it("draws a bar on no layer but the window", () => {
+    // The predictive, menses, and reading-marker layers are not phases, and a bar on any of them would
+    // read as a window where there is none.
     for (const id of ["predicted", "menses", "low", "high", "peak", "intercourse"] as const) {
-      expect(LAYER_PAINT[id].band, `${id} band`).toBe("");
       expect(LAYER_PAINT[id].bar, `${id} bar`).toBe("");
     }
   });
 
-  it("paints no band on the layers that are not phases", () => {
-    // The predictive, menses, and reading-marker layers are not phases, and a band on any of them
-    // would read as a window edge where there is none.
-    for (const id of ["predicted", "menses", "low", "high", "peak", "intercourse"] as const) {
-      expect(LAYER_PAINT[id].band, `${id} band`).toBe("");
+  it("takes a swatch's shape from the layer and its colour from the paint, never both", () => {
+    // The two used to be chosen independently, in `swatchSample` and in the layer declaration, so a key
+    // could show a bar for a tint and still pass every test on the record it read from.
+    for (const layer of CALENDAR_LAYERS) {
+      const sample = swatchSample(layer);
+      for (const shape of ["h-1 w-6", "h-3 w-5", "rounded-full", "border-2"]) {
+        expect(sample, `${layer.id} sample must not carry its own shape`).not.toContain(shape);
+      }
     }
   });
 
