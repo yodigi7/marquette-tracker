@@ -215,8 +215,9 @@ function readPalette() {
       predicted: readColour(block, "fertility-forecast-bg"),
       // Only the fertile phase is drawn as a bar, so it is the only one that has the token. Reading it
       // for every status would assert a bar on Before and After that the Calendar deliberately does
-      // not draw.
-      bar: readColour(block, "fertility-status-fertile-bar"),
+      // not draw. It is also the colour of the day cell behind the bar, which is what stops a rounded
+      // end from revealing the status tint through its own corner.
+      bar: readColour(block, "fertility-status-fertile-window"),
     };
     for (const reading of READINGS) {
       entry.markers[reading] = readColour(block, `fertility-monitor-${reading}`);
@@ -424,15 +425,30 @@ describe("the window's bar", () => {
       }
     });
 
-    it(`${theme} window bar is distinct from the cell tint it covers`, () => {
-      // The bar covers the whole cell, so on a window day the tint behind it is invisible. If the two
-      // were the same colour the bar would be unfalsifiable and a later edit could quietly delete the
-      // distinction the shape depends on. In the dark theme the tint is a step of 0.106 above the page
-      // and the bar 0.209; they have to differ. In light the tint is already the loudest thing on a
-      // white page, so the bar IS the tint by design and requiring a second light pink would buy nothing.
-      if (theme === "dark") {
-        expect(palette[theme].bar, "dark bar").not.toBe(palette[theme].fill.fertile);
-      }
+    it(`${theme} window colour is no darker than the status tint it replaces on the Calendar`, () => {
+      // A rounded corner cannot paint itself: whatever is behind the bar's radius shows through the arc.
+      // With the status tint behind it, each end of the window grew a notch of that tint. The Calendar
+      // therefore paints a window day in the window's own colour.
+      //
+      // This is a one-directional lightness rule, not a separation floor, and deliberately so: the two
+      // are never on screen together -- they are the same surface on the Calendar and the tint is the
+      // Status view's. Demanding a distance between them would be asserting a distinction no user ever
+      // sees, and in dark the honest distance is only 0.088. What actually has to hold is that the window
+      // is not the darker of the two, because a full-height shape at the tint's lightness is not a
+      // surface. In light the tint is already the loudest thing on a white page and the two are the same
+      // value by design.
+      const lightness = (hex) => {
+        const [r, g, b] = hexToRgb(hex).map(toLinear);
+        return (
+          0.2104542553 * Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b) +
+          0.793617785 * Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b) +
+          -0.0040720468 * Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
+        );
+      };
+      expect(
+        lightness(palette[theme].bar),
+        `${theme} window ${palette[theme].bar} is darker than the tint ${palette[theme].fill.fertile}`,
+      ).toBeGreaterThanOrEqual(lightness(palette[theme].fill.fertile));
     });
 
     for (const phase of ["pre", "post-peak"]) {
@@ -478,6 +494,17 @@ describe("day number contrast", () => {
         ).toBeGreaterThanOrEqual(TEXT_CONTRAST);
       });
     }
+
+    // A Calendar window day is painted in the window's own colour, not the status tint, so the number on
+    // it has to clear the text rule against that. The tint is still the surface everywhere else, which is
+    // why both are checked rather than one replacing the other.
+    it(`${theme} fertile number clears ${TEXT_CONTRAST}:1 against the window it sits on`, () => {
+      const ratio = contrast(palette[theme].foreground.fertile, palette[theme].bar);
+      expect(
+        ratio,
+        `${theme} fertile number ${palette[theme].foreground.fertile} on the window ${palette[theme].bar}`,
+      ).toBeGreaterThanOrEqual(TEXT_CONTRAST);
+    });
   }
 });
 

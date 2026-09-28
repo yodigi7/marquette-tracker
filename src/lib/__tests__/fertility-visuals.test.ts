@@ -40,12 +40,12 @@ describe("fertility visual mappings", () => {
     expect(calendarPhaseLabel(phase)).toBe(label);
   });
 
-  it("reuses the existing status fills for the three Calendar phases", () => {
-    // The fill, so the collapsed view cannot drift from the palette the Status view shows for the same
-    // status. The mark each phase is told apart by is its own business: see the two tests below.
+  it("reuses the existing status fills for the two quiet phases", () => {
+    // Before and After are tints with a band, and they reuse the status treatments outright so the
+    // collapsed view cannot drift from the palette the Status view shows. Fertile is the exception and
+    // has its own tests below: the Calendar paints a window day in the window's own colour.
     for (const [phase, status] of [
       ["before", "pre-fertile"],
-      ["fertile", "fertile"],
       ["after", "post-peak"],
     ] as const) {
       expect(FERTILITY_CALENDAR_PHASE_VISUALS[phase].fill, `${phase} fill`).toBe(
@@ -79,14 +79,23 @@ describe("fertility visual mappings", () => {
     expect(fertile.bar, "the window carries a bar").not.toBe("");
   });
 
-  it("gives the bar its own colour, because the cell tint is too dark to carry the shape", () => {
-    // The bar spans the whole cell and a reading marker is painted on it, so it is held to the same 3:1
-    // as any other fill -- but it is allowed to be brighter than the cell's tint behind it, and it has
-    // to be: at the tint's own lightness a full-height bar is a barely-tinted block and the window stops
-    // being the thing the eye lands on. The Status view has no bar and keeps the darker tint.
+  it("paints the Calendar's window day in the window's own colour, not the status tint", () => {
+    // A rounded corner cannot paint itself. Wherever the bar's radius arcs away at the window's two ends,
+    // whatever is behind it shows through -- and with the darker status tint behind it, each end grew a
+    // notch of that tint that read as a leftover of the old treatment. The day cell behind the bar
+    // therefore carries the window's own colour, and a rounded end reveals nothing but the window.
     const fertile = FERTILITY_CALENDAR_PHASE_VISUALS.fertile;
-    expect(fertile.bar).not.toBe(fertile.fill);
-    expect(fertile.bar).toContain("fertility-status-fertile-bar");
+    expect(fertile.bar, "the bar and the cell behind it are one surface").toBe(fertile.fill);
+    // The status tint is untouched: it is still the right value for every surface with no bar.
+    expect(FERTILITY_STATUS_VISUALS.fertile.fill).not.toBe(fertile.fill);
+  });
+
+  it("keeps the quiet phases on the status tint, so only the window is a loud surface", () => {
+    for (const phase of ["before", "after"] as const) {
+      expect(FERTILITY_CALENDAR_PHASE_VISUALS[phase].fill, `${phase} fill`).toBe(
+        FERTILITY_STATUS_VISUALS[phase === "before" ? "pre-fertile" : "post-peak"].fill,
+      );
+    }
   });
 
   it.each(statusCases)("maps %s to a complete tokenized treatment", (status, token) => {

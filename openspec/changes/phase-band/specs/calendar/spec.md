@@ -31,6 +31,8 @@ so that consecutive days in the same phase read as one continuous run rather tha
 - **THEN** the cell shows a solid bar at full cell height in the window's own colour
 - **AND** the cell carries no band
 - **AND** the bar is the fill rather than a wire around one, so the shape is carried by its own colour
+- **AND** the day cell behind the bar carries the same colour, so a rounded end cannot reveal a
+  different one through its own corner
 
 #### Scenario: A contiguous phase reads as one continuous mark
 
@@ -272,7 +274,7 @@ Each entry SHALL describe exactly one layer that the day cells can paint, and ev
 #### Scenario: Hiding a phase hides its mark and keeps the text
 
 - **WHEN** the user hides a phase layer from the legend
-- **THEN** days in that phase paint neither a band nor a bar, and lose the phase's fill
+- **THEN** days in that phase paint neither a band nor a bar, and lose the phase's colour
 - **AND** no other layer's mark on those days is affected
 - **AND** each such day's accessible label still names its phase
 

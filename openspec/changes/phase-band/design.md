@@ -73,12 +73,24 @@ box rather than a bar — which is what the intermediate revision looked like.
 The two quiet phases keeping their bands is a deliberate asymmetry: the window is the thing the user
 scans for, and a bar on every phase would put three in competition for that attention.
 
-### The bar's own colour, and how far it can go
+### The window day is painted in the window's own colour, cell and all
 
 The bar carries its own value rather than reusing the cell's tint, because a full-height shape at the
 tint's lightness is not a surface. In dark the tint is a step of `0.106` OKLab L above the page and the
 bar is `0.209`. In light the tint is already the loudest thing on a white page, so the bar _is_ the tint
 there and the two are deliberately the same value — a second, arbitrary light pink would buy nothing.
+
+**The day cell behind the bar is that same colour**, which is not a detail and was found on screen. A
+rounded corner cannot paint itself: wherever the bar's radius arcs away at the window's two ends,
+whatever is behind it shows through. With the darker status tint behind it, each end of the window grew a
+notch of that tint — a visible leftover of the old treatment, at exactly the two places the eye goes
+first to find the window's edges. Painting the cell and the bar as one surface is also what Google
+Calendar and FullCalendar do, and it means a rounded end reveals nothing but the window.
+
+The status tint is untouched, because it is still the right value for every surface with no bar: the
+Status view. The guard asserts only that the window colour is _no darker_ than the tint, rather than a
+distance between them — the two are never on screen together, so demanding a separation would assert a
+distinction no user ever sees, and in dark the honest distance is only `0.088`.
 
 Because a bar spans the whole day it _is_ a surface a marker is painted on, so it joins the fill set the
 marker rule checks, and dark's `#700b25` sits at `0.0382` with Low binding at `3.18:1`.

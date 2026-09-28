@@ -53,7 +53,7 @@
     --color-fertility-status-post-calendar-border: var(--fertility-status-post-calendar-border);
     --color-fertility-status-pre-band: var(--fertility-status-pre-band);
     --color-fertility-status-fertile-band: var(--fertility-status-fertile-band);
-    --color-fertility-status-fertile-bar: var(--fertility-status-fertile-bar);
+    --color-fertility-status-fertile-window: var(--fertility-status-fertile-window);
     --color-fertility-status-post-peak-band: var(--fertility-status-post-peak-band);
     --color-fertility-status-post-calendar-band: var(--fertility-status-post-calendar-band);
     --color-fertility-marker-menses: var(--fertility-marker-menses);
@@ -129,10 +129,9 @@
     --fertility-status-fertile-fg: #881337;
     --fertility-status-fertile-border: #e11d48;
     --fertility-status-fertile-band: #e11d48;
-    /* The bar is the window's own surface, so it carries the readings like any other fill and is
-       held to the same 3:1. Rose-200 clears all three on this bar and is the loudest thing on a
-       white page, without a reading losing its dot. */
-    --fertility-status-fertile-bar: #fecdd3;
+    /* In light the status tint is already the loudest thing on a white page, so the window and the tint
+       are the same value here and no second pink is needed. */
+    --fertility-status-fertile-window: #fecdd3;
     --fertility-status-post-peak-bg: #d1fae5;
     --fertility-status-post-peak-fg: #064e3b;
     --fertility-status-post-peak-border: #059669;
@@ -212,12 +211,13 @@
     --fertility-status-fertile-fg: #ffe4e6;
     --fertility-status-fertile-border: #fb7185;
     --fertility-status-fertile-band: #fb7185;
-    /* The bar is the window's own surface, so it carries the readings like any other fill and is held to
-       the same 3:1. The binding reading here is LOW, which permits a fill up to 0.0435 luminance -- not
-       the Peak, which permits 0.0922. #700b25 sits at 0.0382 and clears all three, and it is a 0.209 step
-       above the page where the cell tint is 0.106, so the bar reads as a solid shape rather than a dark
-       void. The cell's own fill stays #4c0519, which is what the Status view uses. */
-    --fertility-status-fertile-bar: #700b25;
+    /* The window's own surface, and the colour of the day cell behind it as well. A full-height shape at
+       the cell tint's lightness is not distinguishable from the page, so the Calendar does not use the
+       tint here; the status tint above stays the right value for every surface with no bar, which is the
+       Status view. The bar carries the readings, so it is held to the same 3:1 as any other fill, and the
+       binding reading here is LOW -- 0.0435 luminance is what it permits -- not the Peak, at 0.0922.
+       #700b25 sits at 0.0382, clears all three, and is a 0.209 step above the page. */
+    --fertility-status-fertile-window: #700b25;
     --fertility-status-post-peak-bg: #022c22;
     --fertility-status-post-peak-fg: #d1fae5;
     --fertility-status-post-peak-border: #34d399;

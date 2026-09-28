@@ -102,12 +102,20 @@ export const FERTILITY_CALENDAR_PHASE_VISUALS: Record<CalendarPhase, CalendarPha
   },
   fertile: {
     label: "Fertile",
-    fill: FERTILITY_STATUS_VISUALS.fertile.fill,
+    // The Calendar does not tint a window day at all: the day cell behind the bar is the window's own
+    // colour. The bar is rounded at the window's two ends, and a rounded corner cannot paint itself --
+    // whatever is behind it shows through the arc. With the darker status tint behind it, each end of
+    // the window grew a notch of that tint, which read as a leftover of the old treatment. Putting the
+    // window's colour behind it means a rounded end reveals nothing but the window. The status tint is
+    // still the right value for every surface that has no bar, which is why it is unchanged.
+    fill: "bg-fertility-status-fertile-window",
     // No band. A band is a horizontal line along the cell's top edge, and the menses stripe is a
     // horizontal line along the bottom edge of the day above; across a week boundary the two sit 8px
     // apart and read as one mark. The window is a bar instead, which cannot be confused with a stripe.
     band: "",
-    bar: "bg-fertility-status-fertile-bar",
+    // The same colour as the fill, deliberately: the cell and the bar are one surface, and the bar is
+    // the same colour bleeding across the gap to the days either side of it.
+    bar: "bg-fertility-status-fertile-window",
   },
   after: {
     label: "After",

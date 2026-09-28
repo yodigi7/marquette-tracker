@@ -556,16 +556,36 @@ describe("CalendarView", () => {
       // back, so the window is a bar instead.
       const { container } = renderCell("fertile", { windowEdges: FIRST_DAY });
       expect(container.querySelector(band)).toBeNull();
-      expect(container.querySelector(bar)?.className).toContain("bg-fertility-status-fertile-bar");
+      expect(container.querySelector(bar)?.className).toContain(
+        "bg-fertility-status-fertile-window",
+      );
     });
 
     it("carries its own fill rather than relying on the cell's tint behind it", () => {
       // The bar is the shape, and it spans the whole cell, so it has to be visible as a surface in its
-      // own right. Relying on the cell's darker tint and drawing a wire around it is what made the
-      // previous attempt read as a box; the bar is solid and the tint behind it is only a fallback.
+      // own right. Relying on the cell's darker tint and drawing a wire around it is what made an
+      // earlier attempt read as a box.
       const className = barClasses("fertile", FIRST_DAY);
-      expect(className).toContain("bg-fertility-status-fertile-bar");
+      expect(className).toContain("bg-fertility-status-fertile-window");
       expect(className, "a solid bar, not a wire").not.toContain("border-2");
+    });
+
+    it("leaves nothing behind a rounded end but the window's own colour", () => {
+      // A rounded corner cannot paint itself, so whatever is behind the bar's radius shows through. With
+      // the cell's darker status tint behind it, each end of the window grew a notch of that tint, which
+      // read as a leftover of the old treatment. The cell behind the bar has to be the window's colour.
+      const { container } = renderCell("fertile", { windowEdges: FIRST_DAY });
+      const cells = screen.getByTestId("day-cell").classList;
+      expect(cells.contains("bg-fertility-status-fertile-window"), "the cell is the window").toBe(
+        true,
+      );
+      expect(
+        cells.contains("bg-fertility-status-fertile"),
+        "and not the darker status tint, which is what showed through the rounded corner",
+      ).toBe(false);
+      expect(container.querySelector(bar)?.className).toContain(
+        "bg-fertility-status-fertile-window",
+      );
     });
 
     it("paints nothing between two adjacent window days in the same row", () => {
@@ -1273,7 +1293,7 @@ describe("day cell layer visibility", () => {
 
   it.each([
     ["before", { info: "pre-fertile" as const }, hasClass("bg-fertility-status-pre")],
-    ["fertile", { info: "fertile" as const }, hasClass("bg-fertility-status-fertile")],
+    ["fertile", { info: "fertile" as const }, hasClass("bg-fertility-status-fertile-window")],
     ["after", { info: "post-peak" as const }, hasClass("bg-fertility-status-post-peak")],
     ["predicted", { info: null, forecast: true }, hasClass("bg-fertility-forecast-bg")],
     ["menses", {}, has(stripe)],
