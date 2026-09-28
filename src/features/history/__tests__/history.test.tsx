@@ -49,7 +49,7 @@ describe("HistoryView", () => {
     expect(await screen.findByText(/Forecast/i)).toBeInTheDocument();
 
     const open = store().cycles.find((c) => c.closedAt === null)!;
-    expect(store().output!.cycles.find((c) => c.cycleId === open.id)!.peakDay).toBeNull();
+    expect(store().output!.cycles.find((c) => c.cycleId === open.id)!.firstPeakDay).toBeNull();
 
     // Derive the target from the stored records, not the engine's day array:
     // day results now span the cycle, so their last entry is "today", not the
@@ -64,7 +64,9 @@ describe("HistoryView", () => {
 
     // Engine output recomputes so the open cycle now has a Peak day.
     await waitFor(() => {
-      expect(store().output!.cycles.find((c) => c.cycleId === open.id)!.peakDay).not.toBeNull();
+      expect(
+        store().output!.cycles.find((c) => c.cycleId === open.id)!.firstPeakDay,
+      ).not.toBeNull();
     });
 
     // The open cycle's table row re-renders to show its new Peak day.
@@ -207,6 +209,54 @@ describe("HistoryView", () => {
     );
 
     expect(screen.queryByTestId("history-reconciliation-warning")).toBeNull();
+  });
+
+  it("names both readings of a multi-day Peak run in the cycle table", async () => {
+    // A monitor shows Peak for a minimum of two days. The column names the cycle's Peak day (the
+    // first reading, the one the calendar rule comes from) and the reading its window end came from,
+    // so a reader checking the end against the table finds it.
+    await store().clearAllData();
+    const start = addDays(todayKey(), -20);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+    await store().addDayRecord(cycle.id, addDays(start, 11), 12, { monitor: "peak" });
+    await store().addDayRecord(cycle.id, addDays(start, 12), 13, { monitor: "peak" });
+
+    render(
+      <MemoryRouter>
+        <HistoryView />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("day 12 (end from 13)")).toBeInTheDocument();
+    // The last reading is never presented as the cycle's Peak day on its own.
+    expect(screen.queryByText(/^day 13$/)).not.toBeInTheDocument();
+  });
+
+  it("gives a single-reading cycle no second clause", async () => {
+    await store().clearAllData();
+    const start = addDays(todayKey(), -20);
+    const cycle = await store().setNewCycle(start);
+    await store().addDayRecord(cycle.id, start, 1, { bloodFlow: "medium" });
+    await store().addDayRecord(cycle.id, addDays(start, 13), 14, { monitor: "peak" });
+
+    render(
+      <MemoryRouter>
+        <HistoryView />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("day 14")).toBeInTheDocument();
+  });
+
+  it("leaves the demo seed's calendar begin unchanged", async () => {
+    // The demo writes one monitor Peak day per cycle, so every demo cycle's first and last readings
+    // coincide. That is why seeding needed no change for this fix — and it is worth asserting, because
+    // a future edit that gave the demo a two-day run would silently move the demo's window begin, and
+    // this test is what would notice.
+    for (const cycle of store().output!.cycles) {
+      expect(cycle.firstPeakDay, `cycle ${cycle.cycleNo}`).toBe(cycle.lastPeakDay);
+    }
   });
 
   it("hides computed summaries in logging-only mode and restores them when re-enabled", async () => {

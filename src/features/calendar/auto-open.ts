@@ -22,5 +22,5 @@ export function shouldAutoOpenToday(
     return true;
   }
 
-  return cycleResultsByCycleId(output).get(cycle.id)?.peakDay === null;
+  return cycleResultsByCycleId(output).get(cycle.id)?.lastPeakDay === null;
 }

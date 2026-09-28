@@ -94,6 +94,10 @@ export type PeakSource = "monitor" | "none";
  *
  * This is the *input* to the calendar rule, not its output. A surface that states a window begin from
  * that rule can print these alongside the claim, so the claim is checkable where it is made.
+ *
+ * `peakDay` is the cycle's **first** monitor Peak reading — its Peak day, the day the surge started.
+ * The last reading of a multi-day run anchors the window *end* and never appears here, so what a
+ * surface prints as evidence for a begin is exactly what the begin was derived from.
  */
 export interface LookbackPeak {
   cycleNo: number;
@@ -106,7 +110,18 @@ export interface CycleResult {
   day1: DateKey;
   /** Days from day1 (inclusive) to the next cycle's day1. Null while open. */
   length: number | null;
-  peakDay: number | null;
+  /**
+   * The cycle's Peak day: the **first** monitor `peak` reading in it. This is the value the calendar
+   * rule subtracts six from, and the value every surface naming a cycle's Peak day reports. Null when
+   * the cycle holds no monitor Peak reading.
+   */
+  firstPeakDay: number | null;
+  /**
+   * The **last** monitor `peak` reading in the cycle, and the reading the fertile-window end is
+   * measured from. Distinct from `firstPeakDay` whenever the monitor showed Peak on consecutive days,
+   * which is its specified minimum. Null when the cycle holds no monitor Peak reading.
+   */
+  lastPeakDay: number | null;
   peakSource: PeakSource;
   fertileWindow: FertileWindow;
   days: DayResult[];
@@ -145,19 +160,23 @@ export type EngineWarning =
    */
   | { kind: "high-run"; cycleNo: number; run: number };
 
-/** Previous-cycle peak days (oldest → newest) used by the calendar rules. */
+/** Previous-cycle monitor Peak days (oldest → newest) used by the calendar rules. */
 export interface CycleHistory {
-  peaksByCycle: (number | null)[];
+  /** Each cycle's Peak day — its first monitor `peak` reading. The calendar begin is derived from these. */
+  firstPeaksByCycle: (number | null)[];
+  /** Each cycle's last monitor `peak` reading. The forecast's window end is derived from these. */
+  lastPeaksByCycle: (number | null)[];
   cycleNos: number[];
 }
 
 /**
  * The monitor Peak days a cycle's calendar rule was derived from: the earliest and latest Peak inside
- * the configured history window, and how many cycles in that window carried one.
+ * the configured history window, and how many cycles in that window carried one. Each cycle
+ * contributes its **first** monitor Peak reading, which is that cycle's Peak day.
  *
- * Distinct from the all-cycles `Forecast.peakDayEarliest`/`peakDayLatest` pair, which describes the
- * user's whole record. A window that holds no monitor Peak has no range, so the field is nullable
- * rather than a `0` sentinel — `0` is not a cycle day.
+ * Distinct from the all-cycles `Forecast.firstPeakDayEarliest`/`firstPeakDayLatest` pair, which
+ * describes the user's whole record. A window that holds no monitor Peak has no range, so the field is
+ * nullable rather than a `0` sentinel — `0` is not a cycle day.
  */
 export interface PeakDayRange {
   earliest: number;
@@ -181,8 +200,10 @@ export interface Forecast {
   medianLength: number;
   earliestLength: number;
   latestLength: number;
-  peakDayEarliest: number;
-  peakDayLatest: number;
+  /** Earliest monitor Peak day across every closed cycle — first readings only. */
+  firstPeakDayEarliest: number;
+  /** Latest monitor Peak day across every closed cycle — first readings only. */
+  firstPeakDayLatest: number;
   /**
    * The monitor Peak days inside the configured history window — the ones `nextFertileWindow` was
    * actually derived from. Null when that window holds no monitor Peak. A surface showing an expected

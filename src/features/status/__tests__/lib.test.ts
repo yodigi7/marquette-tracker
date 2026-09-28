@@ -268,8 +268,8 @@ describe("peakCountLine", () => {
    * `todayCycleDay` defaults high so an ordinary case is not accidentally in the future; the
    * future-date cases pass 16 explicitly, which is today's cycle day in them.
    */
-  const at = (peakDay: number | null, cycleDay: number, peaks = 1, todayCycleDay = 99) =>
-    peakCountLine({ peakDay, cycleDay, todayCycleDay, peaks });
+  const at = (lastPeakDay: number | null, cycleDay: number, peaks = 1, todayCycleDay = 99) =>
+    peakCountLine({ lastPeakDay, cycleDay, todayCycleDay, peaks });
 
   it("counts the cycle days since the Peak and names the day it falls on", () => {
     const line = at(12, 15)!;
@@ -380,8 +380,8 @@ describe("expectedPeakRangeLine", () => {
       medianLength: 28,
       earliestLength: 26,
       latestLength: 30,
-      peakDayEarliest: range?.earliest ?? 0,
-      peakDayLatest: range?.latest ?? 0,
+      firstPeakDayEarliest: range?.earliest ?? 0,
+      firstPeakDayLatest: range?.latest ?? 0,
       peakDayRangeInWindow: range,
       expectedPeriodStart: "2026-03-01",
       nextFertileWindow: { begin: "2026-01-08", end: "2026-01-20" },

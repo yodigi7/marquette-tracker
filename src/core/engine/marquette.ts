@@ -18,8 +18,21 @@ import type {
 
 export const CYCLE_LENGTH_MIN = 21;
 export const CYCLE_LENGTH_MAX = 42;
-/** Calendar fallback: earliest possible peak day 12 minus 6 yields fertile day 6. */
+/**
+ * Calendar fallback: the earliest possible **first** monitor Peak day is 12, so 12 − 6 yields the
+ * fertile day 6 the first-six-cycles rule uses.
+ */
 export const DEFAULT_EARLIEST_PEAK = 12;
+/**
+ * The monitor's minimum run of consecutive `peak` readings: two days.
+ *
+ * Fehring 2013, describing the monitor: "at a minimum the monitor usually will give the user at least
+ * one day of 'high' fertility and two days of 'peak' fertility". Fehring 2008 reports ovulation
+ * detected during "the 2 days of CPFM peak fertility" in 91.1% of cycles, which is only consistent
+ * with a two-day span. Two is therefore the floor rather than the average, and it is what makes the
+ * earliest possible *last* Peak day 13 rather than 12.
+ */
+export const MIN_PEAK_RUN_DAYS = 2;
 /**
  * Protocol constant, not a preference: the fertile window ends "three full days past the last
  * peak reading" (Mu, Fehring & Bouchard, Linacre Q 2022;89(1):64-72). Every rule that extends the
@@ -32,18 +45,34 @@ function isHighOrPeak(record: DayRecordInput): boolean {
   return record.monitor === "high" || record.monitor === "peak";
 }
 
-/** Monitor-only Peak evidence: a user-entered monitor Peak, never mucus. */
-function computePeak(records: DayRecordInput[]): { peakDay: number | null; source: PeakSource } {
-  let monitorPeak: number | null = null;
+/**
+ * Monitor-only Peak evidence, as the two readings the protocol uses separately.
+ *
+ * A cycle normally holds more than one monitor Peak: the device is specified to show Peak for a
+ * minimum of two days (`MIN_PEAK_RUN_DAYS`). The protocol measures different ends of the fertile
+ * window from different readings, so both are returned rather than one value standing in for the pair.
+ * `firstPeakDay` is the cycle's Peak day — what the calendar rule and every surface naming a cycle's
+ * Peak day use. `lastPeakDay` is the reading the window end is measured from.
+ */
+function computePeak(records: DayRecordInput[]): {
+  firstPeakDay: number | null;
+  lastPeakDay: number | null;
+  source: PeakSource;
+} {
+  let firstPeakDay: number | null = null;
+  let lastPeakDay: number | null = null;
   for (const record of records) {
     if (record.monitor === "peak") {
-      monitorPeak = record.dayInCycle;
+      if (firstPeakDay === null) {
+        firstPeakDay = record.dayInCycle;
+      }
+      lastPeakDay = record.dayInCycle;
     }
   }
-  if (monitorPeak !== null) {
-    return { peakDay: monitorPeak, source: "monitor" };
+  if (lastPeakDay !== null) {
+    return { firstPeakDay, lastPeakDay, source: "monitor" };
   }
-  return { peakDay: null, source: "none" };
+  return { firstPeakDay: null, lastPeakDay: null, source: "none" };
 }
 
 function computeBegin(
@@ -53,12 +82,16 @@ function computeBegin(
   settings: EngineSettings,
 ): { begin: number; rule: BeginRule; lookbackPeaks: LookbackPeak[] } {
   const windowSize = Math.max(1, settings.historyWindow);
-  const window = history.peaksByCycle.slice(-windowSize);
+  // The calendar rule's "earliest peak day" is each cycle's *first* monitor Peak reading, the day the
+  // surge started. The last reading of a run is the anchor the window end comes from, and must not be
+  // used here: measuring from it opens the window a day late for every two-day run.
+  const window = history.firstPeaksByCycle.slice(-windowSize);
   const historic = window.filter((p): p is number => p !== null);
 
-  // The same slice, zipped back to the cycle each Peak came from. `cycleNos` is threaded in lockstep
-  // with `peaksByCycle` by the engine SDK, so a window slice of one is the same window of the other.
-  // This is a read of the history, not a change to the window: nothing below branches on it.
+  // The same slice, zipped back to the cycle each Peak day came from. `cycleNos` is threaded in lockstep
+  // with the history arrays by the engine SDK, so a window slice of one is the same window of the other.
+  // This is a read of the history, not a change to the window: nothing below branches on it. The days
+  // are first readings, so the evidence a surface prints is the evidence the begin was built from.
   const lookbackPeaks: LookbackPeak[] = [];
   for (let i = 0; i < window.length; i++) {
     const peakDay = window[i];
@@ -105,11 +138,11 @@ function computeBegin(
  * is what let an end land on a day before the Peak that defines it. `DEFAULT_POST_PEAK_DAYS` is a
  * protocol constant (see its own doc comment), so no input to this function can move it.
  */
-function computeEnd(peakDay: number | null): { end: number | null; rule: EndRule } {
-  if (peakDay === null) {
+function computeEnd(lastPeakDay: number | null): { end: number | null; rule: EndRule } {
+  if (lastPeakDay === null) {
     return { end: null, rule: "none" };
   }
-  return { end: peakDay + DEFAULT_POST_PEAK_DAYS, rule: "current-peak-plus-n" };
+  return { end: lastPeakDay + DEFAULT_POST_PEAK_DAYS, rule: "current-peak-plus-n" };
 }
 
 /**
@@ -194,10 +227,10 @@ export function computeCycle(
   today: DateKey,
 ): CycleResult {
   const sorted = [...records].sort((a, b) => a.dayInCycle - b.dayInCycle);
-  const { peakDay, source } = computePeak(sorted);
+  const { firstPeakDay, lastPeakDay, source } = computePeak(sorted);
 
   const begin = computeBegin(cycleNo, sorted, history, settings);
-  const end = computeEnd(peakDay);
+  const end = computeEnd(lastPeakDay);
   const fertileWindow: FertileWindow = {
     begin: begin.begin,
     end: end.end,
@@ -212,7 +245,7 @@ export function computeCycle(
     days.push({
       day,
       date: addDays(cycle.day1, day - 1),
-      status: statusForDay(day, fertileWindow, peakDay !== null),
+      status: statusForDay(day, fertileWindow, lastPeakDay !== null),
     });
   }
 
@@ -261,7 +294,8 @@ export function computeCycle(
     cycleNo,
     day1: cycle.day1,
     length,
-    peakDay,
+    firstPeakDay,
+    lastPeakDay,
     peakSource: source,
     fertileWindow,
     days,

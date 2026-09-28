@@ -58,7 +58,8 @@ function closedCycle(overrides: Partial<CycleResult> = {}): CycleResult {
     cycleNo: 3,
     day1: "2026-01-01",
     length: 28,
-    peakDay: 14,
+    firstPeakDay: 14,
+    lastPeakDay: 14,
     peakSource: "monitor",
     fertileWindow: {
       begin: 6,
@@ -117,16 +118,20 @@ describe("buildSummaryModel", () => {
       record("c1", 12, "2026-01-12", { monitor: "peak" }),
       record("c1", 15, "2026-01-15", { monitor: "peak" }),
     ];
-    const summary = model(closedCycle({ peakDay: 15 }), records);
+    const summary = model(closedCycle({ firstPeakDay: 12, lastPeakDay: 15 }), records);
 
-    expect(summary.peakDay).toBe(15);
+    expect(summary.firstPeakDay).toBe(12);
+    expect(summary.lastPeakDay).toBe(15);
     expect(summary.peakCount).toBe(2);
   });
 
   it("reports no Peak day for a cycle with no monitor Peak reading", () => {
-    const summary = model(closedCycle({ peakDay: null, peakSource: "none" }));
+    const summary = model(
+      closedCycle({ firstPeakDay: null, lastPeakDay: null, peakSource: "none" }),
+    );
 
-    expect(summary.peakDay).toBeNull();
+    expect(summary.firstPeakDay).toBeNull();
+    expect(summary.lastPeakDay).toBeNull();
     expect(summary.peakCount).toBe(0);
   });
 
@@ -221,7 +226,8 @@ describe("buildSummaryModel", () => {
   it("reports no window length when the protocol could not set an end", () => {
     const summary = model(
       closedCycle({
-        peakDay: null,
+        firstPeakDay: null,
+        lastPeakDay: null,
         peakSource: "none",
         fertileWindow: { begin: 6, end: null, beginRule: "calendar-day-6", endRule: "none" },
       }),
@@ -242,7 +248,8 @@ describe("buildSummaryModel", () => {
     );
 
     expect(summary.window).toBeNull();
-    expect(summary.peakDay).toBeNull();
+    expect(summary.firstPeakDay).toBeNull();
+    expect(summary.lastPeakDay).toBeNull();
     expect(summary.warnings).toEqual([]);
     // The raw log still carries the Peak reading: it was logged, not computed.
     expect(summary.days.find((entry) => entry.day === 12)).toMatchObject({ monitor: "peak" });
@@ -573,12 +580,25 @@ describe("header lines", () => {
   });
 
   it("names the Peak day and says how many Peak readings the cycle holds", () => {
-    expect(peakLine(12, 1)).toBe("Monitor Peak on cycle day 12.");
-    expect(peakLine(15, 2)).toContain("The last of 2 monitor Peak readings in this cycle.");
+    // A single-reading cycle is its own Peak day and its own anchor, so it needs no second clause.
+    expect(peakLine(12, 12, 1)).toBe("Monitor Peak on cycle day 12.");
+  });
+
+  it("names both readings of a multi-day run and the job of each", () => {
+    const line = peakLine(12, 13, 2);
+    expect(line).toContain("cycle day 12");
+    expect(line).toContain("the first of 2 monitor Peak readings");
+    expect(line).toContain("cycle day 13");
+    expect(line).toMatch(/ends three full days after the last/i);
+  });
+
+  it("never presents a last reading as the cycle's Peak day", () => {
+    const line = peakLine(12, 15, 2);
+    expect(line).not.toContain("Monitor Peak on cycle day 15.");
   });
 
   it("says a cycle has no Peak reading rather than showing an empty Peak day", () => {
-    const line = peakLine(null, 0);
+    const line = peakLine(null, null, 0);
 
     expect(line).toMatch(/no monitor Peak reading/i);
     expect(line).not.toMatch(/cycle day \d/);
@@ -617,9 +637,9 @@ describe("header lines", () => {
       lengthLine(28, 28),
       lengthLine(1, 1),
       lengthLine(null, 17),
-      peakLine(12, 1),
-      peakLine(15, 2),
-      peakLine(null, 0),
+      peakLine(12, 12, 1),
+      peakLine(12, 15, 2),
+      peakLine(null, null, 0),
       snapshotLine("2026-09-27"),
       exclusionsNote(),
       algorithmOffNote(),

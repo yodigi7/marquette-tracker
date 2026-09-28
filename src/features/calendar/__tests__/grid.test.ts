@@ -20,7 +20,8 @@ const RESULT: CycleResult = {
   cycleNo: 1,
   day1: "2026-08-03",
   length: null,
-  peakDay: null,
+  firstPeakDay: null,
+  lastPeakDay: null,
   peakSource: "none",
   lookbackPeaks: [],
   fertileWindow: {
@@ -36,7 +37,8 @@ const RESULT: CycleResult = {
 /** Peak on day 12 with the default 4-day interval: window 6-16, then post-peak. */
 const PEAKED_RESULT: CycleResult = {
   ...RESULT,
-  peakDay: 12,
+  firstPeakDay: 12,
+  lastPeakDay: 12,
   peakSource: "monitor",
   fertileWindow: {
     begin: 6,

@@ -404,10 +404,38 @@ describe("buildInstructorChartModel — identity and warnings", () => {
     expect(second.lengthLabel).not.toMatch(/\d+ days/);
   });
 
-  it("reports a cycle's Peak day and count", () => {
+  it("reports the cycle's Peak day and the reading its end came from", () => {
+    // Two readings: the first is the Peak day, the last is what the window end was measured from.
+    // Naming only one would leave a reader checking the stated end against a day that is not on it.
     const m = model(1, [peak("c1", 12, 1), peak("c1", 15, 1)], { cycles: 6 });
+    expect(m.cycles[0].peakLine).toMatch(/Peak day 12\b/);
+    expect(m.cycles[0].peakLine).toMatch(/first of 2/i);
     expect(m.cycles[0].peakLine).toMatch(/day 15/);
-    expect(m.cycles[0].peakLine).toMatch(/2/);
+    // The last reading is never presented as the Peak day itself.
+    expect(m.cycles[0].peakLine).not.toMatch(/Peak day 15\b/);
+  });
+
+  it("gives a single-reading cycle no second clause", () => {
+    const m = model(1, [peak("c1", 14, 1)], { cycles: 6 });
+    expect(m.cycles[0].peakLine).toBe("Peak day 14");
+  });
+
+  it("names the cycle's Peak day as the evidence for a calendar-rule begin", () => {
+    // The lookback evidence is what the begin was derived from, so it carries first readings. A chart
+    // showing a last reading here would be explaining the begin with a day the rule never used — the
+    // rule turns on the earliest *first* Peak, 12, not on that cycle's later reading of 13.
+    const m = model(
+      7,
+      [peak("c2", 15, 2), peak("c3", 12, 3), peak("c3", 13, 3), peak("c5", 18, 5)],
+      { cycles: 6 },
+    );
+    const seven = m.cycles.find((c) => c.cycleNo === 7)!;
+
+    expect(seven.evidence.map((e) => e.cycleNo)).toEqual([2, 3, 5]);
+    // Cycle 3 contributes 12, its first reading. Its day-13 reading is not a second Peak day.
+    expect(seven.evidence.map((e) => e.peakDay)).toEqual([15, 12, 18]);
+    expect(seven.beginDay).toBe(12 - 6);
+    expect(seven.beginNote).toMatch(/earliest Peak day 12, cycle 3/i);
   });
 
   it("carries the protocol warnings the engine raised for a charted cycle", () => {
