@@ -124,15 +124,22 @@ The Status view SHALL present each derived status with a single visual treatment
 ### Requirement: Status reports a protocol warning affecting the selected cycle
 
 The Status view SHALL report any engine warning affecting the selected cycle, including monitor
-evidence recorded outside the computed fertile window and an open cycle that has run past its
-computed end. A warning SHALL be presented as a protocol observation about the user's own data, not
-as a device malfunction, and SHALL NOT be phrased as a medical disclaimer. With interpretation
-disabled the view SHALL continue to suppress all derived output, warnings included, because a
-warning is derived output.
+evidence recorded outside the computed fertile window, an open cycle that has run past its
+computed end, and a cycle with no monitor Peak to measure its window end from. A warning SHALL be
+presented as a protocol observation about the user's own data, not as a device malfunction, and
+SHALL NOT be phrased as a medical disclaimer or as an instruction to seek a clinician. With
+interpretation disabled the view SHALL continue to suppress all derived output, warnings included,
+because a warning is derived output.
 
 A warning belongs to the cycle, not to a single date, so it SHALL be shown whenever any date in the
 affected cycle is selected, and it SHALL name the cycle day the offending reading falls on rather
-than leaving the day implicit. It SHALL be presented ahead of the derived status treatment, because
+than leaving the day implicit. Where several warnings apply, the view SHALL report the two kinds that
+contradict a computed window — a reading outside it, and a cycle still in progress past it — in place of
+the others, because those two put the displayed status in tension with the user's own readings. A cycle
+with no monitor Peak and a long run of High readings SHALL report both observations together rather than
+one of them, since a run of Highs is the usual reason a cycle has no Peak, and reporting the absence
+without its cause would state a symptom and hide the evidence. It SHALL be presented ahead of the
+derived status treatment, because
 the warning and the status are in tension: the status reports what the model concluded while the
 warning reports that a recorded reading contradicts it. It SHALL be visually distinct from both the
 status treatment and the window explanation, SHALL be identifiable without relying on colour alone,
@@ -152,6 +159,14 @@ output that recurs until the underlying data changes.
 - **GIVEN** an open cycle whose computed window end precedes the current day
 - **WHEN** the user opens Status for a date in that cycle and interpretation is enabled
 - **THEN** the view reports that the cycle is still in progress past its computed end
+
+#### Scenario: A cycle with no Peak is reported as unresolved
+
+- **GIVEN** a cycle with no user-entered monitor Peak reading, in any cycle number
+- **WHEN** the user opens Status for a date in that cycle and interpretation is enabled
+- **THEN** the view states that this cycle has no monitor Peak reading to measure a window end from
+- **AND** it states that the cycle is unresolved rather than settled
+- **AND** it does not direct the user to a clinician
 
 #### Scenario: The warning is shown for any date in the affected cycle
 

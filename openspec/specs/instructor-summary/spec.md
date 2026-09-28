@@ -83,6 +83,8 @@ end day.
 The summary SHALL name the rule that produced each end, and SHALL NOT distinguish a confirmed window from
 a predicted window by outline, dash, shading, legend key, label, or any other source cue. The stated basis
 SHALL be the rule and the reading it came from, never a claim that the window is confirmed or predicted.
+Where the window ends because of a monitor Peak reading in this cycle, the summary SHALL state that the
+window closes three full days after that reading, and SHALL NOT report an end that falls before it.
 
 #### Scenario: The window is stated with the basis of both ends
 
@@ -104,16 +106,24 @@ SHALL be the rule and the reading it came from, never a claim that the window is
 
 - **GIVEN** a cycle with no monitor Peak reading that is not in its first six cycles
 - **WHEN** the user opens its summary
-- **THEN** the summary states that the window's end came from monitor Peak readings recorded in earlier
-  cycles
-- **AND** it shows no Peak day for this cycle
+- **THEN** the summary shows no end cycle day
+- **AND** it does not name a monitor Peak reading from an earlier cycle as the reason the window ended
+
+#### Scenario: A late Peak is not reported as ending before it
+
+- **GIVEN** a cycle whose monitor Peak is on cycle day 20 and whose earlier cycles hold Peak days no
+  later than day 16
+- **WHEN** the user opens its summary
+- **THEN** the summary states the window ends on cycle day 23
+- **AND** it does not report an end earlier than the cycle's own Peak day
 
 #### Scenario: No Peak means no end is stated
 
-- **GIVEN** a cycle with no monitor Peak reading and no Peak history to fall back on
+- **GIVEN** a cycle with no monitor Peak reading
 - **WHEN** the user opens its summary
 - **THEN** the summary states that no fertile-window end can be determined
 - **AND** it shows no end cycle day
+- **AND** it does not name a date from any other cycle as the end
 
 #### Scenario: No confirmed or predicted source cue is printed
 
@@ -165,8 +175,8 @@ derived, averaged, or carried over from another day.
 With interpretation enabled, the summary SHALL report every protocol warning the app has raised for that
 cycle, each in plain language describing the user's own recorded readings and the window the app computed.
 That SHALL include a monitor reading that falls after the computed window end, a cycle with no Peak
-reading to set an end from, a cycle whose length falls outside the configured protocol band, and a cycle
-still in progress past its computed window end.
+reading to set an end from, a cycle whose length falls outside the configured protocol band, a cycle
+still in progress past its computed window end, and a run of nine or more consecutive High readings.
 
 The summary SHALL report the warnings the app has actually raised, and SHALL NOT raise, imply, or
 reinterpret a warning of its own. A cycle with no raised warnings SHALL show no warnings section.
@@ -184,6 +194,13 @@ reinterpret a warning of its own. A cycle with no raised warnings SHALL show no 
 - **GIVEN** a cycle the app flagged because it has no monitor Peak reading to set an end from
 - **WHEN** the user opens its summary
 - **THEN** the summary reports that there is no Peak reading and therefore no end for the window
+
+#### Scenario: A long run of High readings is reported on the document
+
+- **GIVEN** the app raised a warning for nine or more consecutive monitor High readings in this cycle
+- **WHEN** the user opens its summary
+- **THEN** the summary reports the length of the run of High readings
+- **AND** it does not present the run as a Peak reading
 
 #### Scenario: An out-of-band length is reported on the document
 
