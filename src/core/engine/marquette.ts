@@ -2,6 +2,7 @@ import { addDays, diffDays } from "./dateUtils";
 import type {
   BeginRule,
   CycleHistory,
+  LookbackPeak,
   CycleInput,
   CycleResult,
   DateKey,
@@ -50,9 +51,22 @@ function computeBegin(
   records: DayRecordInput[],
   history: CycleHistory,
   settings: EngineSettings,
-): { begin: number; rule: BeginRule } {
+): { begin: number; rule: BeginRule; lookbackPeaks: LookbackPeak[] } {
   const windowSize = Math.max(1, settings.historyWindow);
-  const historic = history.peaksByCycle.slice(-windowSize).filter((p): p is number => p !== null);
+  const window = history.peaksByCycle.slice(-windowSize);
+  const historic = window.filter((p): p is number => p !== null);
+
+  // The same slice, zipped back to the cycle each Peak came from. `cycleNos` is threaded in lockstep
+  // with `peaksByCycle` by the engine SDK, so a window slice of one is the same window of the other.
+  // This is a read of the history, not a change to the window: nothing below branches on it.
+  const lookbackPeaks: LookbackPeak[] = [];
+  for (let i = 0; i < window.length; i++) {
+    const peakDay = window[i];
+    if (peakDay === null) continue;
+    const cycleNoAt = history.cycleNos[history.cycleNos.length - window.length + i];
+    if (cycleNoAt === undefined) continue;
+    lookbackPeaks.push({ cycleNo: cycleNoAt, peakDay });
+  }
 
   let calendarBegin: number;
   let calendarRule: BeginRule;
@@ -72,9 +86,15 @@ function computeBegin(
   const firstHighDay = records.find((r) => isHighOrPeak(r))?.dayInCycle ?? null;
 
   if (firstHighDay !== null && firstHighDay < calendarBegin) {
-    return { begin: firstHighDay, rule: "first-high-or-peak" };
+    // A recorded reading set the begin, so the calendar rule did not run. Reporting lookback Peaks here
+    // would attach evidence to a rule that produced nothing.
+    return { begin: firstHighDay, rule: "first-high-or-peak", lookbackPeaks: [] };
   }
-  return { begin: calendarBegin, rule: calendarRule };
+
+  // Only the earliest-Peak rule consumes the window. The day-6 and its fallback reach the same day
+  // without reading it, so they carry no evidence.
+  const evidence = calendarRule === "calendar-earliest-peak-minus-6" ? lookbackPeaks : [];
+  return { begin: calendarBegin, rule: calendarRule, lookbackPeaks: evidence };
 }
 
 /**
@@ -184,6 +204,7 @@ export function computeCycle(
     beginRule: begin.rule,
     endRule: end.rule,
   };
+  const lookbackPeaks = begin.lookbackPeaks;
 
   const days: DayResult[] = [];
   const span = cycleSpan(cycle, length, today);
@@ -245,5 +266,6 @@ export function computeCycle(
     fertileWindow,
     days,
     warnings,
+    lookbackPeaks,
   };
 }

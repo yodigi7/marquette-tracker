@@ -59,6 +59,7 @@ function result(over: Partial<CycleResult> = {}): CycleResult {
     },
     days: [dayResult(1, "pre-fertile"), dayResult(6, "fertile"), dayResult(14, "fertile")],
     warnings: [],
+    lookbackPeaks: [],
     ...over,
   };
 }

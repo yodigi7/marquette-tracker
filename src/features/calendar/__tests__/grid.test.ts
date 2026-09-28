@@ -22,6 +22,7 @@ const RESULT: CycleResult = {
   length: null,
   peakDay: null,
   peakSource: "none",
+  lookbackPeaks: [],
   fertileWindow: {
     begin: 6,
     end: null,
