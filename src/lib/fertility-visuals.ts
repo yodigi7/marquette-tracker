@@ -6,12 +6,20 @@ export interface FertilityStatusVisual {
   fill: string;
   foreground: string;
   border: string;
+  /**
+   * The thin full-width strip a Calendar day carries along its top edge, in the status's full-chroma
+   * colour. The band, not the fill, is what tells one status from another: a monitor marker is painted
+   * on the fill, which caps how light the fill may be, so fills cannot separate far enough to carry the
+   * distinction. The band has no marker on it and is free of that cap.
+   */
+  band: string;
   badge: string;
 }
 
 export interface CalendarPhaseVisual {
   label: string;
   fill: string;
+  band: string;
 }
 
 export interface FertilityMonitorVisual {
@@ -44,24 +52,28 @@ export const FERTILITY_STATUS_VISUALS: Record<DayStatus, FertilityStatusVisual> 
     fill: "bg-fertility-status-pre",
     foreground: "text-fertility-status-pre-fg",
     border: "border-fertility-status-pre-border",
+    band: "bg-fertility-status-pre-band",
     badge: "bg-fertility-status-pre text-fertility-status-pre-fg",
   },
   fertile: {
     fill: "bg-fertility-status-fertile",
     foreground: "text-fertility-status-fertile-fg",
     border: "border-fertility-status-fertile-border",
+    band: "bg-fertility-status-fertile-band",
     badge: "bg-fertility-status-fertile text-fertility-status-fertile-fg",
   },
   "post-peak": {
     fill: "bg-fertility-status-post-peak",
     foreground: "text-fertility-status-post-peak-fg",
     border: "border-fertility-status-post-peak-border",
+    band: "bg-fertility-status-post-peak-band",
     badge: "bg-fertility-status-post-peak text-fertility-status-post-peak-fg",
   },
   "post-calendar": {
     fill: "bg-fertility-status-post-calendar",
     foreground: "text-fertility-status-post-calendar-fg",
     border: "border-fertility-status-post-calendar-border",
+    band: "bg-fertility-status-post-calendar-band",
     badge: "bg-fertility-status-post-calendar text-fertility-status-post-calendar-fg",
   },
 };
@@ -75,14 +87,17 @@ export const FERTILITY_CALENDAR_PHASE_VISUALS: Record<CalendarPhase, CalendarPha
   before: {
     label: "Before",
     fill: FERTILITY_STATUS_VISUALS["pre-fertile"].fill,
+    band: FERTILITY_STATUS_VISUALS["pre-fertile"].band,
   },
   fertile: {
     label: "Fertile",
     fill: FERTILITY_STATUS_VISUALS.fertile.fill,
+    band: FERTILITY_STATUS_VISUALS.fertile.band,
   },
   after: {
     label: "After",
     fill: FERTILITY_STATUS_VISUALS["post-peak"].fill,
+    band: FERTILITY_STATUS_VISUALS["post-peak"].band,
   },
 };
 

@@ -455,3 +455,165 @@ describe("resolveCell with projected cycles", () => {
     expect(past.info).toBe("fertile");
   });
 });
+
+describe("window ends for the band shaping", () => {
+  /** CYCLE starts 2026-08-03, so cycle day N is 2026-08-(N + 2). */
+  const dateOf = (cycleDay: number) => `2026-08-${String(cycleDay + 2).padStart(2, "0")}`;
+
+  /** PEAKED_RESULT's window is cycle days 6..16. */
+  const at = (cycleDay: number) =>
+    resolveCell(
+      [CYCLE],
+      NO_RECORDS,
+      new Map([["c1", PEAKED_RESULT]]),
+      NO_FORECAST,
+      dateOf(cycleDay),
+      "2026-12-01",
+    );
+
+  it("marks the window's first and last day and nothing in between", () => {
+    const start = at(6);
+    expect([start.info, start.windowStart, start.windowEnd]).toEqual(["fertile", true, false]);
+
+    const interior = at(11);
+    expect([interior.info, interior.windowStart, interior.windowEnd]).toEqual([
+      "fertile",
+      false,
+      false,
+    ]);
+
+    const end = at(16);
+    expect([end.info, end.windowStart, end.windowEnd]).toEqual(["fertile", false, true]);
+  });
+
+  it("marks both ends of a one-day window on the same day", () => {
+    const single: CycleResult = {
+      ...PEAKED_RESULT,
+      fertileWindow: { ...PEAKED_RESULT.fertileWindow, begin: 10, end: 10 },
+    };
+    const cell = resolveCell(
+      [CYCLE],
+      NO_RECORDS,
+      new Map([["c1", single]]),
+      NO_FORECAST,
+      dateOf(10),
+      "2026-12-01",
+    );
+    expect([cell.info, cell.windowStart, cell.windowEnd]).toEqual(["fertile", true, true]);
+  });
+
+  it("marks the start of an open window and never an end", () => {
+    // A cycle with no Peak has no window end, so there is no last day to mark. RESULT's window is
+    // 6..null, which also means every later day stays fertile rather than becoming post-calendar.
+    const results = new Map([["c1", RESULT]]);
+    const start = resolveCell([CYCLE], NO_RECORDS, results, NO_FORECAST, dateOf(6), "2026-12-01");
+    expect([start.info, start.windowStart, start.windowEnd]).toEqual(["fertile", true, false]);
+
+    const later = resolveCell([CYCLE], NO_RECORDS, results, NO_FORECAST, dateOf(20), "2026-12-01");
+    expect([later.info, later.windowStart, later.windowEnd]).toEqual(["fertile", false, false]);
+  });
+
+  it("marks no end on a day outside the window", () => {
+    // A day outside the window wears a band of its own phase but is not an end of a run.
+    const before = at(4);
+    expect([before.info, before.windowStart, before.windowEnd]).toEqual([
+      "pre-fertile",
+      false,
+      false,
+    ]);
+
+    const after = at(20);
+    expect([after.info, after.windowStart, after.windowEnd]).toEqual(["post-peak", false, false]);
+  });
+
+  it("marks no end on a day with no cycle covering it", () => {
+    const orphan = resolveCell(
+      [CYCLE],
+      NO_RECORDS,
+      new Map<string, CycleResult>(),
+      NO_FORECAST,
+      "2026-09-15",
+      "2026-12-01",
+    );
+    expect([orphan.info, orphan.windowStart, orphan.windowEnd]).toEqual([null, false, false]);
+  });
+
+  it("marks no end on a future date with no projection", () => {
+    const future = resolveCell([CYCLE], NO_RECORDS, RESULTS, NO_FORECAST, "2026-08-25", TODAY);
+    expect([future.info, future.windowStart, future.windowEnd]).toEqual([null, false, false]);
+  });
+
+  it("does not mistake a month boundary for a window boundary", () => {
+    // The window's end is a protocol result, not a display artifact. The flags are pure functions of
+    // the window and carry no month information, so paging the calendar cannot change what is marked.
+    const real = at(16);
+    expect([real.windowStart, real.windowEnd]).toEqual([false, true]);
+    expect([at(16).windowStart, at(16).windowEnd]).toEqual([false, true]);
+  });
+
+  /**
+   * A projection with day1 2026-08-25 and a window of cycle days 3..8. Cycle day N is therefore
+   * 2026-08-(N + 24), and every one of those dates is after TODAY, so the grid resolves the
+   * projection rather than the recorded cycle.
+   */
+  const projectedAt = (cycleDay: number) => {
+    const projection: CycleResult = {
+      ...PROJECTED,
+      day1: FUTURE_PROJECTED_DAY1,
+      fertileWindow: {
+        begin: 3,
+        end: 8,
+        beginRule: "calendar-earliest-peak-minus-6",
+        endRule: "lookback-latest-peak-plus-n",
+      },
+    };
+    return resolveCell(
+      [CYCLE],
+      NO_RECORDS,
+      RESULTS,
+      NO_FORECAST,
+      `2026-08-${String(cycleDay + 24).padStart(2, "0")}`,
+      TODAY,
+      [projection],
+    );
+  };
+
+  it("marks a projected window from the projection's own window", () => {
+    // A forecast band has to be presented the same way a recorded one is, or a predicted window would
+    // read as a different kind of thing from a confirmed one.
+    const start = projectedAt(3);
+    expect([start.info, start.forecast, start.windowStart, start.windowEnd]).toEqual([
+      "fertile",
+      true,
+      true,
+      false,
+    ]);
+
+    const interior = projectedAt(6);
+    expect([interior.info, interior.windowStart, interior.windowEnd]).toEqual([
+      "fertile",
+      false,
+      false,
+    ]);
+
+    const end = projectedAt(8);
+    expect([end.info, end.windowStart, end.windowEnd]).toEqual(["fertile", false, true]);
+  });
+
+  it("marks a projected window independently of the recorded cycle's window", () => {
+    // The recorded cycle is day1 2026-08-03 with RESULT's 6..null window. If the ends were read off
+    // the wrong result, the projection's first day would be marked on the wrong date.
+    const start = projectedAt(3);
+    expect(start.info).toBe("fertile");
+    expect(start.windowStart).toBe(true);
+  });
+
+  it("marks a projected day before the projected window unmarked", () => {
+    const before = projectedAt(1);
+    expect([before.info, before.windowStart, before.windowEnd]).toEqual([
+      "pre-fertile",
+      false,
+      false,
+    ]);
+  });
+});

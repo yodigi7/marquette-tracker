@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { addDays } from "@/core/engine/dateUtils";
+import type { DayStatus } from "@/core/engine/types";
 import { dateKeyLocal, parseDateKey, todayKey } from "@/core/dateKeys";
 import { useAppStore } from "@/core/store/useAppStore";
 import type { CalendarLayerId } from "@/core/store/entities";
@@ -427,6 +428,167 @@ describe("CalendarView", () => {
       expect(cell.getAttribute("data-source")).toBeNull();
       unmount();
     }
+  });
+
+  describe("the phase band", () => {
+    const band = '[data-testid="calendar-phase-band"]';
+
+    function renderBand(
+      info: DayStatus | null,
+      windowStart = false,
+      windowEnd = false,
+      extra: Partial<DayCellProps> = {},
+    ) {
+      return render(
+        <DayCell
+          dateKey="2026-01-14"
+          dayNumber={14}
+          info={info}
+          forecast={false}
+          menses={false}
+          monitor={undefined}
+          intercourse={false}
+          windowStart={windowStart}
+          windowEnd={windowEnd}
+          isToday={false}
+          onSelect={() => {}}
+          {...extra}
+        />,
+      );
+    }
+
+    it.each([
+      ["pre-fertile" as const, "bg-fertility-status-pre-band"],
+      ["fertile" as const, "bg-fertility-status-fertile-band"],
+      ["post-peak" as const, "bg-fertility-status-post-peak-band"],
+      // `post-calendar` collapses into the `after` phase on a Calendar, so it wears the post-peak
+      // band. The Status view is where it is distinguished, and it has its own band token for that.
+      ["post-calendar" as const, "bg-fertility-status-post-peak-band"],
+    ])("paints a %s day with that phase's band", (info, cls) => {
+      // Every phase gets a band. Painting only the fertile one was implemented and withdrawn: it
+      // fixed the reported problem more thoroughly but it decides which information the Calendar offers
+      // rather than how to render it, and all three phases are wanted.
+      const { container } = renderBand(info);
+      expect(container.querySelector(band)?.className).toContain(cls);
+    });
+
+    it("paints the band alongside the fill, not instead of it", () => {
+      // The fill keeps the phase's hue so the month still reads as tinted. It simply is no longer what
+      // separates one phase from another, which is the band's job.
+      const { container } = renderBand("fertile");
+      const cell = screen.getByTestId("day-cell");
+      expect(cell.className).toContain("bg-fertility-status-fertile");
+      expect(container.querySelector(band)).not.toBeNull();
+    });
+
+    it("paints no band on a day with no phase", () => {
+      const { container } = renderBand(null);
+      expect(container.querySelector(band)).toBeNull();
+    });
+
+    it("bridges the grid gap so a run reads as one band", () => {
+      // The grid separates cells by 4px. A band inset to the cell would break every run into
+      // separate marks, which is the failure the band exists to fix.
+      const { container } = renderBand("fertile");
+      expect(container.querySelector(band)?.className).toContain("inset-x-[-4px]");
+    });
+
+    it("is not clipped by the cell", () => {
+      const { container } = renderBand("fertile");
+      expect(container.querySelector(band)?.className).not.toContain("overflow");
+      expect(screen.getByTestId("day-cell").className).not.toContain("overflow-hidden");
+    });
+
+    it.each([
+      ["the first day", true, false, "rounded-l-full", "rounded-r-full"],
+      ["the last day", false, true, "rounded-r-full", "rounded-l-full"],
+      // A one-day window: the single day is both ends, so both edges round.
+      ["a day that is both", true, true, "rounded-l-full", null],
+      ["an interior day", false, false, null, null],
+    ])("marks %s of the run by rounding the band's outer edge", (_l, start, end, has, lacks) => {
+      const { container } = renderBand("fertile", start, end);
+      const className = container.querySelector(band)?.className ?? "";
+      if (has) expect(className, `expected ${has}`).toContain(has);
+      else expect(className).not.toContain("rounded-l-full");
+      if (lacks) expect(className, `expected no ${lacks}`).not.toContain(lacks);
+    });
+
+    it("draws no separate mark beside the band, so nothing reads as a stray dot", () => {
+      // An earlier attempt drew a stub below the band's edge in the band's own colour. It was the same
+      // colour as the band and therefore invisible, and at true size it read as a floating period.
+      const { container } = renderBand("fertile", true, true);
+      expect(container.querySelectorAll('[data-testid="calendar-run-edge"]')).toHaveLength(0);
+      expect(container.querySelectorAll(band)).toHaveLength(1);
+    });
+
+    it.each(["pre-fertile", "post-peak", "post-calendar"] as const)(
+      "never marks a %s day, even if flagged as a window end",
+      (info) => {
+        // The bracket marks the fertile interval specifically. A day flagged as an edge while showing
+        // another phase would be advertising a window the cell is not painting.
+        const { container } = renderBand(info, true, true);
+        const className = container.querySelector(band)?.className ?? "";
+        expect(className).not.toContain("rounded-l-full");
+        expect(className).not.toContain("rounded-r-full");
+      },
+    );
+
+    it("paints no band and no mark on a projected day that has no phase", () => {
+      const { container } = renderBand(null, false, false, { forecast: true });
+      expect(container.querySelector(band)).toBeNull();
+      expect(screen.getByTestId("day-cell").className).toContain("bg-fertility-forecast-bg");
+    });
+
+    it("marks a projected fertile day, so a forecast band reads as the same kind of run", () => {
+      const { container } = renderBand("fertile", true, false, { forecast: true });
+      expect(container.querySelector(band)?.className).toContain(
+        "bg-fertility-status-fertile-band",
+      );
+      expect(container.querySelector(band)?.className).toContain("rounded-l-full");
+    });
+
+    it("shows the band, the menses stripe, and the monitor marker on the same day", () => {
+      // Menses days fall inside a phase, so the absolute positioning has to coexist rather than one
+      // layer covering another.
+      const { container } = renderBand("fertile", false, false, { menses: true, monitor: "high" });
+      const cell = screen.getByTestId("day-cell");
+      expect(container.querySelector(band)).not.toBeNull();
+      expect(cell.querySelector('[data-testid="calendar-menses-stripe"]')).not.toBeNull();
+      expect(cell.querySelector('[data-testid="calendar-monitor-marker"]')?.className).toContain(
+        "bg-fertility-monitor-high",
+      );
+    });
+
+    it("paints no band when the phase layer is hidden, and keeps the phase in the label", () => {
+      const { container } = render(
+        <DayCell
+          dateKey="2026-01-14"
+          dayNumber={14}
+          info="fertile"
+          forecast={false}
+          menses={false}
+          monitor={undefined}
+          intercourse={false}
+          windowStart
+          isToday={false}
+          hiddenLayers={["fertile" as never]}
+          onSelect={() => {}}
+        />,
+      );
+      expect(container.querySelector(band)).toBeNull();
+      expect(screen.getByTestId("day-cell").getAttribute("aria-label")).toContain("Fertile");
+    });
+
+    it("renders no band anywhere when the algorithm is disabled", async () => {
+      const cycle = await store().setNewCycle(addDays(todayKey(), -5));
+      await store().addDayRecord(cycle.id, addDays(todayKey(), -5), 1, { bloodFlow: "medium" });
+      await store().addDayRecord(cycle.id, addDays(todayKey(), -3), 3, { monitor: "high" });
+      await store().updateSettings({ algorithmEnabled: false });
+
+      render(<CalendarView />);
+      await waitFor(() => expect(screen.getAllByTestId("day-cell").length).toBeGreaterThan(0));
+      expect(document.querySelectorAll('[data-testid="calendar-phase-band"]')).toHaveLength(0);
+    });
   });
 
   it("renders a simple phase cell with a menses stripe and one monitor marker", () => {

@@ -41,16 +41,30 @@ describe("fertility visual mappings", () => {
   });
 
   it("reuses the existing status treatments for the three Calendar phases", () => {
-    expect(FERTILITY_CALENDAR_PHASE_VISUALS.before.fill).toBe(
-      FERTILITY_STATUS_VISUALS["pre-fertile"].fill,
-    );
-    expect(FERTILITY_CALENDAR_PHASE_VISUALS.fertile.fill).toBe(
-      FERTILITY_STATUS_VISUALS.fertile.fill,
-    );
-    expect(FERTILITY_CALENDAR_PHASE_VISUALS.after.fill).toBe(
-      FERTILITY_STATUS_VISUALS["post-peak"].fill,
-    );
+    // Both parts of the treatment, so the collapsed view cannot drift from the palette the Status view
+    // shows for the same status.
+    for (const [phase, status] of [
+      ["before", "pre-fertile"],
+      ["fertile", "fertile"],
+      ["after", "post-peak"],
+    ] as const) {
+      const visual = FERTILITY_CALENDAR_PHASE_VISUALS[phase];
+      expect(visual.fill, `${phase} fill`).toBe(FERTILITY_STATUS_VISUALS[status].fill);
+      expect(visual.band, `${phase} band`).toBe(FERTILITY_STATUS_VISUALS[status].band);
+    }
     expect(FERTILITY_CALENDAR_PHASE_VISUALS.after.label).toBe("After");
+  });
+
+  it("gives every status a band, and every phase a distinct one", () => {
+    // The band is what tells the phases apart, so a status without one is a treatment the Calendar
+    // cannot distinguish.
+    for (const status of Object.keys(FERTILITY_STATUS_VISUALS) as DayStatus[]) {
+      expect(FERTILITY_STATUS_VISUALS[status].band, `${status} band`).not.toBe("");
+    }
+    const bands = (["before", "fertile", "after"] as const).map(
+      (phase) => FERTILITY_CALENDAR_PHASE_VISUALS[phase].band,
+    );
+    expect(new Set(bands).size, `bands were ${bands.join(", ")}`).toBe(3);
   });
 
   it.each(statusCases)("maps %s to a complete tokenized treatment", (status, token) => {

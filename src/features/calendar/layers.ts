@@ -44,16 +44,34 @@ export interface LayerPaint {
   fill: string;
   /** Border of a layer that outlines the day cell. */
   border: string;
+  /**
+   * Colour of a layer drawn as the thin strip along the cell's top edge. Separate from `fill` because
+   * the two carry different obligations: a marker is painted on the fill and caps its lightness, so only
+   * the band is required to distinguish one layer from another.
+   */
+  band: string;
   /** Colour or icon class of a layer drawn as a marker inside the cell. */
   marker: string;
 }
 
-const NO_PAINT: LayerPaint = { fill: "", border: "", marker: "" };
+const NO_PAINT: LayerPaint = { fill: "", border: "", band: "", marker: "" };
 
 export const LAYER_PAINT: Record<CalendarLayerId, LayerPaint> = {
-  before: { ...NO_PAINT, fill: FERTILITY_CALENDAR_PHASE_VISUALS.before.fill },
-  fertile: { ...NO_PAINT, fill: FERTILITY_CALENDAR_PHASE_VISUALS.fertile.fill },
-  after: { ...NO_PAINT, fill: FERTILITY_CALENDAR_PHASE_VISUALS.after.fill },
+  before: {
+    ...NO_PAINT,
+    fill: FERTILITY_CALENDAR_PHASE_VISUALS.before.fill,
+    band: FERTILITY_CALENDAR_PHASE_VISUALS.before.band,
+  },
+  fertile: {
+    ...NO_PAINT,
+    fill: FERTILITY_CALENDAR_PHASE_VISUALS.fertile.fill,
+    band: FERTILITY_CALENDAR_PHASE_VISUALS.fertile.band,
+  },
+  after: {
+    ...NO_PAINT,
+    fill: FERTILITY_CALENDAR_PHASE_VISUALS.after.fill,
+    band: FERTILITY_CALENDAR_PHASE_VISUALS.after.band,
+  },
   predicted: {
     ...NO_PAINT,
     fill: FERTILITY_FORECAST_VISUAL.fill,
@@ -66,9 +84,16 @@ export const LAYER_PAINT: Record<CalendarLayerId, LayerPaint> = {
   intercourse: { ...NO_PAINT, marker: FERTILITY_MARKER_VISUALS.intercourse.icon },
 };
 
-/** The classes a shown key's swatch carries, taken from the same paint record. */
+/**
+ * The classes a shown key's swatch carries, taken from the same paint record.
+ *
+ * A band wins over the fill so the key shows the mark the day cells actually use to tell the phases
+ * apart. A sample built from the fill would describe a treatment the user cannot rely on, because the
+ * fills are too close together to distinguish and only the band is meant to be.
+ */
 export function swatchSample(layer: CalendarLayer): string {
   const paint = LAYER_PAINT[layer.id];
+  if (paint.band) return cn(paint.band, BAND_FOOTPRINT);
   return paint.fill ? cn(paint.border, paint.fill) : paint.marker;
 }
 
@@ -87,8 +112,15 @@ export const LAYER_GROUP_LABELS: Record<LayerGroup, string> = {
 
 const SQUARE = "h-2.5 w-2.5 rounded";
 
+/**
+ * A phase key shows a bar rather than a block, matching the band its day cells draw. The legend applies
+ * the footprint itself, so `swatchSample` carries the colour and the band shape together and this
+ * records the shape on the layer as well, so the two cannot disagree.
+ */
+const BAND_FOOTPRINT = "h-1 w-6 rounded-full";
+
 function phaseLayer(id: CalendarPhase, label: string): CalendarLayer {
-  return { id, label, group: "status", needs: "algorithm", footprint: SQUARE };
+  return { id, label, group: "status", needs: "algorithm", footprint: BAND_FOOTPRINT };
 }
 
 function monitorLayer(id: "low" | "high" | "peak", label: string): CalendarLayer {

@@ -184,6 +184,8 @@ export function CalendarView() {
                 cycleStart={cell.cycleStart}
                 monitor={cell.monitor}
                 intercourse={cell.intercourse}
+                windowStart={interpreted ? cell.windowStart : false}
+                windowEnd={interpreted ? cell.windowEnd : false}
                 isToday={dateKey === today}
                 detailMode={detailMode}
                 hiddenLayers={hiddenLayers}

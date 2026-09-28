@@ -49,6 +49,30 @@ describe("the layer declaration", () => {
     expect(swatchSample(predicted)).toContain("border-fertility-forecast-border");
   });
 
+  it("paints a band for every phase, since every phase is shown", () => {
+    // All three phases get a band, because the band is what tells them apart. A phase with no band
+    // would be a phase the Calendar draws a fill for and cannot distinguish.
+    for (const id of ["before", "fertile", "after"] as const) {
+      expect(LAYER_PAINT[id].band, `${id} band`).not.toBe("");
+      expect(swatchSample({ id } as never), `${id} sample`).toContain(LAYER_PAINT[id].band);
+    }
+  });
+
+  it("gives a phase key a band-shaped sample rather than a filled block", () => {
+    for (const layer of CALENDAR_LAYERS) {
+      if (!LAYER_PAINT[layer.id].band) continue;
+      expect(layer.footprint, `${layer.id} footprint`).toBe("h-1 w-6 rounded-full");
+    }
+  });
+
+  it("paints no band on the layers that are not phases", () => {
+    // The predictive, menses, and reading-marker layers are not phases, and a band on any of them
+    // would read as a window edge where there is none.
+    for (const id of ["predicted", "menses", "low", "high", "peak", "intercourse"] as const) {
+      expect(LAYER_PAINT[id].band, `${id} band`).toBe("");
+    }
+  });
+
   it("gives every layer a swatch built from the same paint the cell uses", () => {
     // The legend composes its sample from LAYER_PAINT, so a sample cannot name
     // a colour the day cell does not paint.

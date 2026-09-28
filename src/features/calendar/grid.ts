@@ -2,7 +2,7 @@
 
 import { dayInfo } from "@/core/cycleStatus";
 import { dayInCycle, dateKeyLocal } from "@/core/dateKeys";
-import type { CycleResult, DayStatus } from "@/core/engine/types";
+import type { CycleResult, DayStatus, FertileWindow } from "@/core/engine/types";
 import { cycleForDate } from "@/core/store/selectors";
 import type { CycleEntity, DayRecordEntity, WeekStart } from "@/core/store/entities";
 
@@ -79,7 +79,37 @@ export interface CellInfo {
   cycleStart: boolean;
   monitor: DayRecordEntity["monitor"];
   intercourse: boolean;
+  /**
+   * Whether this day is the first or last day of the fertile window, which the Calendar's band rounds
+   * at. Derived from the same window that produced `info`, so the shaping and the status cannot
+   * disagree. A window with no end — a cycle with no monitor Peak — has a first day but never a last,
+   * so it marks its start only.
+   *
+   * These are pure functions of the window and carry no month information, so a run that is merely
+   * clipped by the edge of a displayed month is not marked at the clip. The window's end is a protocol
+   * result; reporting one at a month boundary would report an end the window does not have.
+   */
+  windowStart: boolean;
+  windowEnd: boolean;
 }
+
+/**
+ * Which end of the window a cycle day sits at, given the window that produced its status.
+ */
+function windowEdges(
+  window: FertileWindow,
+  dayNo: number,
+): Pick<CellInfo, "windowStart" | "windowEnd"> {
+  return {
+    windowStart: dayNo === window.begin,
+    windowEnd: window.end !== null && dayNo === window.end,
+  };
+}
+
+const NO_WINDOW_EDGES: Pick<CellInfo, "windowStart" | "windowEnd"> = {
+  windowStart: false,
+  windowEnd: false,
+};
 
 /** Latest projected cycle covering the date, if any. */
 function projectedCycleForDate(projected: CycleResult[], dateKey: string): CycleResult | undefined {
@@ -131,18 +161,28 @@ export function resolveCell(
       cycleStart: dayNo === 1,
       monitor: undefined,
       intercourse: false,
+      // A projected window is shaped the same way a recorded one is, so a
+      // forecast band reads as the same kind of interval.
+      ...windowEdges(projectedCycle.fertileWindow, dayNo),
     };
   }
+
+  const dayNo = cycle ? dayInCycle(cycle.day1, dateKey) : 0;
+  const result = cycle ? results.get(cycle.id) : undefined;
+  const status = isFuture ? null : statusForCell(cycle, results, dateKey);
 
   return {
     // Derived from the window, so an unlogged day inside a cycle still has a
     // status. Future dates are left to the forecast treatment.
-    info: isFuture ? null : statusForCell(cycle, results, dateKey),
+    info: status,
     forecast: inForecast && isFuture && !record,
-    menses: !isFuture && mensesFor(record, cycle ? dayInCycle(cycle.day1, dateKey) : 0),
+    menses: !isFuture && mensesFor(record, dayNo),
     cycleStart: false,
     monitor: record?.monitor && record.monitor !== "none" ? record.monitor : undefined,
     intercourse: !!record?.intercourse,
+    // No status means no band to shape: a day outside a cycle, a future date with no projection, and
+    // a day past a closed cycle all render unbanded.
+    ...(status && result ? windowEdges(result.fertileWindow, dayNo) : NO_WINDOW_EDGES),
   };
 }
 
