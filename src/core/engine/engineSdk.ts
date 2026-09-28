@@ -44,7 +44,7 @@ export function computeAll(
   }
 
   const results: CycleResult[] = [];
-  const history: CycleHistory = { peaksByCycle: [], cycleNos: [] };
+  const history: CycleHistory = { firstPeaksByCycle: [], lastPeaksByCycle: [], cycleNos: [] };
 
   for (let index = 0; index < sorted.length; index++) {
     const cycle = sorted[index];
@@ -61,7 +61,10 @@ export function computeAll(
       today,
     );
     results.push(result);
-    history.peaksByCycle.push(result.peakDay);
+    // Both arrays are appended in the same iteration of the same loop, so they cannot desync in
+    // length: the calendar begin reads the first readings, the forecast's end the last.
+    history.firstPeaksByCycle.push(result.firstPeakDay);
+    history.lastPeaksByCycle.push(result.lastPeakDay);
     history.cycleNos.push(cycleNo);
   }
 

@@ -420,14 +420,25 @@ function describeBegin(
   };
 }
 
+/**
+ * The cycle's Peak day, and the reading its window end came from.
+ *
+ * A monitor shows Peak for a minimum of two days, so naming one day as the whole story hides the
+ * reading the end was measured from. The first reading is the Peak day the calendar rule is derived
+ * from; the last is the anchor. A single-reading cycle needs no second clause.
+ */
 function peakLine(result: CycleResult, peakCount: number): string {
-  if (result.peakDay === null) {
+  const { firstPeakDay, lastPeakDay } = result;
+  if (firstPeakDay === null) {
     return "No monitor Peak recorded in this cycle";
   }
-  if (peakCount <= 1) {
-    return `Peak day ${result.peakDay}`;
+  if (firstPeakDay === lastPeakDay || peakCount <= 1) {
+    return `Peak day ${firstPeakDay}`;
   }
-  return `Peak day ${result.peakDay} — the last of ${peakCount} monitor Peak readings in this cycle`;
+  return (
+    `Peak day ${firstPeakDay} — the first of ${peakCount} monitor Peak readings in this cycle. ` +
+    `The window ends three full days after the last of them, on day ${lastPeakDay}`
+  );
 }
 
 /** The engine's own warnings, in plain language. Never invented, never re-derived. */

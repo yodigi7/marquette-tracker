@@ -131,8 +131,12 @@ export function windowDescription(window: FertileWindow, peakKnown: boolean): st
 
 /** The cycle and selection a Peak count is reported against. */
 export interface PeakCountInput {
-  /** The cycle's anchoring monitor Peak day, or null when none is logged. */
-  peakDay: number | null;
+  /**
+   * The cycle's **last** monitor Peak reading, or null when none is logged. The count measures from
+   * here rather than from the cycle's Peak day, because it is counted against the window end and the
+   * end is measured from this reading.
+   */
+  lastPeakDay: number | null;
   /** The selected date's cycle day. */
   cycleDay: number;
   /** Today's cycle day. A count may not speak about days beyond it. */
@@ -144,7 +148,7 @@ export interface PeakCountInput {
 /**
  * Where the selected cycle day sits relative to the cycle's Peak reading.
  *
- * A retrospective count and nothing more. `peakDay` is the same reading the window end is measured
+ * A retrospective count and nothing more. `lastPeakDay` is the same reading the window end is measured
  * from, so the two cannot disagree; and both terms are cycle days off the same Day 1, so a day the
  * user did not log cannot move the number. A date earlier than the Peak has a negative difference,
  * and every way of rendering that is a countdown, so it names the day instead.
@@ -159,21 +163,26 @@ export interface PeakCountInput {
  * was used and how many exist, and deliberately does not claim which one set the window end: after
  * six cycles the historical rule can finish the window before the current one does.
  */
-export function peakCountLine({ peakDay, cycleDay, todayCycleDay, peaks }: PeakCountInput): string {
-  if (peakDay === null) {
+export function peakCountLine({
+  lastPeakDay,
+  cycleDay,
+  todayCycleDay,
+  peaks,
+}: PeakCountInput): string {
+  if (lastPeakDay === null) {
     return "No Peak reading logged for this cycle yet.";
   }
   // Checked before the elapsed arithmetic: a Peak can only ever be logged on a day that has
   // happened, so a future date is always ahead of it and would otherwise land in the count branch.
   const future = cycleDay > todayCycleDay;
-  const elapsed = cycleDay - peakDay;
+  const elapsed = cycleDay - lastPeakDay;
   const base = future
-    ? `Your Peak reading is on cycle day ${peakDay} — this date has not happened yet.`
+    ? `Your Peak reading is on cycle day ${lastPeakDay} — this date has not happened yet.`
     : elapsed === 0
-      ? `Your Peak reading is on cycle day ${peakDay} — the same day.`
+      ? `Your Peak reading is on cycle day ${lastPeakDay} — the same day.`
       : elapsed < 0
-        ? `Your Peak reading is on cycle day ${peakDay} — this date is before it.`
-        : `${elapsed} ${elapsed === 1 ? "day" : "days"} since your Peak reading on cycle day ${peakDay}.`;
+        ? `Your Peak reading is on cycle day ${lastPeakDay} — this date is before it.`
+        : `${elapsed} ${elapsed === 1 ? "day" : "days"} since your Peak reading on cycle day ${lastPeakDay}.`;
   return peaks > 1 ? `${base} Last of ${peaks} Peak readings this cycle.` : base;
 }
 

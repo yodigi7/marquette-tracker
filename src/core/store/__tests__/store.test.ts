@@ -220,7 +220,8 @@ describe("day records", () => {
     const cycle = state(store).output?.cycles[0];
     expect(cycle?.fertileWindow.begin).toBe(6);
     expect(cycle?.fertileWindow.end).toBe(17);
-    expect(cycle?.peakDay).toBe(14);
+    expect(cycle?.firstPeakDay).toBe(14);
+    expect(cycle?.lastPeakDay).toBe(14);
   });
 
   it("removing a day record reverts the derived window", async () => {

@@ -76,7 +76,7 @@ export function CalendarView() {
   const currentResult = currentCycle ? results.get(currentCycle.id) : undefined;
   const currentInfo =
     currentCycle && currentResult && currentCycleDay !== null
-      ? dayInfo(currentResult.fertileWindow, currentResult.peakDay !== null, currentCycleDay)
+      ? dayInfo(currentResult.fertileWindow, currentResult.lastPeakDay !== null, currentCycleDay)
       : null;
   const currentRecord = currentCycle
     ? dayRecords.find((record) => record.cycleId === currentCycle.id && record.date === today)

@@ -3,6 +3,7 @@ import {
   computeCycle,
   DEFAULT_EARLIEST_PEAK,
   DEFAULT_POST_PEAK_DAYS,
+  MIN_PEAK_RUN_DAYS,
   statusForCycleDay,
 } from "./marquette";
 import type { CycleHistory, CycleResult, DateKey, EngineSettings, FertileWindow } from "./types";
@@ -31,7 +32,15 @@ const CALENDAR_BEGINS_BEFORE_EARLIEST_PEAK = 6;
  * constant, which is what keeps the forecast and the projection from disagreeing.
  */
 export const PROTOCOL_DEFAULT_WINDOW_BEGIN = 6;
-export const PROTOCOL_DEFAULT_WINDOW_END = DEFAULT_EARLIEST_PEAK + DEFAULT_POST_PEAK_DAYS;
+/**
+ * Composed rather than typed. `DEFAULT_EARLIEST_PEAK` is the earliest possible **first** Peak day, and
+ * the monitor shows Peak for at least `MIN_PEAK_RUN_DAYS` days, so the earliest possible *last* Peak
+ * day is 13 — not 12. Writing the run in keeps the arithmetic visible, so the value cannot drift away
+ * from the rules it stands for, and a later reading of the monitor's behaviour moves one constant
+ * rather than a literal.
+ */
+export const PROTOCOL_DEFAULT_WINDOW_END =
+  DEFAULT_EARLIEST_PEAK + (MIN_PEAK_RUN_DAYS - 1) + DEFAULT_POST_PEAK_DAYS;
 
 /** Ids for projected cycles are synthetic and must never collide with stored ones. */
 const PROJECTED_CYCLE_ID_PREFIX = "projected-";
@@ -111,7 +120,8 @@ export function projectCycles(
   }
 
   const history: CycleHistory = {
-    peaksByCycle: cycles.map((c) => c.peakDay),
+    firstPeaksByCycle: cycles.map((c) => c.firstPeakDay),
+    lastPeaksByCycle: cycles.map((c) => c.lastPeakDay),
     cycleNos: cycles.map((c) => c.cycleNo),
   };
 
@@ -158,17 +168,22 @@ export function projectCycles(
  *
  * A projection is computed with an empty record array, so it holds no Peak of its own — and a cycle
  * with no Peak has no window end. The calendar rule over the lookback is therefore what gives a
- * projection its window: six days before the earliest Peak in the window, three days after the
- * latest. With no Peak anywhere in the window the rule has no edges, so the composed protocol
+ * projection its window, and each edge is taken from the reading its own rule uses: six days before the
+ * earliest **Peak day** (a cycle's first monitor Peak reading) and three days after the latest **last**
+ * Peak reading. With no Peak anywhere in the window the rule has no edges, so the composed protocol
  * default stands in — for a projection only. A cycle the user recorded is never given this window,
  * because for that cycle the absence of a Peak is reported rather than filled in.
  */
 function deriveProjectedWindow(history: CycleHistory, settings: EngineSettings): FertileWindow {
-  const lookback = history.peaksByCycle
-    .slice(-Math.max(1, settings.historyWindow))
+  const windowSize = Math.max(1, settings.historyWindow);
+  const firstInLookback = history.firstPeaksByCycle
+    .slice(-windowSize)
+    .filter((peak): peak is number => peak !== null);
+  const lastInLookback = history.lastPeaksByCycle
+    .slice(-windowSize)
     .filter((peak): peak is number => peak !== null);
 
-  if (lookback.length === 0) {
+  if (firstInLookback.length === 0) {
     return {
       begin: PROTOCOL_DEFAULT_WINDOW_BEGIN,
       end: PROTOCOL_DEFAULT_WINDOW_END,
@@ -178,8 +193,8 @@ function deriveProjectedWindow(history: CycleHistory, settings: EngineSettings):
   }
 
   return {
-    begin: Math.min(...lookback) - CALENDAR_BEGINS_BEFORE_EARLIEST_PEAK,
-    end: Math.max(...lookback) + DEFAULT_POST_PEAK_DAYS,
+    begin: Math.min(...firstInLookback) - CALENDAR_BEGINS_BEFORE_EARLIEST_PEAK,
+    end: Math.max(...lastInLookback) + DEFAULT_POST_PEAK_DAYS,
     beginRule: "calendar-earliest-peak-minus-6",
     endRule: "lookback-latest-peak-plus-n",
   };
@@ -197,7 +212,7 @@ function projectedCycle(
     fertileWindow: window,
     days: result.days.map((day) => ({
       ...day,
-      status: statusForCycleDay(window, result.peakDay !== null, day.day),
+      status: statusForCycleDay(window, result.lastPeakDay !== null, day.day),
     })),
   };
 }

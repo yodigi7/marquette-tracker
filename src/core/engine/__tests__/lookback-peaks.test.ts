@@ -187,7 +187,8 @@ describe("CycleResult.lookbackPeaks", () => {
     const eight = result.cycles[7];
     expect(eight.fertileWindow.beginRule).toBe("calendar-earliest-peak-minus-6");
     expect(eight.fertileWindow.begin).toBe(12 - 6);
-    expect(eight.peakDay).toBeNull();
+    expect(eight.firstPeakDay).toBeNull();
+    expect(eight.lastPeakDay).toBeNull();
     expect(eight.fertileWindow.end).toBeNull();
     expect(eight.fertileWindow.endRule).toBe("none");
     expect(eight.lookbackPeaks).toEqual<LookbackPeak[]>([

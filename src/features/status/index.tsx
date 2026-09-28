@@ -30,7 +30,7 @@ export function StatusView() {
   const result = cycle ? results.get(cycle.id) : undefined;
   const info =
     result && cycleDay !== null
-      ? dayInfo(result.fertileWindow, result.peakDay !== null, cycleDay)
+      ? dayInfo(result.fertileWindow, result.lastPeakDay !== null, cycleDay)
       : null;
   // How many monitor Peak readings this cycle holds. The engine reports only the one it
   // anchors on, and a count that does not mention the others reads as though one is all there is.
@@ -56,14 +56,14 @@ export function StatusView() {
             status={info ?? null}
             cycleDay={cycleDay}
             windowLine={
-              result ? windowDescription(result.fertileWindow, result.peakDay !== null) : ""
+              result ? windowDescription(result.fertileWindow, result.lastPeakDay !== null) : ""
             }
             // Passed unconditionally, like the warning and the next-period estimate: the card
             // returns early when interpretation is off, and that is what suppresses them.
             peakLine={
               result && todayCycleDay !== null
                 ? peakCountLine({
-                    peakDay: result.peakDay,
+                    lastPeakDay: result.lastPeakDay,
                     cycleDay,
                     todayCycleDay,
                     peaks: peakReadings,
