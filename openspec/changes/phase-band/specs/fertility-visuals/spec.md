@@ -99,6 +99,26 @@ Where a user hides a visual layer, the equivalent text or detail information for
 - **WHEN** a user scans a Calendar month containing both a Low and a Peak reading at the size the markers are drawn
 - **THEN** the two readings are visually distinguishable from one another without reading the legend
 
+#### Scenario: A quiet phase is a visible area, not a tint the surface swallows
+
+- **WHEN** a Calendar phase fill is drawn
+- **THEN** it is a clear distance from the surface behind the cell, in both themes
+- **AND** that distance is measured against the card, which is the surface a Calendar renders on and the
+  binding one of the two
+
+#### Scenario: The window is the most prominent phase surface
+
+- **WHEN** the window and the two quiet phase fills are compared against the same surface
+- **THEN** the window is further from that surface than either of them
+- **AND** prominence is judged as distance from the surface rather than as lightness, because in the light
+  theme the most prominent surface is the darkest and a lightness comparison gets that theme backwards
+
+#### Scenario: A quiet phase is never read as the window
+
+- **WHEN** a quiet phase fill and the window's colour are compared
+- **THEN** their hues are far enough apart that making one lighter cannot close the gap
+- **AND** neither sits at a hue close to a reading marker's, since a marker is painted on top of it
+
 #### Scenario: The window's bar is legible as its own surface
 
 - **WHEN** the window's bar is drawn in either theme
