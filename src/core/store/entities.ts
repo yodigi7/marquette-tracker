@@ -1,4 +1,6 @@
 import type { DateKey, Goal, Theme } from "@/core/engine/types";
+import { normalizeTemperatureUnit } from "@/core/temperature";
+import type { TemperatureUnit } from "@/core/temperature";
 
 /** Sync/version bookkeeping attached to every row (AGENTS.md sync-ready path). */
 export interface SyncMeta {
@@ -38,6 +40,12 @@ export type WeekStart = "monday" | "sunday";
 export type CalendarDetailMode = "simple" | "full";
 
 /**
+ * The unit temperatures are entered and displayed in. The stored value on a day
+ * record is always Celsius regardless of this; see `@/core/temperature`.
+ */
+export type { TemperatureUnit } from "@/core/temperature";
+
+/**
  * The Calendar's hideable visual layers, in legend order. The union is derived
  * from the tuple so the recognised set has exactly one source of truth: the
  * settings row stores ids from this list, and a stored id that is no longer in
@@ -74,6 +82,15 @@ export function normalizeCalendarLayerIds(value: unknown): CalendarLayerId[] {
   return value.filter(isCalendarLayerId);
 }
 
+/**
+ * A temperature unit written by another version falls back to the default rather
+ * than being treated as an error, for the same reason as the layer ids above: a
+ * display preference must never be the reason the app cannot read its settings.
+ */
+export function normalizeStoredTemperatureUnit(value: unknown): TemperatureUnit {
+  return normalizeTemperatureUnit(value);
+}
+
 export interface SettingsEntity extends SyncMeta {
   key: "main";
   goal: Goal;
@@ -86,6 +103,8 @@ export interface SettingsEntity extends SyncMeta {
   overlayMucus: boolean;
   overlayBbt: boolean;
   overlayIntercourse: boolean;
+  /** Display/entry unit for basal temperature. Celsius is canonical in storage. */
+  temperatureUnit: TemperatureUnit;
   calendarDetailMode: CalendarDetailMode;
   /** Calendar visual layers the user has hidden. Absent means nothing is hidden. */
   hiddenCalendarLayers: CalendarLayerId[];
@@ -109,6 +128,7 @@ export const DEFAULT_SETTINGS: Omit<SettingsEntity, keyof SyncMeta> = {
   overlayMucus: false,
   overlayBbt: false,
   overlayIntercourse: false,
+  temperatureUnit: "c",
   calendarDetailMode: "simple",
   hiddenCalendarLayers: [],
   projectFutureCycles: false,

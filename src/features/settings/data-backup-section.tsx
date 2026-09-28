@@ -45,6 +45,7 @@ export function DataBackupSection() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [implausibleBbtWarning, setImplausibleBbtWarning] = useState<string | null>(null);
 
   function closeDialog() {
     setDialogOpen(false);
@@ -122,6 +123,20 @@ export function DataBackupSection() {
       const message = `Restored ${result.cycleCount} cycles and ${result.dayRecordCount} day records.`;
       setStatus(message);
       toast.success(message);
+      // Readings outside the range a person could produce are restored exactly as
+      // they were stored, but said out loud: refusing them would leave the user
+      // unable to restore their own backup at all.
+      if (result.implausibleBbtCount > 0) {
+        const count = result.implausibleBbtCount;
+        const warning =
+          count === 1
+            ? "1 temperature reading is outside the usual range and may have been " +
+              "entered in the wrong unit. It was restored unchanged — check it in the day entry."
+            : `${count} temperature readings are outside the usual range and may have been ` +
+              "entered in the wrong unit. They were restored unchanged — check them in the day entry.";
+        setImplausibleBbtWarning(warning);
+        toast.warning(warning);
+      }
       closeDialog();
     } catch (caught) {
       const message = errorMessage(caught);
@@ -168,6 +183,15 @@ export function DataBackupSection() {
       {status ? (
         <p role="status" data-testid="settings-backup-status" className="text-sm text-stone-600">
           {status}
+        </p>
+      ) : null}
+      {implausibleBbtWarning ? (
+        <p
+          role="status"
+          data-testid="settings-backup-bbt-warning"
+          className="text-sm text-amber-700"
+        >
+          {implausibleBbtWarning}
         </p>
       ) : null}
       {error ? (

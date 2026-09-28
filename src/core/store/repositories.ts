@@ -1,7 +1,12 @@
 import type { BackupSnapshot } from "@/core/backup/types";
 import type { DateKey } from "@/core/engine/types";
 import type { CycleEntity, DayRecordEntity, SettingsEntity, SyncMeta } from "./entities";
-import { DEFAULT_SETTINGS, SETTINGS_KEY, normalizeCalendarLayerIds } from "./entities";
+import {
+  DEFAULT_SETTINGS,
+  SETTINGS_KEY,
+  normalizeCalendarLayerIds,
+  normalizeStoredTemperatureUnit,
+} from "./entities";
 import type { AppDb } from "./db";
 
 function nowIso(): string {
@@ -170,6 +175,7 @@ export function createRepositories(db: AppDb): Repositories {
           ...DEFAULT_SETTINGS,
           ...supported,
           hiddenCalendarLayers: normalizeCalendarLayerIds(supported.hiddenCalendarLayers),
+          temperatureUnit: normalizeStoredTemperatureUnit(supported.temperatureUnit),
         };
       }
       const defaults = defaultSettings();

@@ -1,5 +1,9 @@
 import { create } from "zustand";
-import { createBackup as createBackupDocument, prepareBackupDocument } from "@/core/backup";
+import {
+  countImplausibleBbt,
+  createBackup as createBackupDocument,
+  prepareBackupDocument,
+} from "@/core/backup";
 import type { BackupDocument, BackupRestoreResult, PreparedBackup } from "@/core/backup";
 import { addDays } from "@/core/engine/dateUtils";
 import { computeAll } from "@/core/engine/engineSdk";
@@ -297,6 +301,7 @@ export function createAppStore(db: AppDb) {
         return {
           cycleCount: validated.summary.cycleCount,
           dayRecordCount: validated.summary.dayRecordCount,
+          implausibleBbtCount: countImplausibleBbt(validated.document.data.dayRecords),
         };
       },
 

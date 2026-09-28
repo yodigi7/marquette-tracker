@@ -63,6 +63,12 @@ export interface PreparedBackup {
 export interface BackupRestoreResult {
   cycleCount: number;
   dayRecordCount: number;
+  /**
+   * Restored readings that are finite but outside the band a human body can
+   * produce. Kept exactly as stored and reported, never refused or rewritten —
+   * see `countImplausibleBbt`.
+   */
+  implausibleBbtCount: number;
 }
 
 export interface BackupOptions {

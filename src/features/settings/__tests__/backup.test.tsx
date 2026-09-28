@@ -177,3 +177,66 @@ describe("Settings JSON backup and restore", () => {
     expect(screen.queryByTestId("settings-backup-dialog")).not.toBeInTheDocument();
   });
 });
+
+describe("Restore reports implausible temperatures", () => {
+  function snapshotWithBbt(...values: number[]) {
+    const base = fullSnapshot();
+    return {
+      ...base,
+      dayRecords: values.map((bbt, index) => ({
+        ...base.dayRecords[index % base.dayRecords.length],
+        id: `rec-${index}`,
+        date: `2026-01-${10 + index}`,
+        dayInCycle: 10 + index,
+        bbt,
+      })),
+    };
+  }
+
+  function fileWithBbt(...values: number[]) {
+    const text = serializeBackup(
+      createBackup(snapshotWithBbt(...values), {
+        appVersion: "1.0.0",
+        exportedAt: "2026-02-03T04:05:06.000Z",
+      }),
+    );
+    return new File([text], "marquette-backup.json", { type: "application/json" });
+  }
+
+  it("restores the values exactly and warns about the implausible one", async () => {
+    const user = userEvent.setup();
+    renderSettings();
+
+    await user.upload(screen.getByTestId("settings-backup-import"), fileWithBbt(36.5, 98.2));
+    await user.click(await screen.findByTestId("settings-backup-ack"));
+    await user.click(screen.getByTestId("settings-backup-confirm"));
+
+    // The restore succeeds; the reading is kept exactly as it was stored.
+    await waitFor(() => expect(store().dayRecords).toHaveLength(2));
+    const temperatures = store()
+      .dayRecords.map((r) => r.bbt)
+      .sort();
+    expect(temperatures[0]).toBe(36.5);
+    expect(temperatures[1]).toBe(98.2);
+
+    // ...and the user is told one is worth checking.
+    await waitFor(() =>
+      expect(screen.getByTestId("settings-backup-bbt-warning")).toHaveTextContent(
+        /1 temperature reading is outside the usual range/i,
+      ),
+    );
+  });
+
+  it("says nothing about temperature when every reading is ordinary", async () => {
+    const user = userEvent.setup();
+    renderSettings();
+
+    await user.upload(screen.getByTestId("settings-backup-import"), fileWithBbt(36.5, 37.1));
+    await user.click(await screen.findByTestId("settings-backup-ack"));
+    await user.click(screen.getByTestId("settings-backup-confirm"));
+
+    await waitFor(() => expect(store().dayRecords).toHaveLength(2));
+    expect(await screen.findByTestId("settings-backup-status")).toHaveTextContent("Restored");
+    expect(screen.queryByTestId("settings-backup-bbt-warning")).not.toBeInTheDocument();
+  });
+});

@@ -16,6 +16,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAppStore, FutureDateError } from "@/core/store/useAppStore";
 import type { DayRecordEntity } from "@/core/store/entities";
 import { todayKey } from "@/core/dateKeys";
+import {
+  convertToCelsius,
+  formatForDisplay,
+  rangeHint,
+  unitLabel,
+  validateBbt,
+} from "@/core/temperature";
 
 type MonitorValue = NonNullable<DayRecordEntity["monitor"]>;
 type MucusValue = NonNullable<DayRecordEntity["mucus"]>;
@@ -51,10 +58,30 @@ interface QuickEntryProps {
 }
 
 export function QuickEntry({ cycleId, date, dayInCycle, existing, onSaved }: QuickEntryProps) {
+  const settings = useAppStore((state) => state.settings);
+  const unit = settings.temperatureUnit;
   const [monitor, setMonitor] = useState<MonitorValue>(existing?.monitor ?? "none");
   const [mucus, setMucus] = useState<MucusValue>(existing?.mucus ?? "none");
   const [flow, setFlow] = useState<FlowValue>(existing?.bloodFlow ?? "none");
-  const [bbt, setBbt] = useState<string>(existing?.bbt != null ? String(existing.bbt) : "");
+  // The stored value is always Celsius; the field holds whatever the user reads.
+  const [bbt, setBbt] = useState<string>(
+    existing?.bbt != null ? formatForDisplay(existing.bbt, unit) : "",
+  );
+  const [bbtWarning, setBbtWarning] = useState<string | null>(null);
+  // The unit the field's current text is written in, so a preference change
+  // while the dialog is open can re-express the reading instead of leaving a
+  // number on screen that now means something else.
+  const [previousUnit, setPreviousUnit] = useState(unit);
+  if (unit !== previousUnit) {
+    setPreviousUnit(unit);
+    setBbt((current) => {
+      const trimmed = current.trim();
+      return trimmed === ""
+        ? current
+        : formatForDisplay(convertToCelsius(Number(trimmed), previousUnit), unit);
+    });
+    setBbtWarning(null);
+  }
   const [intercourse, setIntercourse] = useState<boolean>(existing?.intercourse ?? false);
   const [intercourseTime, setIntercourseTime] = useState<string>(existing?.intercourseTime ?? "");
   const [pregnancy, setPregnancy] = useState<string>(existing?.pregnancyTest ?? "");
@@ -70,13 +97,44 @@ export function QuickEntry({ cycleId, date, dayInCycle, existing, onSaved }: Qui
     setSymptomInput("");
   }
 
-  async function save() {
+  /**
+   * Resolves the typed temperature to a canonical Celsius value, or reports why
+   * it cannot be stored. `skipWarning` is set by the "Save anyway" path so the
+   * user is not asked about the same reading twice.
+   */
+  function resolveBbt(skipWarning: boolean): number | null | "invalid" | "confirm" {
+    if (bbt.trim() === "") {
+      return null;
+    }
+    const typed = Number(bbt);
+    const verdict = validateBbt(typed, unit);
+    if (verdict.kind === "ok") {
+      return convertToCelsius(typed, unit);
+    }
+    if (verdict.kind === "confirm") {
+      if (skipWarning) {
+        return convertToCelsius(verdict.value, unit);
+      }
+      setBbtWarning(verdict.message);
+      return "confirm";
+    }
+    setBbtWarning(verdict.message);
+    return "invalid";
+  }
+
+  async function save(skipWarning = false) {
+    const bbtValue = resolveBbt(skipWarning);
+    if (bbtValue === "invalid" || bbtValue === "confirm") {
+      // Keep the dialog open with the value still in the field so it can be
+      // corrected. Nothing is written.
+      return;
+    }
     try {
       await useAppStore.getState().addDayRecord(cycleId, date, dayInCycle, {
         monitor: monitor === "none" ? undefined : monitor,
         mucus: mucus === "none" ? undefined : mucus,
         bloodFlow: flow === "none" ? undefined : flow,
-        bbt: bbt === "" ? null : parseFloat(bbt),
+        bbt: bbtValue,
         intercourse,
         intercourseTime: intercourse ? intercourseTime || undefined : undefined,
         symptoms,
@@ -164,14 +222,50 @@ export function QuickEntry({ cycleId, date, dayInCycle, existing, onSaved }: Qui
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <Label className="mb-1 block">BBT (°C)</Label>
+            <Label className="mb-1 block">BBT ({unitLabel(unit)})</Label>
             <Input
               type="number"
-              step="0.01"
-              placeholder="36.5"
+              step={unit === "f" ? "0.1" : "0.01"}
+              placeholder={unit === "f" ? "97.7" : "36.5"}
+              data-testid="bbt"
+              aria-describedby="bbt-hint"
               value={bbt}
-              onChange={(e) => setBbt(e.target.value)}
+              onChange={(e) => {
+                setBbt(e.target.value);
+                setBbtWarning(null);
+              }}
             />
+            <p id="bbt-hint" data-testid="bbt-hint" className="mt-1 text-xs text-stone-500">
+              {rangeHint(unit)}. Outside that you can still save it if the reading is real.
+            </p>
+            {bbtWarning && (
+              <div
+                data-testid="bbt-warning"
+                role="alert"
+                className="mt-2 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900"
+              >
+                <p>{bbtWarning}</p>
+                <div className="mt-2 flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    data-testid="bbt-save-anyway"
+                    onClick={() => void save(true)}
+                  >
+                    Save anyway
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    data-testid="bbt-keep-editing"
+                    onClick={() => setBbtWarning(null)}
+                  >
+                    Keep editing
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
           <div>
             <Label className="mb-1 block">Pregnancy test</Label>

@@ -1,5 +1,5 @@
 import "fake-indexeddb/auto";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -7,7 +7,7 @@ import { useAppStore } from "@/core/store/useAppStore";
 import type { StripModel } from "../lib";
 import { CycleChartView } from "../index";
 import { StripChart } from "../strip-chart";
-import { installChartShim, seedCycles } from "./helpers";
+import { installChartShim, resetStore, seedCycles } from "./helpers";
 
 installChartShim();
 
@@ -189,5 +189,119 @@ describe("CycleChartView overlay settings (US4)", () => {
     await user.click(screen.getAllByRole("switch")[0]);
     expect((await screen.findAllByTestId("overlay-mucus-point"))[0]).toBeInTheDocument();
     expect(useAppStore.getState().settings.overlayMucus).toBe(true);
+  });
+});
+
+describe("StripChart temperature axis follows the active unit", () => {
+  // The unit is a persisted preference, so each case starts from Celsius unless
+  // it opts into Fahrenheit itself. Without this the tests leak into each other.
+  beforeEach(async () => {
+    await resetStore();
+  });
+
+  afterEach(() => cleanup());
+
+  function bbtValues(): number[] {
+    return screen
+      .getAllByTestId("overlay-bbt-point")
+      .map((el) => Number(el.getAttribute("data-bbt")));
+  }
+
+  function axis(): HTMLElement {
+    return screen.getByTestId("bbt-axis");
+  }
+
+  function axisBound(which: "data-min" | "data-max"): number {
+    return Number(axis().getAttribute(which));
+  }
+
+  it("plots stored Celsius values unchanged when Celsius is active", () => {
+    renderStrip(makeModel(), { showBbt: true });
+    // Day 14 holds 37.0 C; the default unit must not alter the plotted value.
+    expect(bbtValues()).toContain(37);
+    expect(axis()).toHaveAttribute("data-unit", "c");
+    expect(axisBound("data-min")).toBeCloseTo(36.2, 5);
+    expect(axisBound("data-max")).toBeCloseTo(37.3, 5);
+  });
+
+  it("converts the plotted values and rescales the axis for Fahrenheit", async () => {
+    await useAppStore.getState().updateSettings({ temperatureUnit: "f" });
+    renderStrip(makeModel(), { showBbt: true });
+
+    // 37.0 C is 98.6 F; the pad is unit-appropriate (0.36 F), not a fixed 0.2.
+    const day14 = screen
+      .getAllByTestId("overlay-bbt-point")
+      .find((el) => Number(el.getAttribute("data-day")) === 14);
+    expect(Number(day14?.getAttribute("data-bbt"))).toBeCloseTo(98.6, 5);
+    expect(axis()).toHaveAttribute("data-unit", "f");
+    expect(axisBound("data-min")).toBeCloseTo(97.52 - 0.36, 5);
+    expect(axisBound("data-max")).toBeCloseTo(98.78 + 0.36, 5);
+  });
+
+  it("labels the axis with its unit", async () => {
+    renderStrip(makeModel(), { showBbt: true });
+    expect(axis()).toHaveTextContent("°C");
+
+    cleanup();
+    await useAppStore.getState().updateSettings({ temperatureUnit: "f" });
+    renderStrip(makeModel(), { showBbt: true });
+    expect(axis()).toHaveTextContent("°F");
+  });
+
+  it("keeps the line inside the plot area after a unit change", async () => {
+    const model = makeModel();
+    renderStrip(model, { showBbt: true });
+    const celsiusMax = axisBound("data-max");
+
+    cleanup();
+    await useAppStore.getState().updateSettings({ temperatureUnit: "f" });
+    renderStrip(model, { showBbt: true });
+    const fahrenheitMax = axisBound("data-max");
+
+    // A rescaled axis is the point: the domain tracks the values, so the line
+    // cannot end up plotted outside the visible range.
+    const values = bbtValues();
+    expect(Math.max(...values)).toBeLessThanOrEqual(fahrenheitMax);
+    expect(Math.min(...values)).toBeGreaterThanOrEqual(axisBound("data-min"));
+    expect(fahrenheitMax).not.toBe(celsiusMax);
+  });
+
+  it("falls back to the usual range in the active unit when there are no readings", () => {
+    renderStrip(makeNoMucusOrSexModel(), { showBbt: true });
+    expect(axis()).toHaveAttribute("data-unit", "c");
+    expect(axis()).toHaveAttribute("data-min", "35");
+    expect(axis()).toHaveAttribute("data-max", "38");
+  });
+
+  it("falls back to the Fahrenheit usual range when Fahrenheit is active", async () => {
+    await useAppStore.getState().updateSettings({ temperatureUnit: "f" });
+    renderStrip(makeNoMucusOrSexModel(), { showBbt: true });
+    expect(axis()).toHaveAttribute("data-unit", "f");
+    expect(axis()).toHaveAttribute("data-min", "95");
+    expect(axis()).toHaveAttribute("data-max", "100.4");
+  });
+
+  it("widens the domain for a stored implausible value instead of clipping it", async () => {
+    const model = makeModel();
+    // A Fahrenheit value written into a Celsius field before validation existed.
+    model.days[14].bbt = 98.2;
+    renderStrip(model, { showBbt: true });
+
+    const max = axisBound("data-max");
+    expect(max).toBeGreaterThan(98.2);
+    expect(max).toBeLessThan(99);
+    expect(bbtValues()).toContain(98.2);
+  });
+
+  it("changes no stored value when the unit preference changes", async () => {
+    const { a } = await seedCycles();
+    const before = useAppStore.getState().dayRecords.map((r) => ({ id: r.id, bbt: r.bbt }));
+
+    await useAppStore.getState().updateSettings({ temperatureUnit: "f" });
+
+    expect(useAppStore.getState().dayRecords.map((r) => ({ id: r.id, bbt: r.bbt }))).toEqual(
+      before,
+    );
+    expect(a).toBeTruthy();
   });
 });

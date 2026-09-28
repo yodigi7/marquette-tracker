@@ -9,7 +9,9 @@ import {
   YAxis,
 } from "recharts";
 import type { ReactElement } from "react";
+import { useAppStore } from "@/core/store/useAppStore";
 import type { MucusLevel } from "@/core/engine/types";
+import { BBT_USUAL_C, bandIn, chartPad, convertFromCelsius, unitLabel } from "@/core/temperature";
 import { FERTILITY_FORECAST_VISUAL, FERTILITY_MONITOR_VISUALS } from "@/lib/fertility-visuals";
 import { bbtSeries, intercourseSeries, mucusSeries } from "./lib";
 import type { StripDay, StripModel, StripWindow } from "./lib";
@@ -29,6 +31,11 @@ const MUCUS_FILL: Record<MucusLevel, string> = {
 };
 
 const BBT_STROKE = "var(--fertility-overlay-bbt)";
+
+/** Axis ticks read better without a trailing ".0". */
+function trimAxisNumber(value: number): string {
+  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(1)));
+}
 
 /** Half-band pad keeps the first/last segments fully inside the plot area. */
 const X_PAD = 0.5;
@@ -139,6 +146,7 @@ export function StripChart({
   showBbt = false,
   showIntercourse = false,
 }: StripChartProps): ReactElement {
+  const unit = useAppStore((state) => state.settings.temperatureUnit);
   const span = Math.max(model.span, 1);
   const data: BandDatum[] = model.days.map((d) => ({
     day: d.day,
@@ -149,10 +157,18 @@ export function StripChart({
   const ticks = Array.from({ length: span }, (_, i) => i + 1);
   const xMax = span + X_PAD;
   const window = model.window;
-  const bbt = bbtSeries(model.days);
+  // Stored values are Celsius; plot them in whatever unit the user reads, and
+  // derive the axis from the plotted values so the line can never fall outside.
+  const bbt = bbtSeries(model.days).map((point) => ({
+    ...point,
+    bbt: convertFromCelsius(point.bbt, unit),
+  }));
   const bbtValues = bbt.map((p) => p.bbt);
+  const pad = chartPad(unit);
   const bbtDomain: [number, number] =
-    bbtValues.length > 0 ? [Math.min(...bbtValues) - 0.2, Math.max(...bbtValues) + 0.2] : [36, 37];
+    bbtValues.length > 0
+      ? [Math.min(...bbtValues) - pad, Math.max(...bbtValues) + pad]
+      : [bandIn(BBT_USUAL_C, unit).min, bandIn(BBT_USUAL_C, unit).max];
   // Distinct y lanes across the hidden [0,2] axis keep the two marker types from
   // overlapping: mucus rides the strip's top edge (y=1), intercourse sits lower in the strip.
   const mucus = mucusSeries(model.days).map((p) => ({
@@ -220,16 +236,34 @@ export function StripChart({
               />
             )}
             {showBbt && (
-              <YAxis
-                yAxisId="bbt"
-                orientation="right"
-                type="number"
-                dataKey="bbt"
-                domain={bbtDomain}
-                width={34}
-                tickLine={false}
-                tick={{ fontSize: 11 }}
-              />
+              <>
+                <YAxis
+                  yAxisId="bbt"
+                  orientation="right"
+                  type="number"
+                  dataKey="bbt"
+                  domain={bbtDomain}
+                  width={44}
+                  tickLine={false}
+                  tick={{ fontSize: 11 }}
+                  tickFormatter={(value: number) => `${trimAxisNumber(value)} ${unitLabel(unit)}`}
+                />
+                {/* The axis values are drawn by Recharts and are not queryable in
+                    every environment, so the domain and its unit are also exposed
+                    as text: it is the reading that makes the scale legible. */}
+                <text
+                  data-testid="bbt-axis"
+                  data-unit={unit}
+                  data-min={bbtDomain[0]}
+                  data-max={bbtDomain[1]}
+                  x="0"
+                  y="0"
+                  className="sr-only"
+                >
+                  Temperature axis in {unitLabel(unit)}, {bbtDomain[0]} to {bbtDomain[1]}{" "}
+                  {unitLabel(unit)}
+                </text>
+              </>
             )}
           </ComposedChart>
         </ResponsiveContainer>

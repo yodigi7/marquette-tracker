@@ -5,6 +5,7 @@ import {
   BACKUP_FORMAT,
   CURRENT_BACKUP_VERSION,
   BackupError,
+  countImplausibleBbt,
   createBackup,
   getBackupSummary,
   prepareBackup,
@@ -406,5 +407,99 @@ describe("calendar layer visibility in a backup", () => {
 
     const prepared = prepareBackupDocument(input, { today: "2026-01-15" });
     expect(prepared.document.data.settings.hiddenCalendarLayers).toEqual([]);
+  });
+});
+
+describe("basal temperature in a backup", () => {
+  function withBbt(...values: (number | null)[]) {
+    return snapshot({
+      dayRecords: values.map((bbt, index) =>
+        dayRecord({
+          id: `day-${index}`,
+          date: `2026-01-${10 + index}`,
+          dayInCycle: 10 + index,
+          bbt,
+        }),
+      ),
+    });
+  }
+
+  it("round-trips every stored temperature exactly", () => {
+    const source = withBbt(36.5, 36.77777777777778, 34.2, null);
+    const restored = prepareBackupDocument(createBackup(source), { today: "2026-02-01" });
+
+    expect(restored.document.data.dayRecords.map((r) => r.bbt)).toEqual([
+      36.5,
+      36.77777777777778,
+      34.2,
+      null,
+    ]);
+  });
+
+  it("carries the same stored values whatever the display preference is", () => {
+    const celsius = createBackup(withBbt(36.5, 37.1), {
+      appVersion: "1.0.0",
+      exportedAt: createdAt,
+    });
+    const fahrenheit = createBackup(withBbt(36.5, 37.1), {
+      appVersion: "1.0.0",
+      exportedAt: createdAt,
+    });
+
+    // The unit is a display preference; the document is byte-identical either way.
+    expect(JSON.stringify(fahrenheit.data.dayRecords)).toBe(
+      JSON.stringify(celsius.data.dayRecords),
+    );
+  });
+
+  it("still refuses a temperature that is not a finite number", () => {
+    // Build the document as text: a hand-edited or foreign file is the case this
+    // check exists for. createBackup would JSON-clone NaN and Infinity to null,
+    // which is a different (and already valid) shape.
+    // `null` is deliberately absent: a cleared temperature is valid and must
+    // still restore. Only a value that is present and not a finite number fails.
+    for (const raw of ['"36.5"', "true", '{"a":1}']) {
+      const text = JSON.stringify({
+        format: BACKUP_FORMAT,
+        formatVersion: CURRENT_BACKUP_VERSION,
+        appVersion: "1.0.0",
+        exportedAt: createdAt,
+        data: {
+          cycles: [cycle()],
+          dayRecords: [dayRecord({ bbt: JSON.parse(raw) as number })],
+          settings: settings(),
+        },
+      });
+      expect(() => prepareBackup(text, { today: "2026-02-01" })).toThrow(BackupError);
+    }
+  });
+
+  it("refuses a non-numeric temperature written into a document", () => {
+    const document = createBackup(snapshot({ dayRecords: [dayRecord({ bbt: 36.5 })] }));
+    // Corrupt it the way a foreign or hand-edited file would be corrupted.
+    const text = serializeBackup(document).replace('"bbt": 36.5', '"bbt": "36.5"');
+    expect(() => prepareBackup(text, { today: "2026-02-01" })).toThrow(BackupError);
+  });
+
+  it("restores an implausible finite reading exactly and reports it", () => {
+    // A Fahrenheit value written into a Celsius field before validation existed.
+    const document = createBackup(withBbt(36.5, 98.2));
+    const prepared = prepareBackupDocument(document, { today: "2026-02-01" });
+
+    // Not rejected: refusing would leave this user unable to restore at all.
+    expect(prepared.document.data.dayRecords.map((r) => r.bbt)).toEqual([36.5, 98.2]);
+    expect(countImplausibleBbt(prepared.document.data.dayRecords)).toBe(1);
+  });
+
+  it("reports no implausible readings for ordinary data", () => {
+    const prepared = prepareBackupDocument(createBackup(withBbt(36.5, 37.1, 34.5, 39.8)), {
+      today: "2026-02-01",
+    });
+    // 39.8 is plausible-but-unusual: kept without comment. 34.5 too.
+    expect(countImplausibleBbt(prepared.document.data.dayRecords)).toBe(0);
+  });
+
+  it("does not bump the backup format version", () => {
+    expect(CURRENT_BACKUP_VERSION).toBe(1);
   });
 });

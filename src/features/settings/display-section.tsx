@@ -1,5 +1,5 @@
 import { useAppStore } from "@/core/store/useAppStore";
-import type { WeekStart } from "@/core/store/entities";
+import type { TemperatureUnit, WeekStart } from "@/core/store/entities";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -13,6 +13,11 @@ import { NumberField } from "./number-field";
 const WEEK_START_OPTIONS: { value: WeekStart; label: string }[] = [
   { value: "monday", label: "Monday" },
   { value: "sunday", label: "Sunday" },
+];
+
+const TEMPERATURE_UNIT_OPTIONS: { value: TemperatureUnit; label: string }[] = [
+  { value: "c", label: "Celsius (°C)" },
+  { value: "f", label: "Fahrenheit (°F)" },
 ];
 
 const CYCLE_BAND_MIN = 15;
@@ -41,6 +46,29 @@ export function DisplaySection() {
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="settings-temperature-unit">Temperature unit</Label>
+        <Select
+          value={settings.temperatureUnit}
+          onValueChange={(value) => updateSettings({ temperatureUnit: value as TemperatureUnit })}
+        >
+          <SelectTrigger id="settings-temperature-unit" data-testid="settings-temperature-unit">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {TEMPERATURE_UNIT_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-sm text-stone-500">
+          The unit you enter and read temperatures in. Saved temperatures are always kept in Celsius
+          and converted for display, so switching this never changes a stored reading.
+        </p>
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2">

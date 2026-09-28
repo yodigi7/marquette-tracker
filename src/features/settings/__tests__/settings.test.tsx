@@ -139,3 +139,35 @@ describe("Calendar layer visibility has no second home", () => {
     expect(screen.getByTestId("display-settings").textContent).not.toMatch(/layer/i);
   });
 });
+
+describe("Temperature unit preference", () => {
+  it("offers the unit in the Display & protocol section, defaulting to Celsius", () => {
+    renderSettings();
+
+    const select = screen.getByTestId("settings-temperature-unit");
+    expect(select).toHaveTextContent("Celsius (°C)");
+    // It belongs with the other display preferences, not in Core or Danger.
+    expect(screen.getByTestId("display-settings")).toContainElement(select);
+  });
+
+  it("names the temperatures it affects", () => {
+    renderSettings();
+
+    expect(screen.getByText(/temperature unit/i)).toBeInTheDocument();
+    expect(screen.getByText(/enter and read temperatures in/i)).toBeInTheDocument();
+  });
+
+  it("persists the choice across a remount", async () => {
+    const user = userEvent.setup();
+    const first = renderSettings();
+
+    await user.click(screen.getByTestId("settings-temperature-unit"));
+    await user.click(await screen.findByRole("option", { name: "Fahrenheit (°F)" }));
+    await waitFor(() => expect(store().settings.temperatureUnit).toBe("f"));
+
+    first.unmount();
+    renderSettings();
+    await waitFor(() => expect(store().settings.temperatureUnit).toBe("f"));
+    expect(screen.getByTestId("settings-temperature-unit")).toHaveTextContent("Fahrenheit (°F)");
+  });
+});

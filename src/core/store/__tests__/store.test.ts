@@ -118,6 +118,62 @@ describe("store hydration", () => {
     expect(state(store).settings.projectFutureCycles).toBe(false);
   });
 
+  it("defaults the temperature unit to Celsius", async () => {
+    const { store } = setup();
+    await store.getState().hydrate();
+    expect(state(store).settings.temperatureUnit).toBe("c");
+  });
+
+  it("persists a temperature unit change across a restart", async () => {
+    const db = createDb();
+    const first = createAppStore(db);
+    await first.getState().hydrate();
+    expect(state(first).settings.temperatureUnit).toBe("c");
+
+    await first.getState().updateSettings({ temperatureUnit: "f" });
+
+    const second = createAppStore(db);
+    await second.getState().hydrate();
+    expect(state(second).settings.temperatureUnit).toBe("f");
+  });
+
+  it("fills a missing temperature unit from defaults for a legacy settings row", async () => {
+    const db = createDb();
+    const first = createAppStore(db);
+    await first.getState().hydrate();
+    const row = (await db.settings.get("main"))! as Partial<SettingsEntity>;
+    // A row written before the preference existed.
+    const { temperatureUnit: _absent, ...withoutUnit } = row as SettingsEntity;
+    await db.settings.put(withoutUnit as SettingsEntity);
+
+    const second = createAppStore(db);
+    await second.getState().hydrate();
+    expect(state(second).settings.temperatureUnit).toBe("c");
+  });
+
+  it("discards a stored temperature unit it does not recognise", async () => {
+    const db = createDb();
+    const first = createAppStore(db);
+    await first.getState().hydrate();
+    const row = (await db.settings.get("main"))!;
+    await db.settings.put({ ...row, temperatureUnit: "kelvin" } as unknown as SettingsEntity);
+
+    const second = createAppStore(db);
+    await second.getState().hydrate();
+    expect(state(second).settings.temperatureUnit).toBe("c");
+  });
+
+  it("changing the temperature unit writes no day record", async () => {
+    const { store } = setup();
+    await store.getState().hydrate();
+    await store.getState().addDayRecord("c1", "2026-01-05", 1, { bbt: 36.5 });
+    const before = state(store).dayRecords.map((r) => ({ id: r.id, bbt: r.bbt }));
+
+    await store.getState().updateSettings({ temperatureUnit: "f" });
+
+    expect(state(store).dayRecords.map((r) => ({ id: r.id, bbt: r.bbt }))).toEqual(before);
+  });
+
   it("persists a cycle projection change across a restart", async () => {
     const db = createDb();
     const first = createAppStore(db);

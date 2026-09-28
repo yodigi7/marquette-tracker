@@ -1385,3 +1385,155 @@ describe("Show all", () => {
     expect(store().dayRecords).toEqual(before);
   });
 });
+
+describe("Basal body temperature entry", () => {
+  function bbtField() {
+    return screen.getByTestId("bbt") as HTMLInputElement;
+  }
+
+  async function openEntryFor(dateKey: string) {
+    const user = userEvent.setup();
+    render(<CalendarView />);
+    await user.click(cellByDate(dateKey)!);
+    await screen.findByRole("dialog");
+    return user;
+  }
+
+  function coverDate() {
+    return dateKeyLocal(new Date(nowYear(), nowMonth(), 1));
+  }
+
+  it("labels, hints, and steps the field for the active unit", async () => {
+    await openEntryFor(coverDate());
+
+    expect(screen.getByText("BBT (°C)")).toBeInTheDocument();
+    expect(bbtField()).toHaveAttribute("step", "0.01");
+    expect(screen.getByTestId("bbt-hint")).toHaveTextContent("Usual range 35–38 °C");
+
+    await store().updateSettings({ temperatureUnit: "f" });
+
+    expect(screen.getByText("BBT (°F)")).toBeInTheDocument();
+    expect(bbtField()).toHaveAttribute("step", "0.1");
+    expect(screen.getByTestId("bbt-hint")).toHaveTextContent("Usual range 95–100.4 °F");
+  });
+
+  it("pre-populates an existing reading in the active unit without changing it", async () => {
+    const day1 = coverDate();
+    const cycle = await store().setNewCycle(day1);
+    await store().addDayRecord(cycle.id, day1, 1, { bbt: 36.5 });
+
+    await openEntryFor(day1);
+    expect(bbtField()).toHaveValue(36.5);
+
+    // Opening the form must not rewrite the stored value.
+    expect(store().dayRecords[0].bbt).toBe(36.5);
+
+    await store().updateSettings({ temperatureUnit: "f" });
+    expect(bbtField()).toHaveValue(97.7);
+    expect(store().dayRecords[0].bbt).toBe(36.5);
+  });
+
+  it("stores a Fahrenheit entry in Celsius", async () => {
+    const day1 = coverDate();
+    await store().setNewCycle(day1);
+    await store().updateSettings({ temperatureUnit: "f" });
+
+    const user = await openEntryFor(day1);
+    await user.type(bbtField(), "98.2");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(store().dayRecords).toHaveLength(1));
+    expect(store().dayRecords[0].bbt).toBeCloseTo(36.7778, 4);
+  });
+
+  it("refuses a Fahrenheit reading typed into a Celsius field and explains why", async () => {
+    const day1 = coverDate();
+    const cycle = await store().setNewCycle(day1);
+
+    const user = await openEntryFor(day1);
+    await user.type(bbtField(), "98.2");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText(/looks like a Fahrenheit reading/i)).toBeInTheDocument();
+    expect(screen.getByText(/36\.78/)).toBeInTheDocument();
+    // Nothing coerced, nothing stored, and the form stays editable.
+    expect(store().dayRecords).toHaveLength(0);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(bbtField()).toHaveValue(98.2);
+    expect(cycle.id).toBeTruthy();
+  });
+
+  it("refuses a value no person could have, without blaming either unit", async () => {
+    await openEntryFor(coverDate());
+    const user = userEvent.setup();
+
+    await user.type(bbtField(), "50");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText(/not a temperature a person could have/i)).toBeInTheDocument();
+    expect(store().dayRecords).toHaveLength(0);
+  });
+
+  it("saves an unusual-but-plausible reading only after it is confirmed", async () => {
+    const day1 = coverDate();
+    const cycle = await store().setNewCycle(day1);
+    const user = await openEntryFor(day1);
+
+    await user.type(bbtField(), "38.5");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    const warning = await screen.findByTestId("bbt-warning");
+    expect(warning).toHaveTextContent("outside the usual basal range");
+    expect(warning).toHaveTextContent("35–38 °C");
+    // Still nothing stored while the warning is up.
+    expect(store().dayRecords).toHaveLength(0);
+
+    await user.click(screen.getByRole("button", { name: "Save anyway" }));
+
+    await waitFor(() => expect(store().dayRecords).toHaveLength(1));
+    expect(store().dayRecords[0].bbt).toBeCloseTo(38.5, 5);
+    expect(store().dayRecords[0].cycleId).toBe(cycle.id);
+  });
+
+  it("stores nothing when the warning is dismissed", async () => {
+    const day1 = coverDate();
+    await store().setNewCycle(day1);
+    const user = await openEntryFor(day1);
+
+    await user.type(bbtField(), "34.5");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByTestId("bbt-warning");
+
+    await user.click(screen.getByRole("button", { name: "Keep editing" }));
+
+    expect(screen.queryByTestId("bbt-warning")).toBeNull();
+    expect(store().dayRecords).toHaveLength(0);
+    // The value is still there to correct rather than having been thrown away.
+    expect(bbtField()).toHaveValue(34.5);
+  });
+
+  it("clears the temperature when the field is emptied", async () => {
+    const day1 = coverDate();
+    const cycle = await store().setNewCycle(day1);
+    await store().addDayRecord(cycle.id, day1, 1, { bbt: 36.5 });
+
+    const user = await openEntryFor(day1);
+    await user.clear(bbtField());
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(store().dayRecords[0].bbt).toBeNull());
+  });
+
+  it("saves a usual reading with no warning", async () => {
+    const day1 = coverDate();
+    await store().setNewCycle(day1);
+    const user = await openEntryFor(day1);
+
+    await user.type(bbtField(), "36.7");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(store().dayRecords).toHaveLength(1));
+    expect(store().dayRecords[0].bbt).toBeCloseTo(36.7, 5);
+    expect(screen.queryByTestId("bbt-warning")).toBeNull();
+  });
+});

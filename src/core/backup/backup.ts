@@ -7,6 +7,7 @@ import {
   normalizeCalendarLayerIds,
   SETTINGS_KEY,
 } from "@/core/store/entities";
+import { isImplausibleCelsius } from "@/core/temperature";
 import { APP_VERSION } from "./version";
 import {
   BACKUP_FORMAT,
@@ -428,6 +429,20 @@ export function prepareBackupDocument(
   const document = normalizeDocument(migrated);
   validateDocument(document, options.today ?? todayKey());
   return { document, summary: getBackupSummary(document) };
+}
+
+/**
+ * Counts stored temperatures that are finite but outside the band a human body
+ * can produce — typically a Fahrenheit reading written into a Celsius field
+ * before the entry field validated anything.
+ *
+ * These are reported, never refused and never rewritten. Rejecting the document
+ * would leave a user holding a backup they cannot restore at all, which is a
+ * worse outcome than the corruption being fixed, and the issue's own non-goals
+ * rule out correcting existing values.
+ */
+export function countImplausibleBbt(records: DayRecordEntity[]): number {
+  return records.filter((record) => record.bbt != null && isImplausibleCelsius(record.bbt)).length;
 }
 
 export function prepareBackup(text: string, options: PrepareOptions = {}): PreparedBackup {
