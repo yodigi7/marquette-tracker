@@ -233,10 +233,17 @@ the selected date has not yet arrived, the view SHALL name the Peak's cycle day 
 count, because a count states that days have elapsed and a date still to come has none.
 
 The view SHALL NOT present a countdown to a Peak day, an expected single Peak day, or any single-day
-ovulation estimate. The view SHALL report the range of the earliest and latest monitor Peak days
-within the configured history window, labelled as derived from past cycles, and SHALL NOT present it as
-a prediction of a specific day. With interpretation disabled the view SHALL suppress both the count
-and the range, because both are derived output.
+ovulation estimate. The view SHALL report the range of the earliest and latest monitor **Peak days**
+within the configured history window — a cycle's Peak day being its first monitor Peak reading —
+labelled as derived from past cycles, and SHALL NOT present it as a prediction of a specific day. With
+interpretation disabled the view SHALL suppress both the count and the range, because both are derived
+output.
+
+The count and the range are drawn from different readings of the same cycle, and the view SHALL NOT
+present them as if they were the same measurement. The count measures from the cycle's last Peak
+reading because that is the reading its window's end came from; the range measures from each past
+cycle's first Peak reading because that is what the calendar rule was derived from. A cycle holding more
+than one monitor Peak reading SHALL have both readings named where the view names either.
 
 #### Scenario: Days since the Peak reading are reported
 
@@ -271,14 +278,14 @@ and the range, because both are derived output.
 
 - **GIVEN** a cycle with a monitor Peak reading on cycle day 12
 - **WHEN** the user opens Status for cycle day 8 of that cycle
-- **THEN** the view names cycle day 12 as that cycle's Peak reading
+- **THEN** the view names cycle day 12 as that cycle's Peak day
 - **AND** it displays no count of days in either direction
 
 #### Scenario: A date that has not happened yet shows no count
 
 - **GIVEN** a cycle with a monitor Peak reading on cycle day 11 and today on cycle day 15
 - **WHEN** the user selects a date in that cycle that is still in the future, such as cycle day 20
-- **THEN** the view names cycle day 11 as that cycle's Peak reading
+- **THEN** the view names cycle day 11 as that cycle's Peak day
 - **AND** it states that the selected date has not happened yet
 - **AND** it displays no count of elapsed days, because none of those days have elapsed
 
@@ -289,13 +296,21 @@ and the range, because both are derived output.
 - **THEN** the view reports an expected Peak day of cycle day 12 to 17
 - **AND** it states that the range comes from past cycles
 
+#### Scenario: The range is drawn from the first reading of each past cycle
+
+- **GIVEN** the closed cycles inside the configured history window hold monitor Peak readings on cycle
+  days 12 and 13, 16 and 17, 13 and 14, 14 and 15, 16 and 17, and 15 and 16
+- **WHEN** the user opens Status for a date in the current cycle
+- **THEN** the view reports an expected Peak day of cycle day 12 to 16
+- **AND** the later reading of each cycle's run does not widen it
+
 #### Scenario: The range follows the configured history window
 
 - **GIVEN** the configured history window is 6
 - **AND** the user has 10 closed cycles whose monitor Peak days include day 11
 - **WHEN** the user opens Status for a date in the current cycle
 - **THEN** the reported range is drawn from the monitor Peak days of the most recent 6 cycles only
-- **AND** the reported range is the one from which the displayed window begin and end were derived
+- **AND** the reported range is the one from which the displayed window begin was derived
 
 #### Scenario: The range is not a prediction of a specific day
 
