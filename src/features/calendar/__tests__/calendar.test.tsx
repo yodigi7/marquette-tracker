@@ -1,5 +1,5 @@
 import "fake-indexeddb/auto";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { addDays } from "@/core/engine/dateUtils";
@@ -14,6 +14,20 @@ import type { DayCellProps } from "../day-cell";
 import { windowEdgesByDay, type WindowEdges } from "../grid";
 import { CALENDAR_LAYERS, LAYER_PAINT } from "../layers";
 import { autoOpenStorageKey } from "../auto-open";
+
+/**
+ * The clock is pinned so this file cannot pass or fail on the day it runs.
+ *
+ * A great many tests here seed a cycle on the 1st of the current month and then log days 2, 3 and 4 of
+ * it. That is only a past record while today is later in the month, so early in any month the seeding
+ * throws `FutureDateError` and the test fails. Others depend on how much of the month is left for a
+ * projected cycle to occupy. Neither is a property of the Calendar.
+ *
+ * Midday on the 15th: the seeded days are comfortably in the past, and there is still half a month of
+ * future for the projection tests to work with. Only `Date` is faked, leaving real timers for
+ * `userEvent`.
+ */
+const PINNED_NOW = new Date(2026, 5, 15, 12, 0, 0);
 
 const store = () => useAppStore.getState();
 
@@ -35,12 +49,15 @@ function allowAutoOpen() {
 }
 
 beforeEach(async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(PINNED_NOW);
   await bootCurrentMonth();
   sessionStorage.setItem(autoOpenStorageKey(todayKey()), "consumed");
 });
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
 });
 
 describe("CalendarView", () => {
@@ -1546,11 +1563,17 @@ describe("legend layer controls", () => {
   it("removes the menses stripe from day cells without touching the record", async () => {
     const user = userEvent.setup();
     const today = todayKey();
-    const day1 = addDays(today, -20);
+    // Five days back rather than twenty: the Calendar renders one month at a time, so a day that far
+    // back can fall in the previous month, and then the cell this test looks up was never rendered at
+    // all. The missing cell returned `undefined` where the assertion expected `null`, which reads as a
+    // broken assertion rather than as "that day is not on screen". The test is about hiding a layer, so
+    // it seeds inside the displayed month and says nothing about navigation.
+    const day1 = addDays(today, -5);
     const cycle = await store().setNewCycle(day1);
     await store().addDayRecord(cycle.id, day1, 1, { bloodFlow: "medium" });
     render(<CalendarView />);
 
+    expect(cellByDate(day1), "the seeded day is on screen").not.toBeNull();
     const stripe = () => cellByDate(day1)?.querySelector('[data-testid="calendar-menses-stripe"]');
     expect(stripe()).not.toBeNull();
 
