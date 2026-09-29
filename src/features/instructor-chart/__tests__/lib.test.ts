@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { computeAll } from "@/core/engine/engineSdk";
 import type { DayRecordEntity } from "@/core/store/entities";
-import { ABSENT, NO_READING_LOGGED, buildInstructorChartModel } from "../lib";
+import { ABSENT, buildInstructorChartModel } from "../lib";
 
 /**
  * The chart model: cycle days across, observations down, evidence beside every calendar-rule claim.
@@ -201,6 +201,31 @@ describe("buildInstructorChartModel — rows", () => {
     expect(rowIds(m.cycles[1])).toContain("bbt");
   });
 
+  it("uses a short label for every row, now that a legend carries the vocabulary", () => {
+    // The label column is 80px on the sheet. These all fit it without wrapping, which is what lets the
+    // day columns have the width instead.
+    const m = model(
+      1,
+      [
+        rec("c1", 1, 1, { monitor: "low", bloodFlow: "medium", mucus: "low", bbt: 36.4 }),
+        rec("c1", 2, 1, { intercourse: true, pregnancyTest: "negative" }),
+      ],
+      { cycles: 6 },
+    );
+    const labels = m.cycles[0].rows.map((row) => row.label);
+
+    expect(labels).toEqual([
+      "Date",
+      "Menses",
+      "Monitor",
+      "Fertile",
+      "Mucus",
+      "Temp",
+      "Intercourse",
+      "Test",
+    ]);
+  });
+
   it("adds rows for every observation the cycle holds", () => {
     const m = model(
       1,
@@ -208,7 +233,6 @@ describe("buildInstructorChartModel — rows", () => {
         rec("c1", 1, 1, { monitor: "low" }),
         rec("c1", 5, 1, { mucus: "low", bbt: 36.4, intercourse: true }),
         rec("c1", 9, 1, { pregnancyTest: "negative" }),
-        rec("c1", 10, 1, { symptoms: ["headache"], notes: "slept badly" }),
       ],
       { cycles: 6 },
     );
@@ -221,9 +245,49 @@ describe("buildInstructorChartModel — rows", () => {
       "bbt",
       "intercourse",
       "pregnancy",
-      "symptoms",
-      "notes",
     ]);
+  });
+
+  it("keeps symptoms and notes out of the grid however much is logged", () => {
+    // Their values are unbounded, so a single long note would otherwise set the width of every column.
+    const m = model(
+      1,
+      [
+        rec("c1", 1, 1, { monitor: "low" }),
+        rec("c1", 5, 1, { symptoms: ["cramps", "breast tenderness", "fatigue"] }),
+        rec("c1", 6, 1, { notes: "slept badly" }),
+      ],
+      { cycles: 6 },
+    );
+    const ids = rowIds(m.cycles[0]);
+
+    expect(ids).not.toContain("symptoms");
+    expect(ids).not.toContain("notes");
+    // Nothing else was lost to make room for them.
+    expect(ids).toContain("monitor");
+  });
+
+  it("reports symptoms and notes once each in the prose list beneath the grid", () => {
+    const m = model(
+      1,
+      [
+        rec("c1", 5, 1, { symptoms: ["cramps"] }),
+        rec("c1", 6, 1, { symptoms: ["fatigue"], notes: "slept badly" }),
+        rec("c1", 7, 1, { notes: "long walk" }),
+      ],
+      { cycles: 6 },
+    );
+
+    expect(m.cycles[0].detailLines).toEqual([
+      "Day 5: cramps",
+      "Day 6: fatigue, slept badly",
+      "Day 7: long walk",
+    ]);
+  });
+
+  it("carries no prose list for a cycle with neither symptoms nor notes", () => {
+    const m = model(1, [rec("c1", 1, 1, { monitor: "low" })], { cycles: 6 });
+    expect(m.cycles[0].detailLines).toEqual([]);
   });
 
   it("shows an absence, never a value, for a day that records nothing for that row", () => {
@@ -251,12 +315,238 @@ describe("buildInstructorChartModel — rows", () => {
     expect(bbt.cells[1].text).not.toContain("36.4");
   });
 
-  it("names a day with no record as having no monitor reading logged", () => {
-    const m = model(1, [rec("c1", 1, 1, { monitor: "low" })], { cycles: 6 });
+  it("gives an untested day and a day with no record the same mark in the monitor row", () => {
+    // Both days mean "the monitor was not used here". Whether a record happened to exist for the day is
+    // an app internal and not a printed fact, so the chart draws one mark for both — and the mark stays,
+    // because an untested day breaks a run of High readings the engine counts.
+    const m = model(
+      1,
+      [rec("c1", 1, 1, { monitor: "low" }), rec("c1", 2, 1, { bloodFlow: "light" })],
+      { cycles: 6 },
+    );
     const monitor = m.cycles[0].rows.find((r) => r.id === "monitor")!;
-    expect(monitor.cells[0].text).toBe("Low");
-    // The monitor row states an unlogged day in words, so "no reading" is not mistaken for a gap.
-    expect(monitor.cells[1].text).toBe(NO_READING_LOGGED);
+
+    expect(monitor.cells[1].text).toBe(ABSENT);
+    expect(monitor.cells[2].text).toBe(ABSENT);
+    expect(monitor.cells[1].text).toBe(monitor.cells[2].text);
+  });
+
+  it("keeps a day with no record blank in the rows that make no claim about it", () => {
+    // The blank is "nothing was logged for this day at all", which stays distinct from the mark meaning
+    // something was logged and the field was left empty.
+    const m = model(
+      1,
+      [
+        rec("c1", 1, 1, { monitor: "low", bbt: 36.4, intercourse: true }),
+        rec("c1", 2, 1, { intercourse: false }),
+      ],
+      { cycles: 6 },
+    );
+    const intercourse = m.cycles[0].rows.find((r) => r.id === "intercourse")!;
+
+    expect(intercourse.cells[1].text).toBe(ABSENT);
+    expect(intercourse.cells[2].text).toBe("");
+    expect(intercourse.cells[2].empty).toBe(true);
+  });
+
+  it("marks an absence with one character, like every other mark", () => {
+    // The mark is a cell's whole content. A word here is what made the monitor row unreadable.
+    expect(ABSENT).toHaveLength(1);
+  });
+});
+
+describe("buildInstructorChartModel — the legend", () => {
+  it("names the mark for every row the chart carries", () => {
+    // The legend is derived from the rows, so it cannot drift from the grid it explains.
+    const m = model(
+      1,
+      [
+        rec("c1", 1, 1, { monitor: "low", bloodFlow: "medium" }),
+        rec("c1", 5, 1, { mucus: "low", intercourse: true, pregnancyTest: "negative" }),
+      ],
+      { cycles: 6 },
+    );
+    const marks = m.cycles[0].legend.map((entry) => `${entry.mark} ${entry.meaning}`);
+
+    // Each entry names its row, because the same character means different things in different rows:
+    // `L` is a monitor low on one row and a mucus low on another.
+    expect(marks).toContain("L Monitor low");
+    expect(marks).toContain("H Monitor high");
+    expect(marks).toContain("P Monitor peak");
+    expect(marks).toContain("1 Menses light");
+    expect(marks).toContain("2 Menses medium");
+    expect(marks).toContain("3 Menses heavy");
+    expect(marks).toContain("X Intercourse yes");
+    expect(marks).toContain("L Mucus low");
+    expect(marks).toContain("H Mucus high");
+    expect(marks).toContain("P Mucus peak");
+    expect(marks).toContain("+ Test positive");
+    expect(marks).toContain("- Test negative");
+  });
+
+  it("carries no entry for a mark the chart does not show", () => {
+    // A run with no pregnancy test has no pregnancy row, so it must not claim a pregnancy key.
+    const m = model(1, [rec("c1", 1, 1, { monitor: "low" })], { cycles: 6 });
+    const text = m.cycles[0].legend.map((entry) => entry.meaning).join(" ");
+
+    expect(rowIds(m.cycles[0])).not.toContain("pregnancy");
+    expect(text).not.toMatch(/test/);
+    expect(text).not.toMatch(/mucus/);
+  });
+
+  it("names the mark for a day the monitor was not used", () => {
+    const m = model(1, [rec("c1", 1, 1, { monitor: "low" })], { cycles: 6 });
+    const marks = m.cycles[0].legend.map((entry) => `${entry.mark} ${entry.meaning}`);
+
+    expect(marks).toContain("- Monitor not used");
+  });
+
+  it("carries no band entry with interpretation off", () => {
+    const m = model(1, [rec("c1", 1, 1, { monitor: "low" })], {
+      cycles: 6,
+      algorithmEnabled: false,
+    });
+    const text = m.cycles[0].legend.map((entry) => entry.meaning).join(" ");
+
+    expect(rowIds(m.cycles[0])).not.toContain("window");
+    expect(text).not.toMatch(/fertile/i);
+    // The recorded observations it still shows are still keyed.
+    expect(text).toMatch(/Monitor low/);
+  });
+
+  it("keys the fertile band by its fill rather than by a character", () => {
+    // The band is a filled cell, not a glyph, so it is described and not spelled out as a mark.
+    const m = model(1, [rec("c1", 1, 1, { monitor: "low" })], { cycles: 6 });
+    const entry = m.cycles[0].legend.find((item) => item.meaning.includes("fertile"));
+
+    expect(entry).toBeTruthy();
+    expect(entry!.meaning).toMatch(/shaded/i);
+  });
+});
+
+describe("buildInstructorChartModel — the short date", () => {
+  it("shows each day's month and day rather than the full date", () => {
+    // The full date was the widest cell in a typical cycle, so it set the width of every day column.
+    const m = model(1, [rec("c1", 1, 1, { monitor: "low" })], { cycles: 6 });
+    const date = m.cycles[0].rows.find((r) => r.id === "date")!;
+
+    expect(date.cells[0].text).toBe("1/1");
+    expect(date.cells[0].text).not.toContain("2026");
+  });
+
+  it("carries no leading zero", () => {
+    // The helper's first cycle opens on 1 January, so month 1 and day 8 are each a single digit.
+    const m = model(1, [rec("c1", 1, 1, { monitor: "low" })], { cycles: 6 });
+    const date = m.cycles[0].rows.find((r) => r.id === "date")!;
+
+    expect(date.cells[7].text).toBe("1/8");
+    expect(date.cells[8].text).toBe("1/9");
+  });
+
+  it("changes month across a month boundary without changing shape", () => {
+    // A cycle opening late in September runs into October, so the row has to show the change of month.
+    const output = computeAll(
+      [{ id: "c1", day1: "2026-09-20" }],
+      [],
+      { historyWindow: 6, cycleMinLength: 21, cycleMaxLength: 42 },
+      "2026-12-01",
+    );
+    const m = buildInstructorChartModel({
+      results: output.cycles,
+      records: [],
+      algorithmEnabled: true,
+      cycleCount: 6,
+    });
+    const date = m.cycles[0].rows.find((r) => r.id === "date")!;
+
+    expect(date.cells[0].text).toBe("9/20");
+    // Day 12 of a cycle opening on 20 September is 1 October.
+    expect(date.cells[11].text).toBe("10/1");
+  });
+});
+
+describe("buildInstructorChartModel — the cell vocabulary", () => {
+  it("marks each monitor reading with a single character", () => {
+    const m = model(
+      1,
+      [
+        rec("c1", 1, 1, { monitor: "low" }),
+        rec("c1", 2, 1, { monitor: "high" }),
+        rec("c1", 3, 1, { monitor: "peak" }),
+      ],
+      { cycles: 6 },
+    );
+    const monitor = m.cycles[0].rows.find((r) => r.id === "monitor")!;
+    expect(monitor.cells.slice(0, 3).map((c) => c.text)).toEqual(["L", "H", "P"]);
+    // One character each. The row is read as a pattern, so a word per cell defeats the point.
+    for (const cell of monitor.cells.slice(0, 3)) {
+      expect(cell.text).toHaveLength(1);
+    }
+  });
+
+  it("marks menses flow with a single character", () => {
+    const m = model(
+      1,
+      [
+        rec("c1", 1, 1, { bloodFlow: "light", monitor: "low" }),
+        rec("c1", 2, 1, { bloodFlow: "medium" }),
+        rec("c1", 3, 1, { bloodFlow: "heavy" }),
+      ],
+      { cycles: 6 },
+    );
+    const menses = m.cycles[0].rows.find((r) => r.id === "menses")!;
+    expect(menses.cells.slice(0, 3).map((c) => c.text)).toEqual(["1", "2", "3"]);
+  });
+
+  it("marks intercourse with a single character and a day without it with an absence", () => {
+    const m = model(
+      1,
+      [
+        rec("c1", 1, 1, { intercourse: true, monitor: "low" }),
+        rec("c1", 2, 1, { intercourse: false }),
+      ],
+      { cycles: 6 },
+    );
+    const row = m.cycles[0].rows.find((r) => r.id === "intercourse")!;
+    expect(row.cells[0].text).toBe("X");
+    // Intercourse was asked about and answered "no", which is an absence, not a blank.
+    expect(row.cells[1].text).toBe(ABSENT);
+  });
+
+  it("marks a pregnancy test result with a sign", () => {
+    const m = model(
+      1,
+      [
+        rec("c1", 5, 1, { pregnancyTest: "positive" }),
+        rec("c1", 6, 1, { pregnancyTest: "negative" }),
+      ],
+      { cycles: 6 },
+    );
+    const row = m.cycles[0].rows.find((r) => r.id === "pregnancy")!;
+    expect(row.cells[4].text).toBe("+");
+    expect(row.cells[5].text).toBe("-");
+  });
+
+  it("marks cervical mucus with the same letters as the monitor", () => {
+    // One vocabulary on the sheet. Leaving mucus spelled out would put a 34px cell back in the grid.
+    const m = model(
+      1,
+      [
+        rec("c1", 1, 1, { mucus: "low" }),
+        rec("c1", 2, 1, { mucus: "high" }),
+        rec("c1", 3, 1, { mucus: "peak" }),
+      ],
+      { cycles: 6 },
+    );
+    const row = m.cycles[0].rows.find((r) => r.id === "mucus")!;
+    expect(row.cells.slice(0, 3).map((c) => c.text)).toEqual(["L", "H", "P"]);
+  });
+
+  it("keeps the temperature as the number recorded", () => {
+    // The chart shows no derived value, so the number goes to paper exactly as it was stored.
+    const m = model(1, [rec("c1", 1, 1, { bbt: 36.4 })], { cycles: 6 });
+    const row = m.cycles[0].rows.find((r) => r.id === "bbt")!;
+    expect(row.cells[0].text).toBe("36.4");
   });
 });
 
@@ -331,10 +621,46 @@ describe("buildInstructorChartModel — evidence beside a calendar-rule claim", 
     const eight = m.cycles.find((c) => c.cycleNo === 8)!;
 
     expect(eight.evidence.map((e) => e.cycleNo)).toEqual([2, 3, 6]);
-    // Six cycles are charted, so cycles 3, 4 and 5 are on the page. Cycle 2 is not, and says so.
+    // Six cycles are charted, so cycles 3-6 are on the page and cycle 2 is not. Each entry says which.
     expect(eight.evidence.map((e) => e.charted)).toEqual([false, true, true]);
-    expect(eight.evidence[0].phrase).toMatch(/cycle 2 day 15 \(not on this chart\)/);
-    expect(eight.evidence[1].phrase).toMatch(/cycle 3 day 12 \(charted on this page\)/);
+    // The parenthetical is per-entry only when the run is mixed; the uniform case is annotated once.
+    expect(eight.evidenceLine).toBe(
+      "cycle 2 day 15 (not on this chart)  ·  cycle 3 day 12  ·  cycle 6 day 19",
+    );
+  });
+
+  it("annotates the whole line once when every contributing cycle is charted", () => {
+    // The default case, and the reason the line is compressed: six cycles of evidence used to repeat one
+    // parenthetical six times each, across six cycles.
+    const m = model(8, [peak("c3", 12, 3), peak("c5", 15, 5), peak("c6", 19, 6)], { cycles: 6 });
+    const eight = m.cycles.find((c) => c.cycleNo === 8)!;
+
+    expect(eight.evidence.every((e) => e.charted)).toBe(true);
+    expect(eight.evidenceLine).toBe(
+      "cycle 3 day 12  ·  cycle 5 day 15  ·  cycle 6 day 19 (all on this chart)",
+    );
+  });
+
+  it("annotates the whole line once when no contributing cycle is charted", () => {
+    const m = model(8, [peak("c2", 15, 2), peak("c3", 12, 3), peak("c6", 19, 6)], { cycles: 2 });
+    const eight = m.cycles.find((c) => c.cycleNo === 8)!;
+
+    expect(eight.evidence.every((e) => !e.charted)).toBe(true);
+    expect(eight.evidenceLine).toBe(
+      "cycle 2 day 15  ·  cycle 3 day 12  ·  cycle 6 day 19 (none on this chart)",
+    );
+  });
+
+  it("names every contributing Peak, cycle and day, whatever the annotation", () => {
+    // The requirement is that no claim on the page is one the reader cannot check, and that holds for
+    // every shape of the line.
+    const m = model(8, [peak("c2", 15, 2), peak("c3", 12, 3), peak("c6", 19, 6)], { cycles: 6 });
+    const eight = m.cycles.find((c) => c.cycleNo === 8)!;
+
+    expect(eight.evidence.map((e) => e.peakDay)).toEqual([15, 12, 19]);
+    expect(eight.evidenceLine).toMatch(/cycle 2 day 15/);
+    expect(eight.evidenceLine).toMatch(/cycle 3 day 12/);
+    expect(eight.evidenceLine).toMatch(/cycle 6 day 19/);
   });
 
   it("marks evidence from cycles the chart does not cover", () => {
@@ -350,11 +676,9 @@ describe("buildInstructorChartModel — evidence beside a calendar-rule claim", 
     expect(eight.evidence.every((e) => e.charted === false)).toBe(true);
     // The headline names the one number the rule turned on; the list carries the rest.
     expect(eight.beginNote).toMatch(/earliest Peak day 12, cycle 3/i);
-    expect(eight.evidence.map((e) => e.phrase)).toEqual([
-      "cycle 2 day 15 (not on this chart)",
-      "cycle 3 day 12 (not on this chart)",
-      "cycle 6 day 19 (not on this chart)",
-    ]);
+    expect(eight.evidenceLine).toBe(
+      "cycle 2 day 15  ·  cycle 3 day 12  ·  cycle 6 day 19 (none on this chart)",
+    );
   });
 
   it("says the rule had no Peak to use and prints no Peak day", () => {

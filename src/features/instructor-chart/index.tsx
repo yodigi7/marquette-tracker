@@ -93,8 +93,7 @@ export function InstructorChartView() {
           />
         </div>
         <p className="text-muted-foreground text-xs">
-          Printing hands the page to your browser — the app produces no file. Choose landscape if
-          your printer has it.
+          Printing hands the page to your browser — the app produces no file.
         </p>
       </div>
       <InstructorChartDocument

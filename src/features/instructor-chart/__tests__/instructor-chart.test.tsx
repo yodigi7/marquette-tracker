@@ -1,6 +1,6 @@
 import "fake-indexeddb/auto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { addDays } from "@/core/engine/dateUtils";
@@ -133,6 +133,18 @@ describe("InstructorChartView", () => {
     vi.unstubAllGlobals();
   });
 
+  it("offers no orientation advice, because the chart sets its own page", async () => {
+    await logCycles(3);
+    renderAt();
+
+    // The sheet claims a landscape page of its own, so telling the user to pick landscape would be
+    // advice for a document that no longer prints the way the user has to correct it.
+    const toolbar = await screen.findByTestId("chart-toolbar");
+    expect(toolbar).not.toHaveTextContent(/landscape/i);
+    // What the user still needs to know is unchanged.
+    expect(toolbar).toHaveTextContent(/no file/i);
+  });
+
   it("renders nothing but a route back when no cycles exist", async () => {
     renderAt();
 
@@ -168,11 +180,11 @@ describe("InstructorChartView", () => {
 
     const evidence = screen.getByTestId("chart-cycle-8-evidence");
     expect(evidence).toHaveTextContent(/Peak days used/i);
-    // The contributing cycles are named and each says it is not on this page.
-    expect(evidence).toHaveTextContent(/not on this chart/i);
+    // The contributing cycles are named, and the line says the run does not reach them.
+    expect(evidence).toHaveTextContent(/none on this chart/i);
   });
 
-  it("marks contributing Peaks as charted when the run covers the whole window", async () => {
+  it("marks only the uncharted entries when the run covers part of the window", async () => {
     const start = todayKey();
     for (let i = 0; i < 8; i++) {
       const day1 = addDays(start, -8 * 28 + i * 28);
@@ -180,9 +192,39 @@ describe("InstructorChartView", () => {
       await store().addDayRecord(cycle.id, day1, 1, { bloodFlow: "medium" });
       await store().addDayRecord(cycle.id, addDays(day1, 11), 12, { monitor: "peak" });
     }
+    // Six cycles charted, so cycles 3-8 are on the page while cycle 8's lookback reaches back to cycle 2.
     renderAt("/instructor-chart?cycles=6");
 
+    // A mixed line marks the entries that are off the page and leaves the rest bare, because those are
+    // the ones a reader has to notice.
     const evidence = await screen.findByTestId("chart-cycle-8-evidence");
-    expect(evidence).toHaveTextContent(/charted on this page/i);
+    expect(evidence).toHaveTextContent(/cycle 2 day 12 \(not on this chart\)/);
+    expect(evidence).toHaveTextContent(/cycle 7 day 12/);
+    // The uniform suffixes do not appear, because the run is neither wholly on nor wholly off the page.
+    expect(evidence).not.toHaveTextContent(/all on this chart/i);
+    expect(evidence).not.toHaveTextContent(/none on this chart/i);
+  });
+
+  it("prints a legend for the marks the chart uses", async () => {
+    await logCycles(3);
+    renderAt();
+
+    // The key has to reach the paper, so it is inside the sheet rather than the print-hidden toolbar.
+    const legend = within(screen.getByTestId("chart-sheet")).getByTestId("chart-legend");
+    expect(legend).toHaveTextContent(/monitor peak/i);
+    expect(legend).toHaveTextContent(/monitor not used/i);
+  });
+
+  it("prints no legend for the fertile band with interpretation off", async () => {
+    await store().updateSettings({ algorithmEnabled: false });
+    await logCycles(3);
+    renderAt();
+
+    await screen.findByTestId("chart-algorithm-off");
+    const legend = screen.getByTestId("chart-legend");
+    // The recorded observations are still keyed...
+    expect(legend).toHaveTextContent(/monitor peak/i);
+    // ...but the band is absent from the grid, so it is absent from the key.
+    expect(legend).not.toHaveTextContent(/fertile/i);
   });
 });

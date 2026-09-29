@@ -296,6 +296,20 @@
     }
 
     /*
+     * The instructor chart is the one document that wants landscape, and `@page` is document-level, so it
+     * cannot be scoped to a component — only to a named page. A grid of one column per cycle day runs
+     * 21 to 42 columns, which is wider than portrait A4 can hold at a readable size, so the chart is
+     * given its own page and everything else the app prints keeps the page above.
+     *
+     * Where a browser ignores named pages it falls back to the portrait page, which is why the chart's
+     * own rules carry the guarantee that no cycle day is lost rather than relying on this orientation.
+     */
+    @page chart {
+        size: landscape;
+        margin: 12mm;
+    }
+
+    /*
      * A dark-theme session must not print a dark sheet, including when the browser is set to print
      * background graphics. These two are the document's own page, not a component's.
      */
@@ -321,6 +335,11 @@
         --primary: #000000;
         --primary-foreground: #ffffff;
         --ring: #000000;
+    }
+
+    /* The chart sheet claims the landscape page declared above. */
+    .chart-page {
+        page: chart;
     }
 
     /*

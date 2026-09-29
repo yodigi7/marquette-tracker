@@ -1,5 +1,5 @@
 import type { DateKey } from "@/core/engine/types";
-import type { ChartCell, ChartCycle, InstructorChartModel } from "./lib";
+import type { ChartCell, ChartCycle, ChartLegendEntry, InstructorChartModel } from "./lib";
 
 /**
  * The printable chart: cycle days across, observations down, cycles stacked down the page.
@@ -31,7 +31,10 @@ export function InstructorChartDocument({
   return (
     <article
       data-testid="chart-sheet"
-      className="print-sheet bg-background text-foreground mx-auto w-full max-w-none space-y-4 p-4 text-sm print:p-0"
+      // `chart-page` is declared as a named page in the print rules, which is the only way to give one
+      // document a landscape page without giving every document the app prints one. Harmless on screen,
+      // and ignored outright by a browser without named-page support.
+      className="print-sheet chart-page bg-background text-foreground mx-auto w-full max-w-none space-y-4 p-4 text-sm print:p-0"
     >
       <header className="flex flex-wrap items-baseline justify-between gap-2 border-b pb-2">
         <h1 className="text-base font-semibold">Marquette Method — cycle chart</h1>
@@ -49,6 +52,8 @@ export function InstructorChartDocument({
         </p>
       ) : null}
 
+      <Legend model={model} />
+
       {!algorithmEnabled ? (
         <p data-testid="chart-algorithm-off" className="text-muted-foreground text-xs">
           Interpretation is off. These are your recorded readings only — the app has not marked a
@@ -64,6 +69,50 @@ export function InstructorChartDocument({
         model.cycles.map((cycle) => <CycleBlock key={cycle.cycleId} cycle={cycle} />)
       )}
     </article>
+  );
+}
+
+/**
+ * The key for the marks on the sheet.
+ *
+ * A character is only as good as the key beside it, and a key in the toolbar is no key at all once the
+ * page is in the printer. So the legend is printed, inside the sheet, from the model's own vocabulary.
+ * The rows differ cycle to cycle, so the key is the union of what the charted cycles actually show.
+ */
+function Legend({ model }: { model: InstructorChartModel }) {
+  const entries: ChartLegendEntry[] = [];
+  const seen = new Set<string>();
+  for (const cycle of model.cycles) {
+    for (const entry of cycle.legend) {
+      const key = `${entry.mark} ${entry.meaning}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      entries.push(entry);
+    }
+  }
+  if (entries.length === 0) return null;
+
+  return (
+    <p data-testid="chart-legend" className="text-muted-foreground text-xs leading-relaxed">
+      {entries.map((entry, index) => (
+        <span key={`${entry.mark}-${entry.meaning}-${index}`} className="mr-3 inline-block">
+          {entry.mark === "" ? (
+            <>
+              <span
+                aria-hidden="true"
+                className="bg-foreground print:bg-black mr-1 inline-block h-2 w-3 align-middle"
+              />
+              <span className="sr-only">Shaded cell: </span>
+            </>
+          ) : (
+            <>
+              <span className="font-semibold">{entry.mark}</span>{" "}
+            </>
+          )}
+          {entry.meaning}
+        </span>
+      ))}
+    </p>
   );
 }
 
@@ -98,8 +147,14 @@ function CycleBlock({ cycle }: { cycle: ChartCycle }) {
 
       <Grid cycle={cycle} />
 
-      {cycle.notes ? (
-        <p className="text-muted-foreground whitespace-pre-wrap text-xs">{cycle.notes}</p>
+      {cycle.detailLines.length > 0 ? (
+        <p
+          data-testid={`chart-cycle-${cycle.cycleNo}-detail`}
+          className="text-muted-foreground text-xs"
+        >
+          <span className="font-medium">Symptoms and notes: </span>
+          {cycle.detailLines.join("  ·  ")}
+        </p>
       ) : null}
     </section>
   );
@@ -136,10 +191,10 @@ function BeginLine({ cycle }: { cycle: ChartCycle }) {
         {cycle.beginNote}
         {cycle.evidenceNote ? ` ${cycle.evidenceNote}` : ""}
       </p>
-      {cycle.evidence.length > 0 ? (
+      {cycle.evidenceLine ? (
         <p data-testid={`chart-cycle-${cycle.cycleNo}-evidence`} className="text-xs">
           <span className="text-muted-foreground">Peak days used: </span>
-          {cycle.evidence.map((entry) => entry.phrase).join("  ·  ")}
+          {cycle.evidenceLine}
         </p>
       ) : null}
     </div>
@@ -151,11 +206,17 @@ function Grid({ cycle }: { cycle: ChartCycle }) {
     // The container scrolls on screen so a 28-day cycle is readable before printing. In print the
     // overflow is dropped by the print rules, so the table sits on the paper at its natural width.
     <div className="w-full overflow-x-auto" data-slot="table-container">
-      <table className="w-full border-collapse text-[10px] whitespace-nowrap">
+      <table
+        data-testid="chart-grid"
+        // Fixed layout is what makes the chart fit rather than happen to fit. The columns take
+        // their width from the page and share it equally, so every cycle day is the same width and
+        // no row can push the back half of a cycle off the paper.
+        className="w-full table-fixed border-collapse text-[10px] whitespace-nowrap"
+      >
         <caption className="sr-only">Cycle {cycle.cycleNo} readings by cycle day</caption>
         <thead>
           <tr>
-            <th scope="col" className="w-24 border-b px-1 py-0.5 text-left font-semibold">
+            <th scope="col" className="w-20 border-b px-1 py-0.5 text-left font-semibold">
               Day
             </th>
             {cycle.columns.map((column) => (
@@ -208,10 +269,16 @@ function Cell({ rowId, cell }: { rowId: string; cell: ChartCell }) {
   return (
     <td
       data-testid="chart-cell"
-      className="border-b px-0.5 py-0.5 text-center"
+      // A cell too narrow for its content elides it. That is the failure mode the fixed layout is
+      // built to contain: one shortened cell, never text running into the next cell and never a
+      // grid running off the page.
+      className="overflow-hidden text-ellipsis border-b px-0.5 py-0.5 text-center"
       data-empty={cell.empty ? "true" : "false"}
     >
       {cell.text}
+      {/* The row header already names the observation, so this carries only what the mark means. A
+          screen reader reads the pair as "Monitor, low" rather than as a bare "L". */}
+      {cell.spoken ? <span className="sr-only">{cell.spoken}</span> : null}
     </td>
   );
 }

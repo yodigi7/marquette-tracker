@@ -9,8 +9,13 @@ import type { DayRecordEntity } from "@/core/store/entities";
  * with no record renders, and what evidence a calendar-rule claim carries.
  */
 
-/** The marker for a day that holds a record which carries nothing for the row in question. */
-export const ABSENT = "—";
+/**
+ * The mark for a day that exists in the grid and holds nothing for the row in question.
+ *
+ * One character, like every other mark on the sheet. The gap against a day with no record at all — the
+ * blank — is the point: this says "logged, and the field was empty", that says "nothing was logged here".
+ */
+export const ABSENT = "-";
 
 /**
  * The longest grid the chart will draw for one cycle.
@@ -22,35 +27,82 @@ export const ABSENT = "—";
  */
 const HARD_MAX_CYCLE_DAYS = 60;
 
-export const MONITOR_LABELS: Record<NonNullable<DayRecordEntity["monitor"]>, string> = {
-  none: "No reading",
-  low: "Low",
-  high: "High",
-  peak: "Peak",
+/**
+ * The characters a cell prints.
+ *
+ * One character per mark, because a cycle day is a column a person scans down, and a word per cell makes
+ * the widest value in a row set the width of every column in it. Every mark below is ASCII or inside
+ * `U+2000-206F`, which is the whole of what the app's subsetted typeface covers — so the sheet is one
+ * typeface at one optical size, and no mark silently falls back to a system font.
+ */
+
+/** A monitor or mucus reading the app can actually hold. See `storedReading`. */
+export type StoredReading = "low" | "high" | "peak";
+
+/** A menses flow the app can actually hold. */
+export type StoredFlow = "light" | "medium" | "heavy";
+
+export const MONITOR_MARKS: Record<StoredReading, string> = { low: "L", high: "H", peak: "P" };
+
+export const MUCUS_MARKS: Record<StoredReading, string> = { low: "L", high: "H", peak: "P" };
+
+export const MENES_MARKS: Record<StoredFlow, string> = { light: "1", medium: "2", heavy: "3" };
+
+export const PREGNANCY_MARKS: Record<NonNullable<DayRecordEntity["pregnancyTest"]>, string> = {
+  negative: "-",
+  positive: "+",
 };
 
-export const MUCUS_LABELS: Record<NonNullable<DayRecordEntity["mucus"]>, string> = {
-  none: "None",
-  low: "Low",
-  high: "High",
-  peak: "Peak",
-};
+/** Intercourse, the standing convention on these charts and one character like every other mark. */
+export const INTERCOURSE_MARK = "X";
 
-export const BLOOD_FLOW_LABELS: Record<NonNullable<DayRecordEntity["bloodFlow"]>, string> = {
-  none: "",
-  light: "Light",
-  medium: "Medium",
-  heavy: "Heavy",
-};
+/**
+ * What each character a row prints stands for.
+ *
+ * One map per row, and the only place a mark is paired with its meaning. The printed legend and every
+ * cell's spoken value are both read off these, so a key cannot drift from the grid it explains and a cell
+ * cannot claim a meaning the legend does not carry.
+ */
+const PHRASES = {
+  monitor: { L: "low", H: "high", P: "peak", [ABSENT]: "not used" },
+  menses: { "1": "light", "2": "medium", "3": "heavy", [ABSENT]: "nothing recorded" },
+  mucus: { L: "low", H: "high", P: "peak", [ABSENT]: "nothing recorded" },
+  intercourse: { [INTERCOURSE_MARK]: "yes", [ABSENT]: "no" },
+  pregnancy: { "+": "positive", "-": "negative" },
+  bbt: { [ABSENT]: "nothing recorded" },
+} satisfies Record<string, Phrases>;
 
-export const PREGNANCY_LABELS: Record<NonNullable<DayRecordEntity["pregnancyTest"]>, string> = {
-  negative: "Negative",
-  positive: "Positive",
-};
+/**
+ * The reading a record actually holds, or `undefined` if it holds none.
+ *
+ * `"none"` is an option the entry dialog offers and then normalises away before saving, so it never
+ * reaches a record. It is named in the type, though, so reading it as a stored value would be a lie the
+ * grid then printed. Both `"none"` and absent are "not used" here, and the chart says so with one mark.
+ */
+function storedReading(value: DayRecordEntity["monitor"]): StoredReading | undefined {
+  return value === "low" || value === "high" || value === "peak" ? value : undefined;
+}
+
+/** The menses flow a record actually holds, or `undefined` if it holds none. */
+function storedFlow(value: DayRecordEntity["bloodFlow"]): StoredFlow | undefined {
+  return value === "light" || value === "medium" || value === "heavy" ? value : undefined;
+}
+
+/** What a row's characters mean. See `PHRASES`. */
+export type Phrases = Record<string, string>;
 
 export interface ChartCell {
-  /** The value as a word, the absent marker, or the empty string for a day with no record. */
+  /** The mark as printed: a character, the absence mark, or the empty string for a day with no record. */
   text: string;
+  /**
+   * What the mark stands for, in words, for assistive technology.
+   *
+   * A character on its own is unreadable without the key, and a screen-reader user should not have to
+   * find the legend to learn that `L` means low. The table's row headers already name the observation, so
+   * this carries only the value, and the two together read as "Monitor, low". Empty where there is
+   * nothing to announce: a blank cell, and the date row, whose mark is already a date.
+   */
+  spoken: string;
   /** True when nothing was recorded, so the grid can show a gap rather than a value. */
   empty: boolean;
   /** Window row only: true on a day the engine classifies fertile. */
@@ -66,6 +118,8 @@ export interface ChartRow {
   id: string;
   label: string;
   cells: ChartCell[];
+  /** What this row's characters stand for. The source for both the legend and every cell's `spoken`. */
+  phrases: Phrases;
 }
 
 /** One lookback Peak day, annotated with whether the cycle is charted on this page. */
@@ -92,9 +146,18 @@ export interface ChartCycle {
   beginNote: string | null;
   endNote: string | null;
   evidence: ChartEvidence[];
+  evidenceLine: string | null;
   evidenceNote: string | null;
   warningLines: string[];
-  notes: string | null;
+  /**
+   * What the cycle holds that does not fit a grid cell — symptoms and notes, one line per cycle day.
+   *
+   * These leave the grid because their length is unbounded, and a single long note would otherwise set
+   * the width of every day column in the cycle. Empty when the cycle holds neither.
+   */
+  detailLines: string[];
+  /** The key for the marks this cycle's grid uses. Derived from `rows`, never declared beside them. */
+  legend: ChartLegendEntry[];
 }
 
 export interface InstructorChartModel {
@@ -118,34 +181,54 @@ export interface ChartInput {
 /** The marker for a day that exists on the grid but holds no day record at all. */
 export const NO_RECORD = "";
 
-/** What a monitor cell says when the day holds no record. The row that carries readings says so in
- * words; every other row simply shows a gap, because "no record" there is not a statement about that
- * particular observation. */
-export const NO_READING_LOGGED = "No reading logged";
+/**
+ * A stored date as the chart prints it: month and day, no year, no leading zero.
+ *
+ * The full date was the widest cell in a typical cycle, so under the grid's own column sizing it set the
+ * width of every day column and pushed the back half of the cycle off the page. The year is not lost —
+ * each cycle prints its Day 1 in full on its own heading, and a run only crosses a year boundary inside a
+ * single cycle.
+ *
+ * The key is split rather than parsed into a `Date`, so the format cannot be moved by a timezone and the
+ * model stays free of any browser API.
+ */
+export function shortDate(date: DateKey): string {
+  // The year is dropped rather than parsed away, so there is nothing for a timezone to disagree about.
+  const [, month, day] = date.split("-");
+  return `${Number(month)}/${Number(day)}`;
+}
 
-/** An optional observation, and how to read it off a day record. */
-interface OptionalRow {
-  id: string;
-  label: string;
-  /** True when this day record carries a value for the row. */
-  present: (record: DayRecordEntity) => boolean;
-  /** The value as a word. Only called when `present` is true. */
-  text: (record: DayRecordEntity) => string;
+/** The text overrides `cellsFor` accepts for one row. */
+interface RowTextConfig {
   /** Text for a day holding a record that carries nothing for this row. */
   emptyText?: string;
   /** Text for a day holding no record at all. */
   noRecordText?: string;
 }
 
+/** An optional observation, and how to read it off a day record. */
+interface OptionalRow extends RowTextConfig {
+  id: string;
+  label: string;
+  /** What this row's characters stand for. See `PHRASES`. */
+  phrases: Phrases;
+  /** True when this day record carries a value for the row. */
+  present: (record: DayRecordEntity) => boolean;
+  /** The value as a mark. Only called when `present` is true. */
+  text: (record: DayRecordEntity) => string;
+}
+
 const OPTIONAL_ROWS: OptionalRow[] = [
   {
     id: "mucus",
-    label: "Cervical mucus",
-    present: (r) => r.mucus !== undefined,
-    text: (r) => MUCUS_LABELS[r.mucus!],
+    phrases: PHRASES.mucus,
+    label: "Mucus",
+    present: (r) => storedReading(r.mucus) !== undefined,
+    text: (r) => MUCUS_MARKS[storedReading(r.mucus)!],
   },
   {
     id: "bbt",
+    phrases: PHRASES.bbt,
     label: "Temp",
     present: (r) => r.bbt !== undefined && r.bbt !== null,
     // Canonical-unit value, shown as stored. The display-unit preference belongs to the app, not the
@@ -154,27 +237,18 @@ const OPTIONAL_ROWS: OptionalRow[] = [
   },
   {
     id: "intercourse",
+    phrases: PHRASES.intercourse,
     label: "Intercourse",
     present: (r) => r.intercourse !== undefined,
-    text: (r) => (r.intercourse ? "Yes" : "No"),
+    // An empty string means "asked and answered no", which `cellsFor` renders as the absence mark.
+    text: (r) => (r.intercourse ? INTERCOURSE_MARK : ""),
   },
   {
     id: "pregnancy",
-    label: "Pregnancy test",
+    phrases: PHRASES.pregnancy,
+    label: "Test",
     present: (r) => r.pregnancyTest !== undefined,
-    text: (r) => PREGNANCY_LABELS[r.pregnancyTest!],
-  },
-  {
-    id: "symptoms",
-    label: "Symptoms",
-    present: (r) => r.symptoms !== undefined && r.symptoms.length > 0,
-    text: (r) => (r.symptoms ?? []).join(", "),
-  },
-  {
-    id: "notes",
-    label: "Notes",
-    present: (r) => r.notes !== undefined && r.notes !== "",
-    text: (r) => r.notes ?? "",
+    text: (r) => PREGNANCY_MARKS[r.pregnancyTest!],
   },
 ];
 
@@ -220,6 +294,37 @@ export function buildInstructorChartModel({
   };
 }
 
+/** One line of the printed legend: the character a cell shows, and what it stands for. */
+export interface ChartLegendEntry {
+  mark: string;
+  meaning: string;
+}
+
+/**
+ * The legend for the rows this cycle actually carries.
+ *
+ * Read off the rows' own phrase maps, so the key is generated from the same source as the cells it
+ * explains and cannot disagree with them. A row that is not on the grid contributes no key, so a run
+ * with no pregnancy test never claims one.
+ */
+function legendFor(rows: ChartRow[]): ChartLegendEntry[] {
+  const entries: ChartLegendEntry[] = [];
+  const has = (id: string) => rows.some((row) => row.id === id);
+
+  for (const id of ["monitor", "menses", "mucus", "intercourse", "pregnancy", "bbt"] as const) {
+    if (!has(id)) continue;
+    const row = rows.find((item) => item.id === id)!;
+    for (const [mark, meaning] of Object.entries(row.phrases)) {
+      entries.push({ mark, meaning: `${row.label} ${meaning}` });
+    }
+  }
+  if (has("window")) {
+    // The band is a filled cell rather than a character, so it is described rather than spelled out.
+    entries.push({ mark: "", meaning: "shaded: fertile window" });
+  }
+  return entries;
+}
+
 function buildCycle({
   result,
   records,
@@ -240,46 +345,58 @@ function buildCycle({
   const cycleDays = result.days.slice(0, HARD_MAX_CYCLE_DAYS);
   const columns = cycleDays.map((day) => ({ day: day.day, date: day.date }));
 
-  const cellsFor = (pick: (record: DayRecordEntity) => string, config?: OptionalRow) =>
+  const cellsFor = (
+    pick: (record: DayRecordEntity) => string,
+    phrases: Phrases,
+    config?: RowTextConfig,
+  ) =>
     columns.map((column) => {
       const record = byDate.get(column.date);
       if (!record) {
-        return {
-          text: config?.noRecordText ?? NO_RECORD,
-          empty: true,
-          marked: false,
-        };
+        const text = config?.noRecordText ?? NO_RECORD;
+        return { text, spoken: phrases[text] ?? "", empty: true, marked: false };
       }
       const text = pick(record);
       const shown = text === "" ? (config?.emptyText ?? ABSENT) : text;
-      return { text: shown, empty: text === "", marked: false };
+      return { text: shown, spoken: phrases[shown] ?? "", empty: text === "", marked: false };
     });
 
   const rows: ChartRow[] = [
     {
       id: "date",
       label: "Date",
-      cells: columns.map((column) => ({ text: column.date, empty: false, marked: false })),
+      phrases: {},
+      // A date is already readable as itself, so it carries no spoken value of its own.
+      cells: columns.map((column) => ({
+        text: shortDate(column.date),
+        spoken: "",
+        empty: false,
+        marked: false,
+      })),
     },
     {
       id: "menses",
       label: "Menses",
-      cells: cellsFor((record) => BLOOD_FLOW_LABELS[record.bloodFlow ?? "none"] ?? ABSENT),
+      phrases: PHRASES.menses,
+      cells: cellsFor((record) => {
+        const flow = storedFlow(record.bloodFlow);
+        return flow === undefined ? "" : MENES_MARKS[flow];
+      }, PHRASES.menses),
     },
     {
-      // The row that carries readings states an unlogged day in words, because "no reading" is a
-      // statement about the monitor and not merely a gap in the grid.
+      // The row that carries readings fills a day it knows nothing about, because "the monitor was not
+      // used here" is a statement about the instrument rather than a hole in the grid. Every other row
+      // leaves the day blank, because a gap there is not a claim about that particular observation.
       id: "monitor",
       label: "Monitor",
+      phrases: PHRASES.monitor,
       cells: cellsFor(
-        (record) => (record.monitor === undefined ? "" : MONITOR_LABELS[record.monitor]),
-        {
-          id: "monitor",
-          label: "Monitor",
-          present: () => true,
-          text: () => "",
-          noRecordText: NO_READING_LOGGED,
+        (record) => {
+          const reading = storedReading(record.monitor);
+          return reading === undefined ? "" : MONITOR_MARKS[reading];
         },
+        PHRASES.monitor,
+        { noRecordText: ABSENT },
       ),
     },
   ];
@@ -296,9 +413,12 @@ function buildCycle({
     // still marked: the engine classifies every day of the cycle, logged or not.
     rows.push({
       id: "window",
-      label: "Fertile window",
+      label: "Fertile",
+      phrases: {},
+      // The band is announced from its own `sr-only` in the document, not from a mark.
       cells: cycleDays.map((day) => ({
         text: "",
+        spoken: "",
         empty: true,
         marked: day.status === "fertile",
       })),
@@ -314,13 +434,22 @@ function buildCycle({
     rows.push({
       id: optional.id,
       label: optional.label,
-      cells: cellsFor((record) => (optional.present(record) ? optional.text(record) : "")),
+      phrases: optional.phrases,
+      cells: cellsFor(
+        (record) => (optional.present(record) ? optional.text(record) : ""),
+        optional.phrases,
+      ),
     });
   }
 
-  const { beginNote, evidence, evidenceNote } = algorithmEnabled
+  const {
+    beginNote,
+    evidence,
+    evidenceLine: printedEvidence,
+    evidenceNote,
+  } = algorithmEnabled
     ? describeBegin(result, chartedNos)
-    : { beginNote: null, evidence: [] as ChartEvidence[], evidenceNote: null };
+    : { beginNote: null, evidence: [] as ChartEvidence[], evidenceLine: null, evidenceNote: null };
 
   return {
     cycleId: result.cycleId,
@@ -341,13 +470,30 @@ function buildCycle({
         ? "No end determined — the protocol sets the end from a Peak in this cycle, and it has none."
         : null,
     evidence,
+    evidenceLine: printedEvidence,
     evidenceNote,
     warningLines: algorithmEnabled ? warningLines(result.warnings) : [],
-    notes: records
-      .filter((record) => record.notes !== undefined && record.notes !== "")
-      .map((record) => `Day ${record.dayInCycle}: ${record.notes}`)
-      .join("\n"),
+    detailLines: detailLines(records),
+    legend: legendFor(rows),
   };
+}
+
+/**
+ * Symptoms and notes, one line per cycle day, for the prose list beneath the grid.
+ *
+ * A day holding both names both, joined, so the day is stated once. The value is the recorded text, never
+ * a summary of it, and a day with neither contributes no line at all.
+ */
+function detailLines(records: DayRecordEntity[]): string[] {
+  const lines: string[] = [];
+  for (const record of records) {
+    const parts: string[] = [];
+    const symptoms = (record.symptoms ?? []).filter((symptom) => symptom !== "");
+    if (symptoms.length > 0) parts.push(symptoms.join(", "));
+    if (record.notes !== undefined && record.notes !== "") parts.push(record.notes);
+    if (parts.length > 0) lines.push(`Day ${record.dayInCycle}: ${parts.join(", ")}`);
+  }
+  return lines;
 }
 
 /**
@@ -360,13 +506,19 @@ function buildCycle({
 function describeBegin(
   result: CycleResult,
   chartedNos: Set<number>,
-): { beginNote: string | null; evidence: ChartEvidence[]; evidenceNote: string | null } {
+): {
+  beginNote: string | null;
+  evidence: ChartEvidence[];
+  evidenceLine: string | null;
+  evidenceNote: string | null;
+} {
   const { beginRule, begin } = result.fertileWindow;
 
   if (beginRule === "first-high-or-peak") {
     return {
       beginNote: `Opened on a recorded reading — day ${begin}, the first High or Peak logged this cycle.`,
       evidence: [],
+      evidenceLine: null,
       evidenceNote: null,
     };
   }
@@ -375,6 +527,7 @@ function describeBegin(
     return {
       beginNote: `Opens on cycle day 6 — the calendar rule for the first six cycles.`,
       evidence: [],
+      evidenceLine: null,
       evidenceNote: null,
     };
   }
@@ -383,23 +536,21 @@ function describeBegin(
     return {
       beginNote: `Opens on cycle day 6 — the history window held no Peak to measure from, so the app fell back to the day-6 rule.`,
       evidence: [],
+      evidenceLine: null,
       evidenceNote:
         "No monitor Peak was available for the calendar rule to use, so no Peak day is claimed here.",
     };
   }
 
   // calendar-earliest-peak-minus-6: the rule that consumes the lookback window.
-  const evidence: ChartEvidence[] = result.lookbackPeaks.map((peak) => {
-    const charted = chartedNos.has(peak.cycleNo);
-    return {
-      cycleNo: peak.cycleNo,
-      peakDay: peak.peakDay,
-      charted,
-      phrase: `cycle ${peak.cycleNo} day ${peak.peakDay}${
-        charted ? " (charted on this page)" : " (not on this chart)"
-      }`,
-    };
-  });
+  const evidence: ChartEvidence[] = result.lookbackPeaks.map((peak) => ({
+    cycleNo: peak.cycleNo,
+    peakDay: peak.peakDay,
+    charted: chartedNos.has(peak.cycleNo),
+    // "cycle 3 day 12" — the entry names itself. Whether that cycle is on the page is stated once for
+    // the whole line when the run is uniform, so it is not repeated against every entry.
+    phrase: `cycle ${peak.cycleNo} day ${peak.peakDay}`,
+  }));
   const earliest = evidence.reduce<ChartEvidence | null>(
     (best, entry) => (best === null || entry.peakDay < best.peakDay ? entry : best),
     null,
@@ -416,8 +567,34 @@ function describeBegin(
   return {
     beginNote: head,
     evidence,
+    evidenceLine: evidenceLine(evidence),
     evidenceNote: null,
   };
+}
+
+/**
+ * The whole evidence list as one printed line.
+ *
+ * The run is usually all-charted or wholly uncharted, and saying so once per entry repeated one
+ * parenthetical six times per line, on six lines. A uniform run is annotated once at the end; a mixed one
+ * marks only the entries that are off the page, because those are the ones a reader has to notice.
+ */
+function evidenceLine(evidence: ChartEvidence[]): string | null {
+  if (evidence.length === 0) return null;
+  const onPage = evidence.filter((entry) => entry.charted);
+  const uniform = onPage.length === 0 || onPage.length === evidence.length;
+  const body = evidence
+    .map((entry) =>
+      uniform || entry.charted ? entry.phrase : `${entry.phrase} (not on this chart)`,
+    )
+    .join("  ·  ");
+  const suffix =
+    onPage.length === evidence.length
+      ? " (all on this chart)"
+      : onPage.length === 0
+        ? " (none on this chart)"
+        : "";
+  return `${body}${suffix}`;
 }
 
 /**

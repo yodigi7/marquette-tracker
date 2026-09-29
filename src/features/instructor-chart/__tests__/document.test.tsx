@@ -1,9 +1,41 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+import { SummaryDocument } from "@/features/cycle-summary/document";
+import type { SummaryModel } from "@/features/cycle-summary/lib";
 import { InstructorChartDocument } from "../document";
 import type { InstructorChartModel } from "../lib";
 
 afterEach(cleanup);
+
+/**
+ * The smallest real summary document. Only the sheet's own class is read here, so the rest is the
+ * smallest shape the component accepts.
+ */
+function summaryModel(): SummaryModel {
+  return {
+    cycleNo: 7,
+    day1: "2026-07-01",
+    firstDay: 1,
+    lastDay: 28,
+    open: false,
+    length: 28,
+    firstPeakDay: 12,
+    lastPeakDay: 13,
+    peakCount: 2,
+    window: null,
+    days: [],
+    columns: {
+      menses: true,
+      mucus: false,
+      bbt: false,
+      intercourse: false,
+      pregnancyTest: false,
+      symptoms: false,
+      notes: false,
+    },
+    warnings: [],
+  };
+}
 
 /**
  * The printed grid: cycle days across, observations down.
@@ -30,38 +62,42 @@ function model(overrides: Partial<InstructorChartModel> = {}): InstructorChartMo
         rows: [
           {
             id: "date",
+            phrases: {},
             label: "Date",
             cells: [
-              { text: "2026-07-01", empty: false, marked: false },
-              { text: "2026-07-02", empty: false, marked: false },
-              { text: "2026-07-03", empty: false, marked: false },
+              { text: "7/1", spoken: "", empty: false, marked: false },
+              { text: "7/2", spoken: "", empty: false, marked: false },
+              { text: "7/3", spoken: "", empty: false, marked: false },
             ],
           },
           {
             id: "menses",
+            phrases: { "-": "nothing recorded" },
             label: "Menses",
             cells: [
-              { text: "Medium", empty: false, marked: false },
-              { text: "—", empty: true, marked: false },
-              { text: "—", empty: true, marked: false },
+              { text: "2", spoken: "medium", empty: false, marked: false },
+              { text: "-", spoken: "nothing recorded", empty: true, marked: false },
+              { text: "-", spoken: "nothing recorded", empty: true, marked: false },
             ],
           },
           {
             id: "monitor",
+            phrases: { L: "low", H: "high", P: "peak", "-": "not used" },
             label: "Monitor",
             cells: [
-              { text: "Low", empty: false, marked: false },
-              { text: "Low", empty: false, marked: false },
-              { text: "High", empty: false, marked: false },
+              { text: "L", spoken: "low", empty: false, marked: false },
+              { text: "L", spoken: "low", empty: false, marked: false },
+              { text: "H", spoken: "high", empty: false, marked: false },
             ],
           },
           {
             id: "window",
-            label: "Fertile window",
+            phrases: {},
+            label: "Fertile",
             cells: [
-              { text: "", empty: true, marked: false },
-              { text: "", empty: true, marked: true },
-              { text: "", empty: true, marked: true },
+              { text: "", spoken: "", empty: true, marked: false },
+              { text: "", spoken: "", empty: true, marked: true },
+              { text: "", spoken: "", empty: true, marked: true },
             ],
           },
         ],
@@ -70,12 +106,21 @@ function model(overrides: Partial<InstructorChartModel> = {}): InstructorChartMo
         beginRule: "calendar-earliest-peak-minus-6",
         beginNote: "Opened by the calendar rule — earliest Peak day 8, cycle 3.",
         endNote: null,
-        evidence: [
-          { cycleNo: 3, peakDay: 8, charted: false, phrase: "cycle 3 day 8 (not on this chart)" },
-        ],
+        evidence: [{ cycleNo: 3, peakDay: 8, charted: false, phrase: "cycle 3 day 8" }],
+        evidenceLine: "cycle 3 day 8 (none on this chart)",
         evidenceNote: null,
         warningLines: [],
-        notes: null,
+        detailLines: [],
+        legend: [
+          { mark: "L", meaning: "monitor low" },
+          { mark: "H", meaning: "monitor high" },
+          { mark: "P", meaning: "monitor peak" },
+          { mark: "-", meaning: "monitor not used" },
+          { mark: "1", meaning: "Menses light" },
+          { mark: "2", meaning: "Menses medium" },
+          { mark: "3", meaning: "Menses heavy" },
+          { mark: "", meaning: "shaded: fertile window" },
+        ],
       },
     ],
     requestedCycles: 6,
@@ -98,9 +143,29 @@ describe("InstructorChartDocument", () => {
   it("gives each observation its own labelled row", () => {
     render(<InstructorChartDocument model={model()} generatedOn="2026-09-28" algorithmEnabled />);
     const grid = screen.getByTestId("chart-cycle-7");
-    for (const label of ["Date", "Menses", "Monitor", "Fertile window"]) {
-      expect(within(grid).getByText(label)).toBeTruthy();
-    }
+    // The row labels themselves, not every element carrying the word: a marked window cell also says
+    // "Fertile" for assistive technology.
+    const labels = within(grid)
+      .getAllByRole("rowheader")
+      .map((cell) => cell.textContent);
+    expect(labels).toEqual(["Date", "Menses", "Monitor", "Fertile"]);
+  });
+
+  it("carries a character for every monitor reading, so colour is never the only cue", () => {
+    render(<InstructorChartDocument model={model()} generatedOn="2026-09-28" algorithmEnabled />);
+    const grid = screen.getByTestId("chart-cycle-7");
+    // Two Lows on day 1 and 2, one High on day 3 — one character each, keyed by the printed legend.
+    expect(within(grid).getAllByText("L")).toHaveLength(2);
+    expect(within(grid).getByText("H")).toBeTruthy();
+    // No cell holds a spelled-out reading any more.
+    expect(within(grid).queryByText("Low")).toBeNull();
+    expect(within(grid).queryByText("High")).toBeNull();
+  });
+
+  it("prints the date row in short form", () => {
+    render(<InstructorChartDocument model={model()} generatedOn="2026-09-28" algorithmEnabled />);
+    const grid = screen.getByTestId("chart-cycle-7");
+    expect(within(grid).getAllByText("7/1").length).toBeGreaterThan(0);
   });
 
   it("marks the fertile days and leaves the rest unmarked", () => {
@@ -109,12 +174,110 @@ describe("InstructorChartDocument", () => {
     expect(marks.map((m) => m.getAttribute("data-marked"))).toEqual(["false", "true", "true"]);
   });
 
-  it("carries a word for every monitor reading, so colour is never the only cue", () => {
+  it("prints a legend for the marks the chart uses, on the sheet itself", () => {
     render(<InstructorChartDocument model={model()} generatedOn="2026-09-28" algorithmEnabled />);
-    const grid = screen.getByTestId("chart-cycle-7");
-    // Two Lows on day 1 and 2, one High on day 3 — all words, never a colour alone.
-    expect(within(grid).getAllByText("Low")).toHaveLength(2);
-    expect(within(grid).getByText("High")).toBeTruthy();
+    // The key has to reach the paper, so it lives inside the sheet rather than in the print-hidden chrome.
+    const legend = within(screen.getByTestId("chart-sheet")).getByTestId("chart-legend");
+
+    expect(legend).toHaveTextContent("monitor low");
+    expect(legend).toHaveTextContent("monitor not used");
+    expect(legend).toHaveTextContent("Menses medium");
+    expect(legend).toHaveTextContent("shaded");
+  });
+
+  it("prints no legend when the model carries none", () => {
+    const bare = model();
+    bare.cycles[0].legend = [];
+    render(<InstructorChartDocument model={bare} generatedOn="2026-09-28" algorithmEnabled />);
+    expect(screen.queryByTestId("chart-legend")).toBeNull();
+  });
+
+  it("puts the grid on a fixed layout so no row can widen it past the page", () => {
+    render(<InstructorChartDocument model={model()} generatedOn="2026-09-28" algorithmEnabled />);
+    const table = within(screen.getByTestId("chart-cycle-7")).getByTestId("chart-grid");
+
+    // Fixed layout is the guarantee: the table is the printable width and every day column is the same
+    // width, whatever any cell in it contains.
+    expect(table.className).toContain("table-fixed");
+    expect(table.className).toContain("w-full");
+  });
+
+  it("clips a cell's own content rather than letting it run into its neighbour", () => {
+    render(<InstructorChartDocument model={model()} generatedOn="2026-09-28" algorithmEnabled />);
+    const cells = screen.getAllByTestId("chart-cell");
+
+    for (const cell of cells) {
+      expect(cell.className).toContain("overflow-hidden");
+      expect(cell.className).toContain("text-ellipsis");
+    }
+  });
+
+  it("prints symptoms and notes once each beneath the grid", () => {
+    const withDetail = model();
+    withDetail.cycles[0].detailLines = ["Day 5: cramps", "Day 6: slept badly"];
+    render(
+      <InstructorChartDocument model={withDetail} generatedOn="2026-09-28" algorithmEnabled />,
+    );
+
+    const detail = screen.getByTestId("chart-cycle-7-detail");
+    expect(detail).toHaveTextContent("Day 5: cramps");
+    expect(detail).toHaveTextContent("Day 6: slept badly");
+  });
+
+  it("prints no detail list for a cycle holding neither", () => {
+    render(<InstructorChartDocument model={model()} generatedOn="2026-09-28" algorithmEnabled />);
+    expect(screen.queryByTestId("chart-cycle-7-detail")).toBeNull();
+  });
+
+  it("prints the evidence line the model composed", () => {
+    render(<InstructorChartDocument model={model()} generatedOn="2026-09-28" algorithmEnabled />);
+    const evidence = screen.getByTestId("chart-cycle-7-evidence");
+
+    // Every contributing Peak is named, and the charted status is stated once for the whole line.
+    expect(evidence).toHaveTextContent(/Peak days used/i);
+    expect(evidence).toHaveTextContent("cycle 3 day 8");
+    expect(evidence).toHaveTextContent(/none on this chart/i);
+  });
+
+  it("gives every mark a spoken value, so a character is never the only way to read it", () => {
+    render(<InstructorChartDocument model={model()} generatedOn="2026-09-28" algorithmEnabled />);
+    const cells = screen.getAllByTestId("chart-cell");
+
+    // The row header names the observation, so the cell only has to carry what the mark means. A
+    // screen reader reads the pair as "Monitor, low" rather than as a bare "L".
+    const spoken = cells.map((cell) => cell.textContent);
+    expect(spoken).toContain("Llow");
+    expect(spoken).toContain("Hhigh");
+    expect(spoken).toContain("2medium");
+  });
+
+  it("leaves a blank cell and a date saying nothing, because there is nothing to announce", () => {
+    render(<InstructorChartDocument model={model()} generatedOn="2026-09-28" algorithmEnabled />);
+    const cells = screen.getAllByTestId("chart-cell");
+
+    // The absence mark is announced, so "no reading" is not mistaken for a gap...
+    expect(cells.filter((cell) => cell.textContent === "-nothing recorded").length).toBe(2);
+    // ...and a date is already readable as itself.
+    expect(cells.filter((cell) => cell.textContent === "7/1").length).toBe(1);
+  });
+
+  it("claims the landscape page it declares, rather than changing every document's page", () => {
+    // `@page` is document-level, so the chart reaches landscape through a named page instead of
+    // reflowing every other document the app prints.
+    render(<InstructorChartDocument model={model()} generatedOn="2026-09-28" algorithmEnabled />);
+    expect(screen.getByTestId("chart-sheet").className).toContain("chart-page");
+
+    // The single-cycle summary is the other printable document, and it is prose: landscape would give it
+    // ten-inch lines. It shares the print tokens but must not claim the chart's page.
+    render(
+      <SummaryDocument
+        model={summaryModel()}
+        generatedOn="2026-09-28"
+        cycleNotes={null}
+        algorithmEnabled
+      />,
+    );
+    expect(screen.getByTestId("summary-sheet").className).not.toContain("chart-page");
   });
 
   it("carries the print-sheet class so the print rules find it", () => {
@@ -157,11 +320,11 @@ describe("InstructorChartDocument", () => {
     expect(begin.textContent).toMatch(/calendar rule/i);
     // The claim names the one number it turned on...
     expect(begin.textContent).toMatch(/earliest Peak day 8, cycle 3/i);
-
-    // ...and the evidence line lists every contributing Peak, saying which cycle is on this page.
+    // ...and the evidence line lists every contributing Peak, saying which cycles are on the page.
     const evidence = screen.getByTestId("chart-cycle-7-evidence");
     expect(evidence.textContent).toMatch(/Peak days used/i);
-    expect(evidence.textContent).toMatch(/cycle 3 day 8 \(not on this chart\)/);
+    expect(evidence.textContent).toMatch(/cycle 3 day 8/);
+    expect(evidence.textContent).toMatch(/none on this chart/i);
   });
 
   it("states the window's days", () => {
