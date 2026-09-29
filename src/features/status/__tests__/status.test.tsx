@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { addDays } from "@/core/engine/dateUtils";
-import { parseDateKey, todayKey } from "@/core/dateKeys";
+import { dateKeyLocal, parseDateKey, todayKey } from "@/core/dateKeys";
 import { useAppStore } from "@/core/store/useAppStore";
 import { StatusView } from "../index";
 
@@ -704,6 +704,13 @@ async function pickDateButton(
   iso: string,
 ): Promise<HTMLElement | null> {
   const target = parseDateKey(iso).getTime();
+
+  // A date like "2026-02-30" parses to a valid Date (March 2) via rollover, so the
+  // cell is never found and the loop pages through every month before giving up.
+  // Detect the rollover and return null immediately instead.
+  if (Number.isNaN(target) || dateKeyLocal(parseDateKey(iso)) !== iso) {
+    return null;
+  }
 
   for (let step = 0; step < MONTH_PAGING_STEPS; step++) {
     const cell = document.querySelector(`[data-day="${iso}"]`);
