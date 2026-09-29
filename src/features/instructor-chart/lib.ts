@@ -1,5 +1,6 @@
 import type { BeginRule, CycleResult, DateKey, EngineWarning } from "@/core/engine/types";
 import type { DayRecordEntity } from "@/core/store/entities";
+import { FERTILITY_CHART_TINTS } from "@/lib/fertility-visuals";
 
 /**
  * The instructor chart's model: cycle days across, observations down, evidence beside every claim.
@@ -12,10 +13,15 @@ import type { DayRecordEntity } from "@/core/store/entities";
 /**
  * The mark for a day that exists in the grid and holds nothing for the row in question.
  *
- * One character, like every other mark on the sheet. The gap against a day with no record at all — the
- * blank — is the point: this says "logged, and the field was empty", that says "nothing was logged here".
+ * One character, like every other mark, and deliberately not `-`: a test result legitimately prints `-`
+ * for negative, and the absence mark appears in every row, so it is the one that must not be ambiguous.
+ * A middot is inside the typeface's covered range, is the quietest mark available, and sits on the centre
+ * line where a cell's content sits, rather than on the baseline where punctuation sits.
+ *
+ * The gap against a day with no record at all — the blank — is the point: this says "logged, and the field
+ * was empty", that says "nothing was logged here".
  */
-export const ABSENT = "-";
+export const ABSENT = "·";
 
 /**
  * The longest grid the chart will draw for one cycle.
@@ -63,14 +69,45 @@ export const INTERCOURSE_MARK = "X";
  * cell's spoken value are both read off these, so a key cannot drift from the grid it explains and a cell
  * cannot claim a meaning the legend does not carry.
  */
-const PHRASES = {
-  monitor: { L: "low", H: "high", P: "peak", [ABSENT]: "not used" },
-  menses: { "1": "light", "2": "medium", "3": "heavy", [ABSENT]: "nothing recorded" },
-  mucus: { L: "low", H: "high", P: "peak", [ABSENT]: "nothing recorded" },
-  intercourse: { [INTERCOURSE_MARK]: "yes", [ABSENT]: "no" },
-  pregnancy: { "+": "positive", "-": "negative" },
-  bbt: { [ABSENT]: "nothing recorded" },
-} satisfies Record<string, Phrases>;
+const PHRASES: Record<string, Phrases> = {
+  // Each reading carries the tint the app already paints that reading with on the Calendar, so a mark
+  // means the same thing in the same colour wherever the reader meets it.
+  monitor: {
+    L: { meaning: "low", tint: FERTILITY_CHART_TINTS.monitorLow },
+    H: { meaning: "high", tint: FERTILITY_CHART_TINTS.monitorHigh },
+    P: { meaning: "peak", tint: FERTILITY_CHART_TINTS.monitorPeak },
+    [ABSENT]: { meaning: "monitor not used", tint: "" },
+  },
+  menses: {
+    "1": { meaning: "light", tint: FERTILITY_CHART_TINTS.menses },
+    "2": { meaning: "medium", tint: FERTILITY_CHART_TINTS.menses },
+    "3": { meaning: "heavy", tint: FERTILITY_CHART_TINTS.menses },
+    [ABSENT]: { meaning: "nothing recorded", tint: "" },
+  },
+  mucus: {
+    L: { meaning: "low", tint: FERTILITY_CHART_TINTS.monitorLow },
+    H: { meaning: "high", tint: FERTILITY_CHART_TINTS.monitorHigh },
+    P: { meaning: "peak", tint: FERTILITY_CHART_TINTS.monitorPeak },
+    [ABSENT]: { meaning: "nothing recorded", tint: "" },
+  },
+  intercourse: {
+    [INTERCOURSE_MARK]: { meaning: "yes", tint: "" },
+    [ABSENT]: { meaning: "no", tint: "" },
+  },
+  pregnancy: {
+    "+": { meaning: "positive", tint: "" },
+    "-": { meaning: "negative", tint: "" },
+  },
+  bbt: { [ABSENT]: { meaning: "nothing recorded", tint: "" } },
+};
+
+/**
+ * What the absence mark says, for the legend.
+ *
+ * It is the one mark every row shares, and it is also how an unmarked cell looks, so the key describes it
+ * once for the sheet rather than repeating it against every row's other characters.
+ */
+const ABSENT_MEANING = "logged, nothing recorded";
 
 /**
  * The reading a record actually holds, or `undefined` if it holds none.
@@ -88,8 +125,15 @@ function storedFlow(value: DayRecordEntity["bloodFlow"]): StoredFlow | undefined
   return value === "light" || value === "medium" || value === "heavy" ? value : undefined;
 }
 
+/** What one character of a row means, and the tint its cell carries. */
+export interface ChartPhrase {
+  meaning: string;
+  /** A class the document applies to the cell. Empty when the cell needs no tint. */
+  tint: string;
+}
+
 /** What a row's characters mean. See `PHRASES`. */
-export type Phrases = Record<string, string>;
+export type Phrases = Record<string, ChartPhrase>;
 
 export interface ChartCell {
   /** The mark as printed: a character, the absence mark, or the empty string for a day with no record. */
@@ -103,6 +147,8 @@ export interface ChartCell {
    * nothing to announce: a blank cell, and the date row, whose mark is already a date.
    */
   spoken: string;
+  /** A class the document applies to tint the cell. Empty when the cell needs none. */
+  tint: string;
   /** True when nothing was recorded, so the grid can show a gap rather than a value. */
   empty: boolean;
   /** Window row only: true on a day the engine classifies fertile. */
@@ -198,16 +244,8 @@ export function shortDate(date: DateKey): string {
   return `${Number(month)}/${Number(day)}`;
 }
 
-/** The text overrides `cellsFor` accepts for one row. */
-interface RowTextConfig {
-  /** Text for a day holding a record that carries nothing for this row. */
-  emptyText?: string;
-  /** Text for a day holding no record at all. */
-  noRecordText?: string;
-}
-
 /** An optional observation, and how to read it off a day record. */
-interface OptionalRow extends RowTextConfig {
+interface OptionalRow {
   id: string;
   label: string;
   /** What this row's characters stand for. See `PHRASES`. */
@@ -315,13 +353,15 @@ function legendFor(rows: ChartRow[]): ChartLegendEntry[] {
     if (!has(id)) continue;
     const row = rows.find((item) => item.id === id)!;
     for (const [mark, meaning] of Object.entries(row.phrases)) {
-      entries.push({ mark, meaning: `${row.label} ${meaning}` });
+      if (mark === ABSENT) continue;
+      entries.push({ mark, meaning: `${row.label} ${meaning.meaning}` });
     }
   }
   if (has("window")) {
     // The band is a filled cell rather than a character, so it is described rather than spelled out.
     entries.push({ mark: "", meaning: "shaded: fertile window" });
   }
+  entries.push({ mark: ABSENT, meaning: ABSENT_MEANING });
   return entries;
 }
 
@@ -345,20 +385,25 @@ function buildCycle({
   const cycleDays = result.days.slice(0, HARD_MAX_CYCLE_DAYS);
   const columns = cycleDays.map((day) => ({ day: day.day, date: day.date }));
 
-  const cellsFor = (
-    pick: (record: DayRecordEntity) => string,
-    phrases: Phrases,
-    config?: RowTextConfig,
-  ) =>
+  // Two absences, and they mean different things: a day with no record at all is blank, because nothing
+  // was logged for it, while a day that was logged without a value for this row carries the mark. Every
+  // row on the sheet follows this one rule, the monitor row included.
+  const cellsFor = (pick: (record: DayRecordEntity) => string, phrases: Phrases) =>
     columns.map((column) => {
       const record = byDate.get(column.date);
       if (!record) {
-        const text = config?.noRecordText ?? NO_RECORD;
-        return { text, spoken: phrases[text] ?? "", empty: true, marked: false };
+        return { text: NO_RECORD, spoken: "", tint: "", empty: true, marked: false };
       }
       const text = pick(record);
-      const shown = text === "" ? (config?.emptyText ?? ABSENT) : text;
-      return { text: shown, spoken: phrases[shown] ?? "", empty: text === "", marked: false };
+      const shown = text === "" ? ABSENT : text;
+      const phrase = phrases[shown];
+      return {
+        text: shown,
+        spoken: phrase?.meaning ?? "",
+        tint: phrase?.tint ?? "",
+        empty: text === "",
+        marked: false,
+      };
     });
 
   const rows: ChartRow[] = [
@@ -366,10 +411,11 @@ function buildCycle({
       id: "date",
       label: "Date",
       phrases: {},
-      // A date is already readable as itself, so it carries no spoken value of its own.
+      // A date is already readable as itself, so it carries no spoken value and no tint of its own.
       cells: columns.map((column) => ({
         text: shortDate(column.date),
         spoken: "",
+        tint: "",
         empty: false,
         marked: false,
       })),
@@ -384,20 +430,17 @@ function buildCycle({
       }, PHRASES.menses),
     },
     {
-      // The row that carries readings fills a day it knows nothing about, because "the monitor was not
-      // used here" is a statement about the instrument rather than a hole in the grid. Every other row
-      // leaves the day blank, because a gap there is not a claim about that particular observation.
+      // The monitor row is an ordinary row: a day with no record is blank, and a day that was logged
+      // without a reading carries the absence mark. That keeps one rule for every row on the sheet — a
+      // blank means nothing was logged, a mark means something was — which is the only way a reader can
+      // tell a skipped day from an untested one by looking.
       id: "monitor",
       label: "Monitor",
       phrases: PHRASES.monitor,
-      cells: cellsFor(
-        (record) => {
-          const reading = storedReading(record.monitor);
-          return reading === undefined ? "" : MONITOR_MARKS[reading];
-        },
-        PHRASES.monitor,
-        { noRecordText: ABSENT },
-      ),
+      cells: cellsFor((record) => {
+        const reading = storedReading(record.monitor);
+        return reading === undefined ? "" : MONITOR_MARKS[reading];
+      }, PHRASES.monitor),
     },
   ];
 
@@ -415,10 +458,12 @@ function buildCycle({
       id: "window",
       label: "Fertile",
       phrases: {},
-      // The band is announced from its own `sr-only` in the document, not from a mark.
+      // The band is announced from its own `sr-only` in the document, and painted as a solid fill, so it
+      // carries neither a mark nor a tint.
       cells: cycleDays.map((day) => ({
         text: "",
         spoken: "",
+        tint: "",
         empty: true,
         marked: day.status === "fertile",
       })),

@@ -114,3 +114,27 @@ rather than an optional extra.
       in words and that an absence mark is announced rather than silent.
 - [x] 7.3 Assert that the single-cycle summary does not claim the chart's named page, so the chart's
       landscape does not reach the other printable document. Verify in `document.test.tsx`.
+
+## 8. Added at the issue owner's direction
+
+Colour, and the un-collapsing of the monitor row's blank. Both are the user's call rather than this
+change's, so they are recorded as their own group.
+
+- [x] 8.1 Reverse the collapse: a day with no record is blank in the monitor row again, matching every
+      other row, and drop the row config that let the monitor row override the two absence texts. Verify
+      that an untested day and a never-logged day are told apart, in the monitor row and in another row.
+- [x] 8.2 Move the absence mark to a middot, because a test result legitimately prints `-` for negative,
+      and key it once for the sheet rather than per row. Verify `-` survives as the negative mark.
+- [x] 8.3 In `src/index.css` and `src/lib/fertility-visuals.ts`, add theme-aware tint tokens for the
+      three monitor readings and for menses, and declare them as classes so colour reaches the sheet
+      through a token. Verify the model hands each value its row's tint.
+- [x] 8.4 In `document.tsx`, apply a cell's tint beside its character, and expose the mark and value as
+      data attributes so a test can select a cell by what it says. Verify a value is tinted, a cell with
+      no value is not, and the band's solid fill is not tinted either.
+- [x] 8.5 Print the tints as an inset `box-shadow` rather than a background, because a print action drops
+      backgrounds unless the reader opts in, and pre-blend each colour over white because a shadow paints
+      no alpha. Guard both in `scripts/__tests__/print-styles.test.mjs`.
+- [x] 8.6 Raise the tints to a luminance that is actually visible on paper, and guard it with a
+      measurement in `print-styles.test.mjs` that fails if they drift back toward invisible, and that
+      fails if black text on any of them drops below 4.5:1.
+- [x] 8.7 Reconcile the spec delta and `design.md` with all three decisions, and re-run the gate.

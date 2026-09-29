@@ -52,12 +52,11 @@ that being wrong about them degrades one cell rather than the page.
 mark            meaning                          prior cell text
 -----------     ------------------------------   -------------------------
 L  H  P         monitor low / high / peak       "Low" / "High" / "Peak"
--               monitor not used, or no record   "No reading logged"
 1  2  3         menses flow light / med / heavy  "Light" / "Medium" / "Heavy"
 X               intercourse                      "Yes" / "No"
 +  -            pregnancy test pos / neg         "Positive" / "Negative"
 L  H  P         cervical mucus, same as monitor  "Low" / "High" / "Peak"
--               logged, nothing recorded         "-"
+middot          logged, nothing recorded         (em dash)
 (blank)          no record at all                 (blank)
 ```
 
@@ -90,20 +89,29 @@ the glyph change costs nothing in accessibility relative to the words it replace
 announce nothing: there is nothing to say about a day with no record, and a date is already readable as
 itself.
 
-### The two monitor-absence states collapse to one mark, on this chart only
+### Every row follows one rule: blank for no record, a mark for a value that is absent
 
-A record whose monitor field is empty and a day holding no record are both "the monitor was not used that
-day", so both read `-`. The difference between them is an app internal and not a printed fact. This is
-scoped to the chart: the Calendar, Status, and cycle-summary surfaces key off cycle days rather than
-records and are untouched.
+A day holding no record is blank in every row. A day that was logged but carries no value for the row
+carries one mark. The monitor row is not a special case: a day logged with the monitor unused shows the
+mark, and a day never logged is blank, so a reader can tell a skipped day from an untested one by looking
+at the row they are in.
 
-The mark is load-bearing and stays. The engine's high-run counter iterates records and requires
+This was tried the other way first — collapsing both states onto one mark — and reversed. The collapse made
+the monitor row the single row on the sheet whose blanks meant something different, and one rule across
+every row is worth more than the words it saves.
+
+The mark itself is load-bearing and stays. The engine's high-run counter iterates records and requires
 consecutive cycle days, so an untested day breaks a run of High readings: nine Highs with one day missing
-are two runs, and neither reaches the 9-day stop-testing warning. A reader has to be able to see the hole.
+are two runs, and neither reaches the 9-day stop-testing warning.
 
-**Alternatives considered.** Keeping "No reading logged" in words, and a separate dash for a record with
-an empty monitor field, both preserve a distinction nobody can act on and cost 77px and a second glyph in
-the row that most needs to be scannable.
+The mark is a middot rather than a hyphen, because a test result legitimately prints `-` for negative and
+this mark appears in every row. The one mark every row shares is the one that must not be ambiguous, and a
+middot is both the quietest available and on the centre line where a cell's content sits rather than on the
+baseline where punctuation sits. It is keyed once for the whole sheet rather than per row, since it is also
+how an unmarked cell looks.
+
+**Alternatives considered.** Collapsing the two states onto one mark, tried and reversed. Spelling the
+absence out in words, which cost 77px and turned the row into a wall of repeated prose.
 
 ### The date row is short, and the year moves nowhere
 
@@ -172,6 +180,40 @@ a sparse run gets a short legend and the legend cannot drift from the grid. It i
 not in the toolbar, because a key the paper does not carry is no key at all. The sheet takes the union
 across the charted cycles, since the rows differ cycle to cycle.
 
+### Colour is a tint beside the character, and a shadow rather than a background
+
+A cell whose mark has a colour in the app's own vocabulary is tinted with that colour's hue at low alpha,
+declared as a token and applied as a class, so the sheet keeps the project's rule that colour reaches it
+through a token rather than a literal. The character stays the cue and the tint is a second one, so the
+chart reads identically in black and white and a reader who cannot use colour gains nothing and loses
+nothing.
+
+Three decisions inside that:
+
+**The tints are printed as an inset `box-shadow`, not a background.** This is the load-bearing one, and it
+was wrong the first time. A print action discards element backgrounds unless the reader ticks "Background
+graphics" in the dialog, and it discards them before any rule of ours is consulted — so the first attempt,
+a `background-color` override in the print block, was dead code for anyone using the default setting, which
+is most people. A shadow is not a background and prints regardless. Inset, so the wash sits inside the cell
+rather than being cast outside it, and at full opacity, because a shadow paints no alpha — which is why
+each value is the screen tint pre-blended over white.
+
+**The tints are strong enough to be seen.** The first pass used 16%, which resolves to a near-white wash
+(luminance 0.76 against paper's 0.95) — present in the stylesheet and effectively absent on a printed
+page. The values now sit at luminance 0.43-0.48, which reads as a tint rather than a block of ink, and
+which _improves_ the text contrast as a side effect: black on these is 9.7:1 to 10.6:1, against the 4.5:1
+the project requires. The guard for this is a measurement, not a comment — a test computes each printed
+colour's luminance and fails if it drifts back toward invisible.
+
+**The fertile band is not tinted.** It is a solid fill, and a fill is the one mark that survives a
+photocopy; a pale wash would nearly vanish in a bad one. The band is already the strongest thing on the
+sheet, so tinting it would cost ink and buy nothing.
+
+**Alternatives considered.** Colouring the character instead of the cell — rejected, because these hues are
+2-3:1 against white as text, well under the 4.5:1 this project requires. Forcing backgrounds to print —
+rejected, because it also makes the sheet's own white background print, which is what the existing print
+rules work to avoid.
+
 ### Row labels shorten, and the label column narrows
 
 The label column goes from 96px to 80px and the longest labels shorten — `Fertile window` to `Fertile`,
@@ -203,13 +245,23 @@ has to be reviewable as a set of reversible decisions rather than discovered lat
 7. **The evidence line is compressed** to `cycle 3 day 12 · cycle 5 day 18 (all on this chart)`, and the
    phrases two tests assert on change wording.
 
+Reversed after the first implementation, at the issue owner's direction:
+
+8. **A day with no record is blank in the monitor row again**, exactly as in every other row, rather than
+   sharing the absence mark with a day whose record left the monitor empty. This removes one of the three
+   spec edits the change had made, because the requirement no longer needs a monitor-row exception.
+
+9. **The absence mark is a middot rather than a hyphen**, and is keyed once for the whole sheet instead of
+   per row. Forced by a collision: a test result legitimately prints `-` for negative, and this mark
+   appears in every row, so it was the one that had to be unambiguous.
+
 **Routine — mechanical, no user-visible judgement:**
 
-8. The absence mark is unified on ASCII `-` across the grid, replacing the em dash in rows that were not
-   part of the request, so one mark means one thing.
-9. The label column narrows to 80px and row labels shorten.
-10. The unreachable `MONITOR_LABELS.none` and the `NO_READING_LOGGED` sentence are deleted.
-11. The `9/28` format is US month-first with no leading zero, matching the app's existing US-oriented date
+10. The absence mark replaces the em dash in rows that were not part of the request, so one mark means one
+    thing.
+11. The label column narrows to 80px and row labels shorten.
+12. The unreachable `MONITOR_LABELS.none` and the `NO_READING_LOGGED` sentence are deleted.
+13. The `9/28` format is US month-first with no leading zero, matching the app's existing US-oriented date
     conventions.
 
 ## Risks / Trade-offs

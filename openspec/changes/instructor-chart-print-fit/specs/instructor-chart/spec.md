@@ -9,10 +9,11 @@ kind of observation as a row, and SHALL stack the cycles back to back down the p
 grid SHALL carry a row for the date of every day, a row marking each day's monitor reading with a single
 character drawn from the chart's printed legend, a row for menses, and rows for each optional observation
 the run has data for. Every cycle day in a charted cycle SHALL have a column, whether or not a day record
-exists for it, and a day holding no record SHALL show the absence rather than a value, except in the
-monitor row, where a day the monitor was not used and a day holding no record SHALL show the same mark.
-Symptoms and notes SHALL NOT be grid rows; the chart SHALL report them once per day in the prose list
-printed beneath the grid.
+exists for it, and a day holding no record SHALL show the absence rather than a value, in every row
+including the monitor row. A day that was logged but carries no value for a row SHALL be distinguishable
+from a day holding no record at all, in every row, and the same rule SHALL apply to every row on the
+chart. Symptoms and notes SHALL NOT be grid rows; the chart SHALL report them once per day in the prose
+list printed beneath the grid.
 
 #### Scenario: Cycle days run across as columns
 
@@ -31,8 +32,14 @@ printed beneath the grid.
 
 - **WHEN** a charted cycle day holds no day record
 - **THEN** its column shows that no reading was logged
-- **AND** it shows no value for that day in any observation row other than the monitor row
-- **AND** in the monitor row it shows the same mark as a day the monitor was not used
+- **AND** it shows no value for that day in any observation row
+
+#### Scenario: An untested day is told apart from a day never logged
+
+- **WHEN** a charted cycle day holds a record that carries no monitor reading
+- **THEN** its monitor cell shows the mark the chart uses for a reading that was not taken
+- **AND** that mark is distinguishable from the gap shown for a day holding no record
+- **AND** the same distinction applies in every other observation row
 
 #### Scenario: The date row is in short form
 
@@ -123,6 +130,42 @@ the top of the printed page.
 - **AND** the document begins at the top of the page
 
 ## ADDED Requirements
+
+### Requirement: Marks may be tinted as a second cue, never as the only one
+
+The chart MAY tint a cell's background to reinforce the mark it carries. A tint SHALL never be the only way
+to read a value: every value the chart shows SHALL remain identifiable from its character, and the chart
+SHALL remain fully readable with colour removed. The fertile-window band SHALL be a filled cell rather
+than a tint, because a fill is the mark that survives a photocopy. A tint SHALL be drawn from the app's own
+theme-aware tokens rather than from a colour literal, and SHALL render as a faint neutral wash rather than
+as ink when printed, so a reader who cannot use colour gains nothing and a reader who can gains a cue the
+character already carries.
+
+#### Scenario: A tint reinforces a value without carrying it
+
+- **GIVEN** a charted cycle with monitor readings of Low, High, and Peak
+- **WHEN** the user opens the instructor chart
+- **THEN** each reading's cell is tinted in the app's colour for that reading
+- **AND** each cell still shows its character, and the printed legend still defines it
+- **AND** the chart reads identically with colour removed
+
+#### Scenario: A cell with no value is not tinted
+
+- **WHEN** the user reads a cell that carries no value
+- **THEN** that cell is not tinted
+- **AND** it is visibly empty rather than painted as though it held something
+
+#### Scenario: The band is a fill, not a tint
+
+- **WHEN** the chart shows the fertile window
+- **THEN** the band's cells are a solid fill
+- **AND** they are not tinted
+
+#### Scenario: Tints print as a faint wash, not as ink
+
+- **WHEN** the user prints the chart
+- **THEN** a tinted cell prints as a faint neutral wash
+- **AND** the chart's characters and the fertile band print in full ink
 
 ### Requirement: The chart prints a legend for every mark it uses
 

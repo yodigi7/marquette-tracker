@@ -1,4 +1,5 @@
 import type { DateKey } from "@/core/engine/types";
+import { cn } from "@/lib/utils";
 import type { ChartCell, ChartCycle, ChartLegendEntry, InstructorChartModel } from "./lib";
 
 /**
@@ -272,8 +273,17 @@ function Cell({ rowId, cell }: { rowId: string; cell: ChartCell }) {
       // A cell too narrow for its content elides it. That is the failure mode the fixed layout is
       // built to contain: one shortened cell, never text running into the next cell and never a
       // grid running off the page.
-      className="overflow-hidden text-ellipsis border-b px-0.5 py-0.5 text-center"
+      className={cn(
+        "overflow-hidden text-ellipsis border-b px-0.5 py-0.5 text-center",
+        // A tint beside the character, never instead of it: the sheet reads identically with colour
+        // removed, and a browser that drops backgrounds costs the reader nothing.
+        cell.tint,
+      )}
       data-empty={cell.empty ? "true" : "false"}
+      // The mark and the value the tint stands for, so a test can find a cell by what it says rather
+      // than by the position of its text nodes.
+      data-mark={cell.text}
+      data-value={cell.spoken}
     >
       {cell.text}
       {/* The row header already names the observation, so this carries only what the mark means. A

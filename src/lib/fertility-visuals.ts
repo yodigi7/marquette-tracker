@@ -143,6 +143,24 @@ export const FERTILITY_MARKER_VISUALS = {
   intercourse: { icon: "fill-fertility-marker-intercourse text-fertility-marker-intercourse" },
 } as const;
 
+/**
+ * Cell tints for the printable instructor chart.
+ *
+ * A second cue beside the chart's characters, never the only one. Every value is a low-alpha wash of a
+ * hue the app already uses for that reading, declared as a class so the sheet keeps the project's rule
+ * that colour reaches it through a token rather than a literal, and so the print rules can override it in
+ * one place.
+ *
+ * The fertile band is deliberately absent: it is a solid fill, and a fill is the one mark that survives a
+ * photocopy.
+ */
+export const FERTILITY_CHART_TINTS = {
+  monitorLow: "bg-fertility-chart-monitor-low",
+  monitorHigh: "bg-fertility-chart-monitor-high",
+  monitorPeak: "bg-fertility-chart-monitor-peak",
+  menses: "bg-fertility-chart-menses",
+} as const;
+
 export const FERTILITY_FORECAST_VISUAL: FertilityForecastVisual = {
   fill: "bg-fertility-forecast-bg",
   cellBorder: "border-dashed border-fertility-forecast-border",

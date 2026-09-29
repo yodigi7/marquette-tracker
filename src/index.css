@@ -58,6 +58,10 @@
     --color-fertility-monitor-low: var(--fertility-monitor-low);
     --color-fertility-monitor-high: var(--fertility-monitor-high);
     --color-fertility-monitor-peak: var(--fertility-monitor-peak);
+    --color-fertility-chart-monitor-low: var(--fertility-chart-monitor-low);
+    --color-fertility-chart-monitor-high: var(--fertility-chart-monitor-high);
+    --color-fertility-chart-monitor-peak: var(--fertility-chart-monitor-peak);
+    --color-fertility-chart-menses: var(--fertility-chart-menses);
     --color-fertility-forecast-bg: var(--fertility-forecast-bg);
     --color-fertility-forecast-border: var(--fertility-forecast-border);
     --color-fertility-forecast-fg: var(--fertility-forecast-fg);
@@ -140,6 +144,24 @@
     --fertility-forecast-bg: #ede9fe;
     --fertility-forecast-border: #7c3aed;
     --fertility-forecast-fg: #4c1d95;
+    /*
+     * Cell tints for the printable instructor chart. The chart prints one character per day, so these
+     * are a second cue beside the character and never the only one: the chart reads identically in black
+     * and white, and a browser that drops backgrounds costs the reader nothing.
+     *
+     * Each is its own hue at an alpha chosen to be *visible*, the same idiom as `--fertility-window-fill`
+     * below. An earlier pass used 16%, which resolved to a near-white wash — present in the file and
+     * effectively absent on paper, which is the failure this comment exists to prevent. At these values
+     * the sheet's own foreground clears 4.5:1 on every one of them by a wide margin, so a printed value
+     * is never a tint with pale text on it.
+     *
+     * The band is deliberately not here: it is a solid fill, because a fill is the one mark that survives
+     * a photocopy.
+     */
+    --fertility-chart-monitor-low: rgb(17 94 89 / 0.45); /* teal-800, the reading's own hue */
+    --fertility-chart-monitor-high: rgb(194 65 12 / 0.45); /* orange-700 */
+    --fertility-chart-monitor-peak: rgb(192 38 211 / 0.45); /* fuchsia-600 */
+    --fertility-chart-menses: rgb(239 68 68 / 0.5); /* the menses marker's own hue */
     --fertility-window-fill: rgb(225 29 72 / 0.14); /* the window's hue */
     --fertility-window-border: #e11d48;
     --fertility-overlay-bbt: #64748b;
@@ -264,6 +286,15 @@
     --fertility-forecast-bg: #2e1065;
     --fertility-forecast-border: #c4b5fd;
     --fertility-forecast-fg: #ede9fe;
+    /*
+     * The chart's tints for a dark surface. Alpha is a little higher than the light set because the
+     * surface is darker, and every value is a tint rather than a fill, so a dark-theme sheet still prints
+     * as pale washes under black text once the print rules remap the foreground.
+     */
+    --fertility-chart-monitor-low: rgb(4 171 150 / 0.28);
+    --fertility-chart-monitor-high: rgb(255 152 83 / 0.28);
+    --fertility-chart-monitor-peak: rgb(241 149 255 / 0.28);
+    --fertility-chart-menses: rgb(248 113 113 / 0.3);
     --fertility-window-fill: rgb(251 113 133 / 0.2); /* the window's hue, not a near-miss rose */
     --fertility-window-border: #fb7185;
     --fertility-overlay-bbt: #94a3b8;
@@ -340,6 +371,43 @@
     /* The chart sheet claims the landscape page declared above. */
     .chart-page {
         page: chart;
+    }
+
+    /*
+     * The chart's tints are a second cue beside the character, and a character is the cue that has to
+     * survive losing colour.
+     *
+     * An inset box-shadow, not a background, and that is the whole point. A browser's print action drops
+     * element backgrounds unless the reader ticks "Background graphics", and it drops them before any rule
+     * here is consulted — so a background-painted tint is simply absent from a PDF saved with the default
+     * setting, which is the setting most readers never touch. A shadow is not a background, so it prints
+     * either way.
+     *
+     * Inset, so the wash sits inside the cell rather than being cast outside it, and at full opacity
+     * because a shadow paints no alpha. Each value is the light screen tint pre-blended over white — the
+     * readings' own hues at the alphas above, resolved by hand once — so a printed cell matches what the
+     * reader saw on screen rather than merely tinting it. Recompute these if the alphas above change.
+     */
+    @media print {
+        .print-sheet .bg-fertility-chart-monitor-low {
+            background-color: transparent;
+            box-shadow: inset 0 0 0 100vmax #94b7b4;
+        }
+
+        .print-sheet .bg-fertility-chart-monitor-high {
+            background-color: transparent;
+            box-shadow: inset 0 0 0 100vmax #e4aa92;
+        }
+
+        .print-sheet .bg-fertility-chart-monitor-peak {
+            background-color: transparent;
+            box-shadow: inset 0 0 0 100vmax #e39deb;
+        }
+
+        .print-sheet .bg-fertility-chart-menses {
+            background-color: transparent;
+            box-shadow: inset 0 0 0 100vmax #f7a2a2;
+        }
     }
 
     /*

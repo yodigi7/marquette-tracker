@@ -212,7 +212,7 @@ describe("InstructorChartView", () => {
     // The key has to reach the paper, so it is inside the sheet rather than the print-hidden toolbar.
     const legend = within(screen.getByTestId("chart-sheet")).getByTestId("chart-legend");
     expect(legend).toHaveTextContent(/monitor peak/i);
-    expect(legend).toHaveTextContent(/monitor not used/i);
+    expect(legend).toHaveTextContent(/logged, nothing recorded/i);
   });
 
   it("prints no legend for the fertile band with interpretation off", async () => {

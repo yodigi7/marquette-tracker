@@ -65,39 +65,73 @@ function model(overrides: Partial<InstructorChartModel> = {}): InstructorChartMo
             phrases: {},
             label: "Date",
             cells: [
-              { text: "7/1", spoken: "", empty: false, marked: false },
-              { text: "7/2", spoken: "", empty: false, marked: false },
-              { text: "7/3", spoken: "", empty: false, marked: false },
+              { text: "7/1", spoken: "", tint: "", empty: false, marked: false },
+              { text: "7/2", spoken: "", tint: "", empty: false, marked: false },
+              { text: "7/3", spoken: "", tint: "", empty: false, marked: false },
             ],
           },
           {
             id: "menses",
-            phrases: { "-": "nothing recorded" },
             label: "Menses",
+            phrases: {
+              "1": { meaning: "light", tint: "bg-fertility-chart-menses" },
+              "2": { meaning: "medium", tint: "bg-fertility-chart-menses" },
+              "3": { meaning: "heavy", tint: "bg-fertility-chart-menses" },
+              "\u00b7": { meaning: "nothing recorded", tint: "" },
+            },
             cells: [
-              { text: "2", spoken: "medium", empty: false, marked: false },
-              { text: "-", spoken: "nothing recorded", empty: true, marked: false },
-              { text: "-", spoken: "nothing recorded", empty: true, marked: false },
+              {
+                text: "2",
+                spoken: "medium",
+                tint: "bg-fertility-chart-menses",
+                empty: false,
+                marked: false,
+              },
+              { text: "\u00b7", spoken: "nothing recorded", tint: "", empty: true, marked: false },
+              { text: "\u00b7", spoken: "nothing recorded", tint: "", empty: true, marked: false },
             ],
           },
           {
             id: "monitor",
-            phrases: { L: "low", H: "high", P: "peak", "-": "not used" },
             label: "Monitor",
+            phrases: {
+              L: { meaning: "low", tint: "bg-fertility-chart-monitor-low" },
+              H: { meaning: "high", tint: "bg-fertility-chart-monitor-high" },
+              P: { meaning: "peak", tint: "bg-fertility-chart-monitor-peak" },
+              "\u00b7": { meaning: "not used", tint: "" },
+            },
             cells: [
-              { text: "L", spoken: "low", empty: false, marked: false },
-              { text: "L", spoken: "low", empty: false, marked: false },
-              { text: "H", spoken: "high", empty: false, marked: false },
+              {
+                text: "L",
+                spoken: "low",
+                tint: "bg-fertility-chart-monitor-low",
+                empty: false,
+                marked: false,
+              },
+              {
+                text: "L",
+                spoken: "low",
+                tint: "bg-fertility-chart-monitor-low",
+                empty: false,
+                marked: false,
+              },
+              {
+                text: "H",
+                spoken: "high",
+                tint: "bg-fertility-chart-monitor-high",
+                empty: false,
+                marked: false,
+              },
             ],
           },
           {
             id: "window",
-            phrases: {},
             label: "Fertile",
+            phrases: {},
             cells: [
-              { text: "", spoken: "", empty: true, marked: false },
-              { text: "", spoken: "", empty: true, marked: true },
-              { text: "", spoken: "", empty: true, marked: true },
+              { text: "", spoken: "", tint: "", empty: true, marked: false },
+              { text: "", spoken: "", tint: "", empty: true, marked: true },
+              { text: "", spoken: "", tint: "", empty: true, marked: true },
             ],
           },
         ],
@@ -256,9 +290,38 @@ describe("InstructorChartDocument", () => {
     const cells = screen.getAllByTestId("chart-cell");
 
     // The absence mark is announced, so "no reading" is not mistaken for a gap...
-    expect(cells.filter((cell) => cell.textContent === "-nothing recorded").length).toBe(2);
-    // ...and a date is already readable as itself.
-    expect(cells.filter((cell) => cell.textContent === "7/1").length).toBe(1);
+    const absent = cells.filter((cell) => cell.getAttribute("data-value") === "nothing recorded");
+    expect(absent).toHaveLength(2);
+    expect(absent.every((cell) => cell.textContent?.startsWith("\u00b7"))).toBe(true);
+    // ...and a date is already readable as itself, so it announces nothing.
+    const dates = cells.filter((cell) => cell.getAttribute("data-mark") === "7/1");
+    expect(dates).toHaveLength(1);
+    expect(dates[0].getAttribute("data-value")).toBe("");
+  });
+
+  it("tints a value's cell, so colour is a second cue beside the character", () => {
+    render(<InstructorChartDocument model={model()} generatedOn="2026-09-28" algorithmEnabled />);
+    const cells = within(screen.getByTestId("chart-cycle-7")).getAllByTestId("chart-cell");
+
+    // The monitor row's Low cell carries the low tint...
+    const low = cells.find((cell) => cell.getAttribute("data-mark") === "L")!;
+    expect(low.className).toContain("bg-fertility-chart-monitor-low");
+    // ...and a cell with nothing recorded is untinted, so an empty cell stays visibly empty.
+    const none = cells.find((cell) => cell.getAttribute("data-value") === "nothing recorded")!;
+    expect(none.className).not.toContain("bg-fertility-chart");
+  });
+
+  it("leaves the fertile band a solid fill, which is what survives a photocopy", () => {
+    render(<InstructorChartDocument model={model()} generatedOn="2026-09-28" algorithmEnabled />);
+    const marked = screen
+      .getAllByTestId("chart-window-cell")
+      .filter((cell) => cell.getAttribute("data-marked") === "true");
+
+    // A pale wash would nearly vanish in a bad photocopy, so the band keeps the solid fill instead.
+    for (const cell of marked) {
+      expect(cell.className).toContain("bg-foreground");
+      expect(cell.className).not.toContain("bg-fertility-chart");
+    }
   });
 
   it("claims the landscape page it declares, rather than changing every document's page", () => {

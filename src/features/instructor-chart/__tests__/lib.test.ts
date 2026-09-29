@@ -315,10 +315,10 @@ describe("buildInstructorChartModel — rows", () => {
     expect(bbt.cells[1].text).not.toContain("36.4");
   });
 
-  it("gives an untested day and a day with no record the same mark in the monitor row", () => {
-    // Both days mean "the monitor was not used here". Whether a record happened to exist for the day is
-    // an app internal and not a printed fact, so the chart draws one mark for both — and the mark stays,
-    // because an untested day breaks a run of High readings the engine counts.
+  it("tells an untested day apart from a day that was never logged", () => {
+    // The monitor row is an ordinary row. Day 2 has a record with the monitor left empty, so it carries
+    // the mark; day 3 has no record at all, so it is blank. A reader needs the difference: a day logged
+    // with the monitor unused is a statement, and a day never logged is a gap.
     const m = model(
       1,
       [rec("c1", 1, 1, { monitor: "low" }), rec("c1", 2, 1, { bloodFlow: "light" })],
@@ -327,13 +327,13 @@ describe("buildInstructorChartModel — rows", () => {
     const monitor = m.cycles[0].rows.find((r) => r.id === "monitor")!;
 
     expect(monitor.cells[1].text).toBe(ABSENT);
-    expect(monitor.cells[2].text).toBe(ABSENT);
-    expect(monitor.cells[1].text).toBe(monitor.cells[2].text);
+    expect(monitor.cells[2].text).toBe("");
+    expect(monitor.cells[2].empty).toBe(true);
   });
 
-  it("keeps a day with no record blank in the rows that make no claim about it", () => {
-    // The blank is "nothing was logged for this day at all", which stays distinct from the mark meaning
-    // something was logged and the field was left empty.
+  it("applies the same blank-versus-mark rule to every row", () => {
+    // One rule across the sheet: a blank always means nothing was logged for that day, and a mark always
+    // means something was logged and the field was left empty. The monitor row is not a special case.
     const m = model(
       1,
       [
@@ -342,11 +342,13 @@ describe("buildInstructorChartModel — rows", () => {
       ],
       { cycles: 6 },
     );
+    const bbt = m.cycles[0].rows.find((r) => r.id === "bbt")!;
     const intercourse = m.cycles[0].rows.find((r) => r.id === "intercourse")!;
 
-    expect(intercourse.cells[1].text).toBe(ABSENT);
-    expect(intercourse.cells[2].text).toBe("");
-    expect(intercourse.cells[2].empty).toBe(true);
+    for (const row of [bbt, intercourse]) {
+      expect(row.cells[1].text).toBe(ABSENT);
+      expect(row.cells[2].text).toBe("");
+    }
   });
 
   it("marks an absence with one character, like every other mark", () => {
@@ -394,11 +396,14 @@ describe("buildInstructorChartModel — the legend", () => {
     expect(text).not.toMatch(/mucus/);
   });
 
-  it("names the mark for a day the monitor was not used", () => {
+  it("names the absence mark once for the whole sheet", () => {
+    // It is how every unmarked cell looks, so it is keyed once rather than against every row. `-` stays
+    // free for a negative test result, which is a value and not an absence.
     const m = model(1, [rec("c1", 1, 1, { monitor: "low" })], { cycles: 6 });
     const marks = m.cycles[0].legend.map((entry) => `${entry.mark} ${entry.meaning}`);
 
-    expect(marks).toContain("- Monitor not used");
+    expect(marks).toContain("· logged, nothing recorded");
+    expect(marks.filter((mark) => mark.startsWith("- "))).toEqual([]);
   });
 
   it("carries no band entry with interpretation off", () => {
