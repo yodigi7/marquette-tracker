@@ -4,6 +4,13 @@ import type { CycleResult, DayResult, DayStatus } from "@/core/engine/types";
 import {
   bbtSeries,
   buildStripModel,
+  colorDistance,
+  CYCLE_COLORS,
+  FIRST_RING_SIZE,
+  MAX_COMPARISON_CYCLES,
+  MIN_FIRST_SIX_DISTANCE,
+  weakestAdjacentDistance,
+  weakestPairDistance,
   intercourseSeries,
   mucusSeries,
   resolveSelectedCycle,
@@ -291,5 +298,56 @@ describe("resolveSelectedCycle", () => {
   it("returns undefined when there are no cycles", () => {
     expect(resolveSelectedCycle([], "a")).toBeUndefined();
     expect(resolveSelectedCycle([], undefined)).toBeUndefined();
+  });
+});
+
+describe("CYCLE_COLORS", () => {
+  it("holds at least as many colours as the comparison view allows selecting", () => {
+    // Tied to the control's own maximum, so raising the control past the palette
+    // fails here instead of quietly letting a full-size selection repeat a colour.
+    expect(CYCLE_COLORS.length).toBeGreaterThanOrEqual(MAX_COMPARISON_CYCLES);
+  });
+
+  it("has no repeated colour anywhere in the palette", () => {
+    expect(new Set(CYCLE_COLORS).size).toBe(CYCLE_COLORS.length);
+  });
+
+  it("makes the first six mutually distinguishable, not just distinct from their neighbours", () => {
+    // Six stacked rows are all on screen against one another, so the weakest
+    // *pair* is what matters, not the weakest adjacent pair.
+    expect(weakestPairDistance(CYCLE_COLORS, FIRST_RING_SIZE)).toBeGreaterThanOrEqual(
+      MIN_FIRST_SIX_DISTANCE,
+    );
+  });
+
+  it("keeps every pair of consecutive colours far apart across the whole palette", () => {
+    // Rows sit directly above and below one another, so an adjacent pair that
+    // reads as the same colour is the worst case on screen.
+    expect(weakestAdjacentDistance(CYCLE_COLORS)).toBeGreaterThanOrEqual(MIN_FIRST_SIX_DISTANCE);
+  });
+
+  it("measures as clearly more separated than the first six it replaced", () => {
+    // The previous first six (blue, green, orange, pink, teal, indigo) scored
+    // 12.0 here: blue/indigo and orange/pink were near-indistinguishable. This
+    // guards against regressing back toward that without pinning the exact value.
+    const replaced = ["#3b82f6", "#22c55e", "#f97316", "#ec4899", "#14b8a6", "#6366f1"];
+    expect(weakestPairDistance(CYCLE_COLORS, FIRST_RING_SIZE)).toBeGreaterThan(
+      weakestPairDistance(replaced, replaced.length) * 2,
+    );
+  });
+
+  it("measures distance symmetrically", () => {
+    for (let i = 0; i < CYCLE_COLORS.length; i++) {
+      for (let j = i + 1; j < CYCLE_COLORS.length; j++) {
+        expect(colorDistance(CYCLE_COLORS[i], CYCLE_COLORS[j])).toBeCloseTo(
+          colorDistance(CYCLE_COLORS[j], CYCLE_COLORS[i]),
+          10,
+        );
+      }
+    }
+  });
+
+  it("reports zero distance for a colour against itself", () => {
+    expect(colorDistance(CYCLE_COLORS[0], CYCLE_COLORS[0])).toBeCloseTo(0, 10);
   });
 });

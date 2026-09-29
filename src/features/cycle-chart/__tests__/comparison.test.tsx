@@ -104,3 +104,84 @@ describe("CycleComparisonView", () => {
     expect(screen.getAllByTestId("comparison-day-band").length).toBeGreaterThan(0);
   });
 });
+
+describe("CycleComparisonView colour identity", () => {
+  afterEach(() => cleanup());
+
+  /** Four logged cycles, returned oldest first as the store holds them. */
+  async function seedFourCycles(): Promise<string[]> {
+    await resetStore();
+    const ids: string[] = [];
+    for (const day1 of ["2026-01-01", "2026-01-29", "2026-02-26", "2026-03-26"]) {
+      const { id } = await useAppStore.getState().setNewCycle(day1);
+      ids.push(id);
+    }
+    return ids;
+  }
+
+  const colorOf = (cycleId: string): string | null =>
+    screen
+      .getAllByTestId("comparison-legend-item")
+      .find((el) => el.dataset.cycleId === cycleId)
+      ?.getAttribute("data-color") ?? null;
+
+  const customCheckbox = (cycleNo: number): HTMLInputElement => {
+    const labels = screen.getByTestId("comparison-custom-picker").querySelectorAll("label");
+    const match = Array.from(labels).find((l) => l.textContent?.startsWith(`Cycle ${cycleNo} `));
+    return match!.querySelector("input")!;
+  };
+
+  it("does not repaint the cycles that remain when the cycle count changes", async () => {
+    const ids = await seedFourCycles();
+    renderComparison();
+    // All four show at the default history window; record what each one wears.
+    const before = new Map(ids.map((id) => [id, colorOf(id)]));
+    expect(before.get(ids[3])).not.toBeNull();
+
+    fireEvent.change(screen.getByTestId("comparison-n-input"), { target: { value: "2" } });
+
+    // Locks a stated requirement. Note this case alone does not distinguish the
+    // anchored rule from a selection-anchored one: "most recent N" is always a
+    // prefix of the newest-first list, so survivors keep their slot either way.
+    // Hand-picking below is the case that actually separates the two rules.
+    for (const id of [ids[3], ids[2]]) {
+      expect(colorOf(id)).toBe(before.get(id));
+    }
+  });
+
+  it("does not repaint when cycles are hand-picked instead", async () => {
+    const ids = await seedFourCycles();
+    renderComparison();
+    const before = new Map(ids.map((id) => [id, colorOf(id)]));
+
+    fireEvent.change(screen.getByTestId("comparison-mode"), { target: { value: "custom" } });
+    // Pick a scattered set: the oldest and the newest, skipping the middle two.
+    fireEvent.click(customCheckbox(1));
+    fireEvent.click(customCheckbox(4));
+
+    for (const id of [ids[0], ids[3]]) {
+      expect(colorOf(id)).toBe(before.get(id));
+    }
+  });
+
+  it("derives the same colours every time the view reads the data", async () => {
+    const ids = await seedFourCycles();
+    renderComparison();
+    const first = new Map(ids.map((id) => [id, colorOf(id)]));
+
+    // Switch selection mode and back, so the view re-reads and re-derives.
+    fireEvent.change(screen.getByTestId("comparison-mode"), { target: { value: "custom" } });
+    fireEvent.change(screen.getByTestId("comparison-mode"), { target: { value: "recent" } });
+
+    for (const id of ids) {
+      expect(colorOf(id)).toBe(first.get(id));
+    }
+  });
+
+  it("never gives two selected cycles the same colour", async () => {
+    const ids = await seedFourCycles();
+    renderComparison();
+    const colors = ids.map((id) => colorOf(id));
+    expect(new Set(colors).size).toBe(colors.length);
+  });
+});

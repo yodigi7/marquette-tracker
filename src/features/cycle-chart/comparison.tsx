@@ -3,7 +3,13 @@ import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { cycleResultsByCycleId } from "@/core/store/selectors";
 import { useAppStore } from "@/core/store/useAppStore";
-import { buildStripModel, cycleSpanOf, type StripModel } from "./lib";
+import {
+  buildStripModel,
+  comparisonColors,
+  cycleSpanOf,
+  MAX_COMPARISON_CYCLES,
+  type StripModel,
+} from "./lib";
 import { CycleComparisonChart } from "./comparison-chart";
 
 type SelectionMode = "recent" | "custom";
@@ -18,6 +24,10 @@ export function CycleComparisonView() {
   const [customIds, setCustomIds] = useState<Set<string>>(new Set());
 
   const results = useMemo(() => cycleResultsByCycleId(output), [output]);
+
+  // Anchored to every logged cycle, not the selected set, so a cycle's colour
+  // survives hiding, resizing, and hand-picking. See `comparisonColors`.
+  const colorByCycleId = useMemo(() => comparisonColors(cycles), [cycles]);
 
   // Build StripModel for each cycle (reuses the existing single-cycle logic)
   const modelsByCycleId = useMemo(() => {
@@ -95,9 +105,13 @@ export function CycleComparisonView() {
               data-testid="comparison-n-input"
               type="number"
               min={1}
-              max={12}
+              max={MAX_COMPARISON_CYCLES}
               value={recentN}
-              onChange={(e) => setRecentN(Math.max(1, Math.min(12, Number(e.target.value) || 1)))}
+              onChange={(e) =>
+                setRecentN(
+                  Math.max(1, Math.min(MAX_COMPARISON_CYCLES, Number(e.target.value) || 1)),
+                )
+              }
               className="w-16 rounded border bg-background px-2 py-1 text-sm"
             />
           </div>
@@ -138,7 +152,7 @@ export function CycleComparisonView() {
       )}
 
       {selectedModels.length > 0 ? (
-        <CycleComparisonChart models={selectedModels} />
+        <CycleComparisonChart models={selectedModels} colorByCycleId={colorByCycleId} />
       ) : (
         <p className="py-8 text-center text-sm text-muted-foreground">
           Select at least one cycle to compare.
