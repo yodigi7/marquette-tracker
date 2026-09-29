@@ -102,7 +102,7 @@
       from the stylesheet: window `rgb(128, 6, 48)`, `Before` `rgb(90, 74, 16)`, `After` `rgb(5, 59, 44)`, and
       the three markers `rgb(4, 171, 150)` / `rgb(255, 152, 83)` / `rgb(241, 149, 255)`. Confirm the three
       phase legend keys are all 10x10. `pnpm check` green at 1052 tests, `openspec validate --all` 19/19.
-- [ ] 6.4 **This is the one open task, and it needs a real device.** Confirm in both themes that:
+- [x] 6.4 **Confirmed on a real device by the product owner, in both themes.** The checklist it was written against:
 
   In dark, the things most likely to be wrong, in order:
 
@@ -125,3 +125,14 @@
 
   Review from `pnpm dev` in the issue worktree. Record any visual finding as an issue comment rather than
   expanding this change.
+
+  **What this confirmation does and does not settle.** It settles the two risks this change knowingly
+  carried: the `Peak`/`High` pair at `0.231` against a `0.25` floor, and the `0.0123` margin between the
+  window and the gold. Both were left in place deliberately and neither produced a change, so they are
+  accepted as they stand rather than outstanding.
+
+  It does not make the palette provably correct on hardware in general, and the guard still does not cover
+  what a device pass covers. Two things remain true afterwards and are recorded in design.md rather than
+  closed here: the separation floor is a poor proxy for legibility, because OKLab sums hue with lightness
+  and cannot say which pairs are backed by which; and light mode's two quiet phases are still `0.062`
+  apart, which was never fixed and is now confirmed as readable rather than as addressed.
