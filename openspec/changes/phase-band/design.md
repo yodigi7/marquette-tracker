@@ -7,20 +7,28 @@ dictates the whole shape of the solution:
 
 ```
 dark dot      hex        luminance   max fill luminance it permits
-low           #0d9488      0.2304     0.0435   <- binding
-high          #fb923c      0.4139     0.1046
-peak          #e879f9      0.3767     0.0922
+low           #04ab96      0.3135     1.0406   <- binding
+high          #ff9853      0.4434     1.4302
+peak          #f195ff      0.4742     1.5225
 ```
 
-A monitor marker is painted inside the day cell, on top of the fill, so every tinted fill is capped at
-`0.0435` relative luminance. The current dark fills sit well under that. A search over hue and
-lightness for the best three-phase palette inside the cap reaches a worst-pair separation of `0.0616`,
-against `0.0572` today. Three tinted fills are not separable in the dark theme.
+A monitor marker is painted inside the day cell, on top of the fill, so every tinted fill is bounded by
+the 3:1 rule — and the bound is set by the **darkest** reading in the theme.
 
-**The binding reading is Low, not Peak.** That correction matters: it was recorded the other way round
-for most of this change's life, and it is exactly the kind of error that lets a "make the window more
-obvious" edit push a bar past what a reading can survive. The guard now names the binding reading in its
-failure message.
+**The binding reading is Low, not Peak.** That correction mattered for most of this change's life and was
+recorded the other way round: getting it backwards is exactly the error that lets a "make the window more
+obvious" edit push a background past what a reading can survive. The guard now names the binding reading
+in its failure message.
+
+**The bound was never a property of the fills.** For most of this change the dark `Low` reading was
+`#0d9488`, which permitted a fill of `0.0435` relative luminance. The fills sat within `0.017` OKLab
+lightness of one another inside that, and a search over hue and lightness found a worst-pair separation
+of `0.0616` against `0.0572` at the time — which is what made the number read as a property of the
+palette rather than of one colour choice. It was not. The 3:1 rule is a property of the **pair**: the
+background is bounded by how dark the darkest reading is, so moving that reading moves the bound. Lifting
+`Low` to `#04ab96` raised what a fill may be from `0.0435` to `1.0406`, at which point nothing in this
+palette is capped at all — the `Before` fill is at 7% of what it is now permitted. See "The cap was in
+the reading, not the fill" below.
 
 ## Goals / Non-Goals
 
@@ -29,17 +37,21 @@ failure message.
 - Make `Before`, `Fertile`, and `After` genuinely distinguishable in dark mode.
 - Make the fertile window unmistakably the thing the eye lands on.
 - Make the window's mark impossible to confuse with the menses stripe.
-- Keep every reading marker's legibility exactly as it is today.
+- Keep every reading marker legible — by lightness, so the three are told apart at the size they are drawn.
 - Make the window's opening and closing days identifiable without a second mark on screen.
 - Keep the calendar's week rows legible.
 
 **Non-Goals:**
 
-- No engine, window-computation, or status-semantics change.
+- No engine, window-computation, or status-semantics change. The one engine addition is a test asserting
+  behaviour the engine already had.
 - No change to the Status view's badges, which show the precise status and need four distinguishable
   fills of their own.
-- No change to the tile fills, so nothing about the reading markers moves.
 - No change to the menses stripe, which stays where it is, in its own colour.
+- **No change to a reading marker's shape, size, or meaning.** The readings were originally out of scope
+  entirely and moved into it late: they turned out to be the constraint holding the fills down, so
+  lightening them was the only route to the fills the review asked for. They moved on lightness, within
+  their existing hues, and nothing about what a marker looks like as an object changed.
 - No new dependency.
 
 ## Decisions
@@ -73,74 +85,88 @@ box rather than a bar — which is what the intermediate revision looked like.
 The two quiet phases going back to being plain tints is a second, smaller call, and it drew a second
 review in turn: the tints were too dark, and `Before` looked like the window.
 
+### The cap was in the reading, not the fill
+
+This is the decision the rest of the change hangs on, and it was reached late and by being wrong about the
+constraint rather than about the colours.
+
+**The mis-framing.** A monitor marker is painted on a Calendar day's fill, so the 3:1 rule bounds how light
+that fill may be — and the 3:1 rule is a property of the **pair**. Every attempt to move the fills treated
+the fill as the thing with a limit and the marker as the thing to fit inside it, so the search space was
+"which fill values inside `0.0435` separate best". It is not. The fill's bound is set by how _dark_ the
+darkest of the three readings is, so the reading is the input that moves the fill's ceiling, not a
+constraint the fill has to live under.
+
+That single mis-framing explains most of what went wrong on this change. It is why a review asking for
+yellower, lighter, further-from-the-window `Before` days could not be satisfied and appeared to be asking
+for something impossible; it is why the fills ended up at 94% of a ceiling that was itself arbitrary; and
+it is why the window bar was lifted to `0.0755` to compensate, which then squeezed the readings and caused
+a second round of the same complaint one level up.
+
+**The fix.** Lifting the `Low` reading raises what any fill may be. The dark `Low` went from `#0d9488` at
+`0.2304` luminance — which permitted a fill of `0.0435` — to `#04ab96` at `0.3135`, which permits
+`1.0406`. Nothing in this palette is capped now. The `Before` fill is at 7% of what it is permitted, the
+window bar at 5%, and the headroom that three of the four original complaints were fighting for turned out
+to have been sitting in a marker colour the whole time.
+
+**Why it was the right call despite the scope.** The readings were explicitly out of scope, and repeatedly
+described as the one thing that must not move. They also turned out to be the only lever that moved the
+fills, so the choice was between leaving the review's request unsatisfiable and moving the thing that was
+out of scope. What moved was the readings' **lightness**, within their existing hues: the markers keep
+their shape, their size, their role, and what they mean. The product owner directed it after being shown
+that the alternative was shipping near-black days.
+
+**The window bar had to come back down afterwards**, which is the part that is easy to miss. The bar is the
+lightest surface a reading is ever painted on, so _its_ luminance sets the floor for all three markers. At
+`#9d0041` and `0.0755` that floor was `0.3265`, which left the three readings in a band too narrow to
+separate and was the direct cause of "Peak and Low are too close". Dropping the bar to `#800630` at
+`0.0493` puts the floor at `0.2480` while the bar still out-separates the `Before` fill from the card. The
+two constraints are in genuine tension and the window yields, because a window whose brightness makes the
+readings painted on it unreadable is not a more visible window. The margin is `0.0123` and it is thin.
+
 ### The quiet phases: Before changes hue, both get lighter
 
-Two constraints were fighting, and neither was visible in the code.
+The cap argument is gone, but two of the three constraints that came with it are not, and the second one is
+still load-bearing.
 
-**The lift is capped.** A fill cannot be brighter than `0.0435` luminance, set by the Low reading, and
-that cap is the reason the tints read as barely-there. It is also why a full-height shape at the tint's
-lightness is not a surface, which is the whole argument for the window's own colour.
-
-**The hue made the lift useless.** `Before` was amber at hue `46` and the window is rose at `14` —
-thirty-two degrees apart. Brightening amber therefore walked it _toward_ the window, so "make it lighter"
+**The hue made the lift nearly useless.** `Before` was amber at hue `46` and the window is rose at `11` —
+thirty-five degrees apart. Brightening amber therefore walked it _toward_ the window, so "make it lighter"
 and "make it look less like the window" were the same request pointed in opposite directions. An earlier
 attempt lifted the tints and the review came back saying `Before` was now similar to the window. It was.
 
-`Before` is a warm gold at hue `86` now, seventy-one degrees from the window instead of thirty-one, and
-`After` stays teal. Both are lifted: `0.105 -> 0.149` and `0.075 -> 0.125` measured from the card, which is
-the surface the Calendar actually renders on. Both sit below the window in lightness _and_ chroma, so the
-window is still the most prominent surface on the calendar.
+`Before` is a warm gold at hue `93` now, eighty-two degrees from the window, and `After` stays teal at
+hue `169`. From the card — the surface the Calendar actually renders on — the window is `0.2355`, `Before`
+`0.2232`, and `After` `0.1253`. The window is still the most prominent surface, but the `Before` fill is
+`0.0123` behind it, so the ordering the review asked for holds on a thin margin rather than a comfortable
+one.
 
 **Indigo was tried and rejected**, and the reason is worth keeping. A cool fill spends its whole luminance
-budget on being cool, so it is capped harder than a warm one -- indigo cleared the Low reading at `3.66:1`
+budget on being cool, so it is capped harder than a warm one — indigo cleared the `Low` reading at `3.66:1`
 where amber managed `4.00:1`, and landed at `0.151` against the card against gold's `0.149`, at a lower
-lightness and with more chroma. A cooler hue bought separation and paid for it in exactly the dimension
-the review had complained about. Warm, moved away from rose rather than across the wheel, is the answer
-that does not cost the thing that was asked for.
+lightness and with more chroma. A cooler hue bought separation and paid for it in exactly the dimension the
+review had complained about. Warm, moved away from rose rather than across the wheel, is the answer that
+does not cost the thing that was asked for. This reasoning still holds now that the cap is gone, because
+the underlying observation is about how a cool fill spends its budget, not about the ceiling it hits.
 
-**The remaining trade, stated rather than buried.** In the warm band, moving the hue from amber toward gold
-is a straight line: visibility stays flat, distance from the window improves, distance from `After`
-degrades. The two problems actually reported -- too dark, and too close to the window -- get the better of
-it, and `Before`/`After` give back ground, from `0.112` to `0.094`. That is still well above the `0.057`
-this started at, so it is a partial give-back and not a return to the problem. If `Before` and `After` turn
-out to be hard to tell apart on a device, the honest place to fix that is the summary or the legend rather
-than another mark on every day.
+**The `Before`/`After` trade, restated.** In the warm band, moving the hue from amber toward gold is a
+straight line: distance from the window improves, distance from `After` degrades. They are `0.131` apart
+now, against `0.057` where this started and `0.144` at the tightest point of the earlier gold work. If
+`Before` and `After` turn out to be hard to tell apart on a device, the honest place to fix that is the
+summary or the legend rather than another mark on every day.
 
-**The ceiling, and why the next review could not have what it asked for.** A review asked for the gold to
-be yellower, more differentiating, less dark and less red. Three of those are the same knob: in the warm
-band, moving the hue up and the luminance up and the distance from the window up are one movement, and the
-Low reading's floor stops it. Concretely, the binding reading dot sits at `0.2304` luminance and has to
-reach `3:1` against whatever the day's background is, which caps _any_ background at `0.0435` luminance
-whatever its hue. `Before` is at `0.0409`, which is 94% of that.
+**The readings are now spaced on lightness**, which is the other half of what the review was reporting and
+was not visible as a colour problem at all. The symptom was specific and diagnostic: `High` was
+distinguishable, `Low` and `Peak` were not. The cause is measurable — all three sat within `0.037` of each
+other in OKLab lightness, so hue was carrying all of the distinction, and hue discrimination degrades
+sharply below roughly 10px while a lightness difference does not. The markers are drawn at 10px in a day
+cell and **6px** in the legend. Rendering the pairs confirmed the gap between the metric and the eye
+entirely: the two colours differ in 79% of the dot's pixels with a mean channel delta of 129 out of 255,
+and still read as one mark.
 
-So the sweep is flat: every value in the band sits between `0.149` and `0.167` from the card, and the one
-that is furthest from the window is always the dimmest. The value shipped is `#4c3700` at `0.0427`, and it
-is the last one that clears the reading floor at all — the next value up is `3.00:1` and the one after that
-is `2.94:1`.
-
-**Darkening the Low reading dot is not the way past this**, which is worth recording because it looks like
-it should be, and it was the obvious next idea. A dot _darker_ than its background has to clear 3:1 the
-other way round, so a dark Low dot forces a _light_ background — at `0.0146` luminance it would demand
-`0.1439` or more — while the Peak reading, being lighter, demands `0.0922` or less. The readings straddle
-the fill and ask for opposite things about the same day, so no background serves all three once Low goes
-dark. There is no version of "make the days lighter" that leaves the readings alone.
-
-**What that step costs.** Reading margin goes from `3.21:1` to `3.08:1`. That is the whole payment, and it
-is a real one — it leaves almost nothing for a later edit — but the three things that were asked for all
-move in the right direction, so it is the right place to spend it. If the quiet phases ever need to be
-visibly lighter than this, the only remaining lever is the reading dot itself, which is the one thing
-this change has been told repeatedly not to touch, and it would be a decision to take deliberately rather
-than a colour to pick.
-
-That is also the argument for the mark the band used to carry and no longer does: the cap is a hard
-ceiling, and a ceiling is exactly the situation where a mark that is not a background is the answer.
-
-**Open, and it is a product decision rather than a colour to pick.** Lighter days than `#4c3700` need a
-change to the reading markers, and the two instructions on this change conflict: the readings are the one
-thing that must not move, and the quiet phases are the thing that must get lighter. The ways through are a
-hairline outline on the markers, which keeps their colours and their bare-dot character and changes their
-edge, or dark markers throughout, which changes what a reading looks like everywhere including the cycle
-chart. Both are visible; neither is a colour choice.
+They are now at `0.31`, `0.44` and `0.47` luminance, a spread of `0.16` where there was `0.037`. Saturation
+could not have done it: all three readings were within `0.02` of the sRGB gamut edge, so there was
+essentially nothing left to take, and pushing all three to their gamut limits moved the worst pair only
+from `0.261` to `0.277`.
 
 **Two things the search got wrong, recorded because they nearly shipped.** A search that maximises
 distance from the window will always run to the widest gap on the colour wheel, and on this palette the
@@ -151,8 +177,9 @@ no fill may match a marker's hue, and the window must be the most prominent surf
 
 **Light mode is untouched, deliberately.** It has the same shape of problem — its two quiet phases are
 cream and mint, both near-neutral, `0.062` apart, and the pale pink window sits among them — but the
-readings there are darker steps, so the cap and the achievable lift are different, and nobody has
-reported it. Worth checking on a real device rather than changing blind.
+readings there are darker steps, so the achievable lift and the resulting distances differ, and nobody has
+reported it. Its readings are at `0.264`, `0.347` and `0.274` apart, all above the floor. Worth checking on
+a real device rather than changing blind.
 
 ### The window day is painted in the window's own colour, cell and all
 
@@ -174,7 +201,15 @@ distance between them — the two are never on screen together, so demanding a s
 distinction no user ever sees, and in dark the honest distance is only `0.088`.
 
 Because a bar spans the whole day it _is_ a surface a marker is painted on, so it joins the fill set the
-marker rule checks, and dark's `#700b25` sits at `0.0382` with Low binding at `3.18:1`.
+marker rule checks, and dark's `#800630` sits at `0.0493` with Low binding at `3.66:1`.
+
+**The bar is bounded from above by the readings, not only by its own rules**, which is the constraint that
+shaped its final value. Being the lightest surface in the palette, it sets the floor every reading must
+clear: `3 x (bar luminance + 0.05) - 0.05`. The first value bright enough to be unmistakable, `#9d0041`,
+put that floor at `0.3265` and collapsed the three readings into a band too narrow to separate. `#800630`
+puts it at `0.2480` and still leaves the bar the most prominent surface on the Calendar. The temptation to
+keep brightening the bar is exactly the move that produced the second round of the same complaint, so the
+reasoning is recorded here rather than left as a value someone will want to improve.
 
 The 3:1 non-text rule does **not** apply to the bar against the page, and writing it would have been a
 rule that fails a correct palette: that rule covers boundaries needed to identify a control and
@@ -250,9 +285,12 @@ having two near-white things on it.
   above's bottom edge are 8px apart across a week boundary and read as one mark.
 - **A backing disc behind the reading marker.** Invisible at the size the marker is drawn, and it does
   not help: the marker already clears 3:1 against every fill.
-- **Lifting all three reading markers** so the fills could be lighter. Raises the fill cap by 1.6x but
-  drops the readings' own separation to 0.197, under their 0.25 floor. Two accessibility rules in direct
-  conflict, and the marker's should not give.
+- **Lifting all three reading markers together, to the same lightness.** Rejected, and this is a different
+  proposal from the one that shipped. Raising the markers by the same amount lifts the fill ceiling by
+  about 1.6x but leaves the three readings _more_ alike, dropping their own separation to `0.197` under
+  their `0.25` floor. Two accessibility rules in direct conflict, and this one should not give. Lifting
+  one marker and then spacing the three across the headroom is the version that works; see "The cap was
+  in the reading, not the fill".
 - **Painting only the fertile window** and leaving `Before` and `After` untinted. Fixes the reported
   problem more thoroughly than anything here, and was implemented. Withdrawn because all three phases are
   wanted, and it is a decision about which information the Calendar offers rather than how to render it.
@@ -272,20 +310,38 @@ having two near-white things on it.
   Calendar resolves every cell once and derives the shape from that. The cost is that the shape is no
   longer local to a cell; the mitigation is that it is a pure function with its own tests, including
   tests for a padded month.
-- **`Before` and `After` are still told apart by hue alone**, now `0.144` apart rather than `0.062`. Better,
-  and still the weakest pair in the palette. → Accepted, guarded against regressing, and named here rather
-  than left to be discovered.
+- **The `Peak`/`High` pair is knowingly under the separation floor.** `0.231` against `0.25`, in the dark
+  theme, held at a named `0.20` by an exception in the guard rather than by lowering the floor for
+  everything. `Peak` was set at OKLab L `0.80` by the product owner after a sweep was rendered; clearing
+  the floor needs it darker, at L `0.76` or below, which visibly pinks it down. → Accepted knowingly, and
+  a test asserts the set of things under the real floor is exactly that one pair, so it cannot spread and
+  a further regression on it still fails.
+- **The window out-separates the `Before` fill by `0.0123`.** That is the thinnest margin in the palette
+  and the one most likely to be eaten by a later well-meaning brightening. → The guard holds the rule, so
+  it fails rather than passing quietly, but it is worth knowing before editing either value.
+- **The separation floor is a poor proxy for legibility, and the guard is now documented as such.** OKLab
+  distance sums hue with lightness into one figure, so a pair backed only by hue scores the same as one
+  backed by lightness — and at 6px those are not the same thing. This is why a guard rule and a visual
+  review disagreed about the same palette, and why the exception above was written rather than the metric
+  being moved. Anyone treating a passing separation number as evidence that markers are tellable apart is
+  reading the wrong thing.
+- **`Before` and `After` are still the closest phase pair**, `0.131` apart against `0.057` where this
+  started. Better, and still the weakest pair among the phases. → Accepted, guarded against regressing,
+  and named here rather than left to be discovered. If it fails on a device the fix belongs in the summary
+  or the legend, not in a fourth mark on every day.
 - **Light mode has the same shape of problem and has not been fixed** — cream and mint, `0.062` apart, with
-  the pale pink window among them. → Deliberate: the readings there are darker, so the numbers differ and
-  nobody has reported it. Flagged for the device check.
-- **The bar is intrinsically close to the amber `Before` tint in hue.** The two are told apart by shape
-  long before hue — a full-height filled bar against a tinted day with nothing on it.
-- **Dark's bar clears its worst reading by 0.18:1.** That is the price of being the loudest thing on a
-  dark calendar, and it is thin. The guard asserts it, and names which reading binds, so a later
-  brightening is made against the right number rather than the wrong one.
-- **Light mode's marks only reach 0.1721** against each other, because a mark on white has to clear 3:1
-  and the dark values that satisfy that crowd each other. → The guard's separation floor is per theme for
-  this reason.
+  the pale pink window among them. → Deliberate: the readings there are darker, so the numbers differ, all
+  three pairs clear the floor, and nobody has reported it. Flagged for the device check.
+- **The bar is intrinsically close to the `Before` tint in hue.** The two are told apart by shape long
+  before hue — a full-height filled bar against a tinted day with nothing on it.
+- **Dark's bar clears its worst reading by `0.66:1`** above the `3:1` floor, and that margin is set by the
+  `Low` reading. → The guard asserts it and names which reading binds, so a later brightening is made
+  against the right number.
+- **Light mode's readings are closer together than dark's**, at `0.264`, `0.274` and `0.347`, because a
+  mark on white has to clear 3:1 and the dark values that satisfy that crowd each other. → The guard's
+  separation floor is per theme for this reason.
+- **The `Low` reading against the `Before` fill sits at `3.00:1`**, which is the floor to two decimal
+  places. It clears, and it leaves nothing for a later edit to either value.
 
 ## Migration Plan
 
@@ -295,3 +351,10 @@ layer-visibility ids are unchanged. Rollback is a revert.
 ## Open Questions
 
 None.
+
+One decision this change was required to make and did: for most of its life it carried an unresolved
+conflict — the readings were declared the one thing that must not move, and the quiet phases were the
+thing that had to get lighter, and the two could not both hold because the readings were what capped the
+fills. It was resolved by moving the readings, on lightness, within their existing hues, at the product
+owner's direction and against the recommendation recorded here at the time. Recorded in "The cap was in
+the reading, not the fill" so the reasoning survives; there is no open question left on it.

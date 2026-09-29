@@ -218,7 +218,7 @@ The Calendar SHALL represent recorded menses with a visible stripe along the bot
 
 The Calendar legend SHALL match the colors, borders, line styles, and marker shapes used in the active presentation. The default legend SHALL be grouped around the simplified status categories, the predictive treatment, the menses stripe, and the color-coded monitor readings. The predictive treatment SHALL be described by a single entry covering both the next-window forecast and projected cycle days, because both use the same predictive cue. A full-detail legend SHALL additionally offer the secondary indicator that the full-detail presentation exposes.
 
-Each entry SHALL describe exactly one layer that the day cells can paint, and every layer the day cells can paint SHALL have an entry. An entry's sample SHALL render the same mark the day cells draw for that layer, so the key cannot disagree with the cell. A sample's colour SHALL come from the same paint the day cell uses and its shape from the layer's own declared footprint, so the two cannot be chosen independently and drift apart. A hidden entry SHALL render a hollow swatch rather than the colour sample, so a hidden entry is distinguishable from a shown one without relying on colour alone, and its label SHALL remain unchanged.
+Each entry SHALL describe exactly one layer that the day cells can paint, and every layer the day cells can paint SHALL have an entry. An entry's sample SHALL render the colour the day cells draw for that layer, taken from the same paint the day cell uses, so the key cannot disagree with the cell. Where a layer's day-cell mark has a shape the key must convey — the window's bar against the two quiet phases' tints — the key SHALL convey it in the shape of the mark rather than in the shape of the key: a key drawn at a different size to signal that its day cell is filled rather than tinted reads as a claim about importance instead, and the window's key is the one most often compared against its two neighbours. The three phase keys SHALL therefore be the same size, and the window's SHALL be told from the others by colour. A hidden entry SHALL render a hollow swatch rather than the colour sample, so a hidden entry is distinguishable from a shown one without relying on colour alone, and its label SHALL remain unchanged.
 
 #### Scenario: Simplified legend covers the default vocabulary
 
@@ -226,11 +226,18 @@ Each entry SHALL describe exactly one layer that the day cells can paint, and ev
 - **THEN** it explains `Before`, `Fertile`, `After`, the predictive treatment, menses, and monitor readings
 - **AND** its samples match the corresponding day-cell treatments
 
-#### Scenario: A phase sample shows the mark the day cells draw
+#### Scenario: The three phase keys are the same size and are told apart by colour
+
+- **WHEN** the Calendar legend shows the `Before`, `Fertile`, and `After` keys
+- **THEN** all three keys are drawn at the same size
+- **AND** each carries its own phase's colour, sampled from the paint its day cells use
+- **AND** the window is identified among them by its colour rather than by a larger key
+
+#### Scenario: A phase sample shows the colour the day cells draw
 
 - **WHEN** a legend entry describes a phase
-- **THEN** its sample renders that phase's mark: a bar for the window, a tint tile for the quiet phases
-- **AND** the sample is recognisably the same mark the day cells draw
+- **THEN** its sample renders that phase's colour as the day cells paint it
+- **AND** the sample is recognisably the same colour the day cells draw
 
 #### Scenario: Post-calendar state is explained
 

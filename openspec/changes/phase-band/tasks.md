@@ -22,12 +22,56 @@
 - [x] 2.4 Confirm the status fills are unchanged, so every reading marker's contrast is exactly what it is today and the Status view is untouched.
 - [x] 2.5 Remove the per-phase band tokens in both themes. The band was withdrawn: it and the menses stripe are both horizontal lines at opposite cell edges, 8px apart across a week boundary, where they read as one mark.
 
+## 2b. The cap was in the reading, not the fill
+
+- [x] 2.6 Establish that the 3:1 rule bounds the marker and the fill _together_, so the fill's ceiling is
+      set by the darkest reading and moves when that reading moves. Everything up to here treated the fill as
+      the constrained object and the marker as fixed inside it, which is why three of the four things a review
+      asked for looked unsatisfiable. The dark `Low` at `#0d9488` permitted a fill of 0.0435; the fills sat at
+      94% of that ceiling, which is what made an arbitrary number read as a property of the palette.
+- [x] 2.7 Lighten the dark `Low` reading to `#04ab96`, raising the permitted fill ceiling from 0.0435 to
+      1.0406. This frees the two phase fills and the window bar at once — none of which had been near its own
+      limit; all three were held down by the same dot. Scope note: the readings were originally out of scope
+      and are explicitly not any more, which is the honest record of why they moved.
+- [x] 2.8 Re-space the three readings on **lightness**, which is the channel that survives a small target:
+      0.31, 0.44 and 0.47 luminance, against 0.037 of spread before. Verified that saturation could not have
+      done it — all three were within 0.02 of the sRGB gamut edge, and pushing all three to their limits moved
+      the worst pair only from 0.261 to 0.277.
+- [x] 2.9 Set `Peak` at OKLab L 0.80 (`#f195ff`) by the product owner after a rendered sweep, knowingly
+      under the 0.25 separation floor against `High` at 0.231, and name that one pair as an exception in the
+      guard rather than lowering the floor for every pair. Add a test asserting the set of things under the
+      real floor is exactly that pair, so the exception cannot widen and a further regression on it fails.
+- [x] 2.10 Settle the dark window at `#800630`. The first value bright enough to be unmistakable, `#9d0041`
+      at 0.0755, raised the floor every reading must clear to 0.3265 and squeezed the three readings into a
+      band too narrow to separate. 0.0493 puts that floor at 0.2480 and the bar still out-separates the
+      `Before` fill, by 0.0123.
+- [x] 2.11 Re-check the fills against the freed headroom. `Before` lands at `#5a4a10`, 7% of what the `Low`
+      reading now permits, clearing it at 3.00:1. `After` is unchanged at `#053b2c`. `Before` and `After` are
+      0.131 apart, against 0.057 where this change started.
+
+## 2c. Guard correctness
+
+- [x] 2.12 Strip CSS comments before reading any token. An unterminated comment had been commenting out the
+      dark `Before` fill and three other dark tokens for an entire review cycle, and because the guard matched
+      the stylesheet as raw text it found those tokens inside the comment and reported a clean pass for a
+      palette the app was no longer painting. Add a test that fails on a comment that is never closed.
+- [x] 2.13 Check only the readings that can be painted on each fill, rather than the full cross product,
+      and add the engine test the scoping depends on: a pre-fertile day is before the window's begin, the begin
+      is `min(first High-or-Peak, calendar begin)`, so a `Before` day can only hold a `Low` reading or none.
+      Asserting that against the engine rather than assuming it is what stops the scoping from being a lie if
+      the window's begin rule ever changes.
+
 ## 3. Visual plumbing
 
 - [x] 3.1 Add a `bar` slot to the phase visual, populated for the fertile phase only, and record that it is allowed to differ from the status fill because it is the mark the window is recognised by.
 - [x] 3.2 Give the Calendar's fertile phase the window colour as its fill as well as its bar, so a rounded bar end cannot reveal the darker status tint through its own corner.
 - [x] 3.3 Add a `bar` slot to the layer paint record, populate it for the fertile layer, and confirm every other layer leaves it empty.
-- [x] 3.4 Make a legend swatch take its colour from the paint and its shape from the layer's own declared footprint, so the two can no longer be chosen independently and drift apart. Give the window a tall block and the two tints a small tile.
+- [x] 3.4 Make a legend swatch take its colour from the paint and its shape from the layer's own declared footprint, so the two can no longer be chosen independently and drift apart.
+- [x] 3.4a Give all three phase keys the same footprint. They were first given different sizes — a tall
+      block for the window's bar, a small tile for the two tints — which was an attempt to show the difference
+      in shape and read instead as a claim about importance, on the one key most often compared against its two
+      neighbours. The three are told apart by colour, and a difference the eye has to search for is not doing
+      the work of one it can see.
 - [x] 3.5 Remove the band from the status and phase records and from the paint record, and drop the day cell's band element. Verify no day cell in any phase draws a strip along its top edge.
 
 ## 4. Grid
@@ -53,5 +97,31 @@
 
 - [x] 6.1 Update the existing Calendar tests that assert where a phase's colour sits on the cell, since the marks are descendants rather than classes on the cell itself, and confirm the rest of the Calendar suite is unaffected.
 - [x] 6.2 Run `pnpm check` and confirm format, lint, tests, and build are green, and that `openspec validate --all` passes with these artifacts present.
-- [x] 6.3 Confirm in the running app, in both themes, that the bar's geometry is right and the bands are gone. Read the rendered result back out of the DOM on a month whose window wraps two row boundaries: confirmed zero tabs outside the grid's first and last columns, zero holes between bars in a row, zero bars bleeding vertically, a rounded left end on the window's first day and a rounded right end on its last, and `rgb(112, 11, 37)` dark / `rgb(254, 205, 211)` light. Confirmed the cell behind each rounded end is that same colour, so the corner reveals nothing but the window, and zero bands anywhere in the month. Confirmed the three phase surfaces render as `rgb(76, 55, 0)` Before, `rgb(112, 11, 37)` the window, `rgb(5, 59, 44)` After. Confirmed the two quiet phases still carry their bands, the window carries none, and no day carries both a bar and a menses stripe.
-- [ ] 6.4 Confirm on a real device, in both themes, that the window reads as one thing at a glance, that its two ends are identifiable and show no trace of the old tint, that the calendar's week rows stay legible across it, that the menses stripe is no longer confused with it, and that `Before` and `After` are told apart. In dark, check that the gold `Before` reads as "before". Note it sits at 98% of the reading cap, so if it still reads too dark the answer is a change to the markers rather than another colour, and that `Before` and `After` and not as another phase, and that the window still wins. `Before` and `After` are closer than they were, at 0.093 against 0.094, so that pair is the one to look at hardest. In light, check the known unfixed case: cream and mint are 0.062 apart with the pale pink window among them. Review from `pnpm dev` in the issue worktree. Record any visual finding as an issue comment rather than expanding this change.
+- [x] 6.3 Confirm in the running app, in both themes, that the bar's geometry is right and the bands are gone. Read the rendered result back out of the DOM on a month whose window wraps two row boundaries: confirmed zero tabs outside the grid's first and last columns, zero holes between bars in a row, zero bars bleeding vertically, a rounded left end on the window's first day and a rounded right end on its last. Confirmed the cell behind each rounded end is that same colour, so the corner reveals nothing but the window, and zero bands anywhere in the month. _(The colour values recorded at the time were `rgb(112, 11, 37)` dark and `rgb(254, 205, 211)` light, with the two quiet phases at `rgb(76, 55, 0)` and `rgb(5, 59, 44)`; they were true when observed and have since changed — see 2.11 and 2.10 for the current values. Left as the record of what was checked rather than rewritten to match later code.)_
+- [x] 6.5 Confirm the final palette in the running app in dark mode, read back from the DOM rather than
+      from the stylesheet: window `rgb(128, 6, 48)`, `Before` `rgb(90, 74, 16)`, `After` `rgb(5, 59, 44)`, and
+      the three markers `rgb(4, 171, 150)` / `rgb(255, 152, 83)` / `rgb(241, 149, 255)`. Confirm the three
+      phase legend keys are all 10x10. `pnpm check` green at 1052 tests, `openspec validate --all` 19/19.
+- [ ] 6.4 **This is the one open task, and it needs a real device.** Confirm in both themes that:
+
+  In dark, the things most likely to be wrong, in order:
+
+  1. **That `Peak` and `High` are tellable apart.** They measure `0.231` where the floor is `0.25`, which
+     is a known and accepted shortfall, and the `Peak` value was chosen by eye rather than by the metric.
+     This is the pair to look at hardest. If they blur, the fix is `Peak` at L `0.76` or below, which
+     clears the floor and visibly pinks it down.
+  2. **That the gold `Before` reads as "before"** and not as a third kind of window. It is brighter than
+     anything this change previously shipped, at 7% of the ceiling the `Low` reading now permits, and it is
+     only `0.0123` behind the window in prominence. That margin is the thinnest in the palette.
+  3. **That `Before` and `After` are told apart.** They are `0.131` apart, the closest phase pair. If they
+     are not, the fix belongs in the summary or the legend, not in a fourth mark on every day.
+  4. That the window still reads as one thing at a glance, that its two ends are identifiable and show no
+     trace of a different colour through their corners, that the week rows stay legible across it, and that
+     the menses stripe is not confused with it.
+
+  In light, check the known unfixed case: the two quiet phases are cream and mint, `0.062` apart, with the
+  pale pink window among them. Its readings are closer together than dark's but all three pairs clear the
+  floor. Nobody has reported it; it is unfixed by choice rather than by oversight.
+
+  Review from `pnpm dev` in the issue worktree. Record any visual finding as an issue comment rather than
+  expanding this change.
