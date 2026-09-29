@@ -6,12 +6,13 @@
 
 The app shell SHALL render the application title as a link to the root route (`/`), which is the
 Calendar, on every screen the shell renders and on both viewport surfaces. The title SHALL be
-reachable by keyboard and SHALL be exposed to assistive technology as a link. The title SHALL carry a
-visible hover or focus affordance so that it is distinguishable from a static label. The title SHALL
-NOT be marked as the current page, because the primary navigation's Calendar item carries that
-highlight; at most one entry in the shell SHALL be marked as the current page at any time. The title
-SHALL remain a shortcut to the root route and SHALL NOT be added to the primary navigation's list of
-destinations.
+reachable by keyboard and SHALL be exposed to assistive technology as a link. The title SHALL NOT be
+marked as the current page, because the primary navigation's Calendar item carries that highlight; at
+most one entry in the shell SHALL be marked as the current page at any time. The title SHALL remain a
+shortcut to the root route and SHALL NOT be added to the primary navigation's list of destinations.
+The title's appearance SHALL NOT change: it SHALL carry no hover, focus, or active styling of its
+own, because the title already rests at full contrast and the navigation links' hover treatment
+cannot apply to it.
 
 #### Scenario: Title is a link on the wide-viewport bar
 
@@ -41,11 +42,12 @@ destinations.
 - **THEN** the app navigates to the root route
 - **AND** the title is exposed to assistive technology as a link
 
-#### Scenario: Title shows an affordance indicating it is interactive
+#### Scenario: The title's appearance is unchanged
 
-- **WHEN** the application title is hovered or keyboard-focused
-- **THEN** it renders a visible difference from its resting appearance, so that it is
-  distinguishable from a static label
+- **WHEN** the application title is rendered, hovered, or keyboard-focused
+- **THEN** it renders in exactly its resting appearance, with no hover, focus, or active styling of
+  its own
+- **AND** the top bar's layout, spacing, and the other navigation items' appearance are unchanged
 
 #### Scenario: Title is never marked as the current page
 

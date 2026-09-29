@@ -12,8 +12,8 @@ frustrates.
 - The app title becomes a real link to the root route (`/`), which is the Calendar.
 - The title is present on two surfaces — the narrow-viewport top bar and the wide-viewport
   navigation bar — and both must behave the same way.
-- The title gains a visible hover/focus affordance so it reads as interactive rather than as a
-  static label.
+- The title's appearance does not change. It gains no hover, focus, or active treatment: it becomes a
+  link and nothing else, so the top bar looks exactly as it does today.
 - The title is **not** marked as the current page when the Calendar is already open. The existing
   "Calendar" navigation item owns that highlight; the title is a shortcut home, not a location
   indicator, and two highlighted entries on one screen would be wrong.

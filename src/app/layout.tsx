@@ -14,12 +14,14 @@ const NAV_ITEMS = [
 
 /**
  * The title is a shortcut home, not a primary destination and not a current-page marker, so it
- * carries no `aria-current` — the Calendar nav item owns that. The affordance is an underline
- * rather than the nav links' brighten-on-hover, because the title already rests at full foreground
- * and `hover:text-foreground` would be a visual no-op here. One constant so the two viewport
- * surfaces cannot drift apart.
+ * carries no `aria-current` — the Calendar nav item owns that.
+ *
+ * It also carries no hover, focus, or active styling. The title already rests at full foreground,
+ * so the nav links' brighten-on-hover cannot apply to it, and the owner chose that the title change
+ * no visual styling at all rather than substitute a different cue. The class is deliberately only
+ * what it has always been, so a later change to the top bar's appearance is a conscious decision.
  */
-const TITLE_CLASS = "font-semibold underline-offset-4 hover:underline";
+const TITLE_CLASS = "font-semibold";
 
 function AppTitle() {
   return (

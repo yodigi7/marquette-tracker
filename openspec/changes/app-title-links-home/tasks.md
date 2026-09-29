@@ -9,8 +9,9 @@ Tests are written before the implementation in this group, per the project's tes
       elements. Verify it fails against the current `<span>` implementation.
 - [x] 1.2 Add a failing test asserting the title is a real link element with an `href` (so it is
       keyboard-operable and exposed to assistive tech as a link). Verify it fails.
-- [x] 1.3 Add a failing test asserting the title carries a visible hover/focus affordance class
-      (`hover:underline` per design Decision 3). Verify it fails.
+- [x] 1.3 Add a failing test asserting the title carries NO visual styling of its own — no `hover:`,
+      `focus:`, or `active:` variant, and the class value is exactly its resting value (design
+      Decision 3). Verify it fails.
 - [x] 1.4 Add a failing test asserting the title NEVER carries `aria-current`, including when the
       app is rendered on `/`, and that the Calendar nav item is the one marked on `/`. Verify it fails.
 - [x] 1.5 Add a failing test asserting the wide-viewport `<nav>` still contains exactly
@@ -33,17 +34,15 @@ Tests are written before the implementation in this group, per the project's tes
 ## 2. Implement the title link (`src/app/layout.tsx`)
 
 - [x] 2.1 Replace the narrow-viewport `<span className="font-semibold">Marquette Tracker</span>` with
-      a react-router `<Link to="/">`, keeping `font-semibold` and adding the `hover:underline
-underline-offset-4` affordance. Do not add `aria-current`. Verify test 1.1's narrow-surface
-      assertion passes.
+      a react-router `<Link to="/">`, keeping `font-semibold` and adding no other styling. Do not
+      add `aria-current`. Verify test 1.1's narrow-surface assertion passes.
 - [x] 2.2 Restructure the wide-viewport branch: move the title into a sibling wrapper
       `div` with classes `hidden items-center gap-4 px-4 py-3 md:flex` placed alongside a
       `<nav className="flex gap-3 text-sm">` that holds only the four destination links. Keep the
       `<Separator>` between title and nav, and keep the header's `print:hidden` and the `<main>`
       classes untouched. Verify test 1.5 passes and the existing print test still passes.
-- [x] 2.3 Make the wide-viewport title a `<Link to="/">` with the same `font-semibold` plus the
-      `hover:underline underline-offset-4` affordance as 2.1, and no `aria-current`. Verify tests 1.1,
-      1.2, 1.3, and 1.4 all pass.
+- [x] 2.3 Make the wide-viewport title a `<Link to="/">` with the same `font-semibold` and no other
+      styling as 2.1, and no `aria-current`. Verify tests 1.1, 1.2, 1.3, and 1.4 all pass.
 - [x] 2.4 Extract the shared title className into a single module-level constant so the two
       surfaces cannot drift apart, and verify both surfaces still render identically (test 1.1).
 
@@ -53,6 +52,14 @@ underline-offset-4` affordance. Do not add `aria-current`. Verify test 1.1's nar
   `flex gap-3 text-sm`, so the box model and rendered layout are unchanged. `pnpm vitest run` on
   both shell test files: 24 passed / 0 failed, covering all six new tests and every pre-existing
   test (nav destinations, active item, hash routes, print suppression) unmodified.
+
+  **Revised after review:** tasks 1.3, 2.1, and 2.3 were rewritten. They originally added an
+  `underline-offset-4 hover:underline` affordance, proposed because the navigation's
+  brighten-on-hover cannot apply to a title that already rests at full contrast. The owner ruled that
+  the title gets no visual change at all, so the underline was removed, the requirement and scenario
+  in the spec delta were reworded from "carries an affordance" to "carries no styling of its own",
+  and test 1.3 was inverted to pin the title's class to exactly its resting value. That test now
+  fails loudly if any styling is reintroduced later.
 
 ## 3. Verification
 

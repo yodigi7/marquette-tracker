@@ -163,8 +163,8 @@ describe("RootLayout navigation (app-shell)", () => {
 
 /**
  * The app title is a shortcut home, not a primary destination. These cover both viewport surfaces,
- * the one copy per surface, the link affordance, and the rule that the Calendar nav item keeps sole
- * ownership of the current-page marker.
+ * the one copy per surface, the absence of any visual change, and the rule that the Calendar nav
+ * item keeps sole ownership of the current-page marker.
  */
 describe("RootLayout title link (app-shell)", () => {
   afterEach(() => cleanup());
@@ -199,15 +199,16 @@ describe("RootLayout title link (app-shell)", () => {
     ).toBe(false);
   });
 
-  it("gives the title a visible hover affordance so it does not read as a static label", () => {
+  it("adds no visual styling to the title — it is a link and nothing more", () => {
+    // Owner decision: the title changes behaviour, not appearance. It keeps exactly the class it
+    // has always had, with no hover, focus, or active treatment. The nav links' brighten-on-hover
+    // cannot apply to it anyway, since the title already rests at full foreground. This test pins
+    // that, so a future contributor does not "fix" the missing affordance without asking.
     renderLayout();
 
     for (const link of titleLinks()) {
-      expect(link.className).toContain("hover:underline");
-      // `hover:text-foreground` is the nav links' cue, but the title already rests at full
-      // foreground, so that class would be a visual no-op. Underline is the project's own link
-      // convention (shadcn Button/Badge `link` variant).
-      expect(link.className).not.toContain("hover:opacity-0");
+      expect(link.className).toBe("font-semibold");
+      expect(link.className).not.toMatch(/hover:|focus:|active:/);
     }
   });
 

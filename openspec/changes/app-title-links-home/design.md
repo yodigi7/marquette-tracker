@@ -27,7 +27,7 @@ Two existing behaviours constrain the work:
 **Goals:**
 
 - The title navigates to `/` on both surfaces, in-app, with no reload.
-- The title is a real, focusable link, distinguishable from a static label.
+- The title is a real, focusable link, with its appearance left untouched.
 - The shell's existing invariants (four primary destinations; one current-page marker) survive
   unchanged.
 
@@ -83,30 +83,35 @@ Alternative considered: keep the title inside the `<nav>` and widen the existing
 exclude it. Rejected — it weakens a test that exists to protect a real invariant, and a site-title
 link inside a navigation landmark is the wrong semantics.
 
-### 3. Affordance is an underline, not the nav links' colour shift
+### 3. The title gets no visual treatment at all
 
 The primary navigation uses `hover:text-foreground` over a `text-muted-foreground` rest state. The
-title is **already** at full foreground colour (`font-semibold` with no colour class), so applying
-`hover:text-foreground` to it would be a visually indistinguishable no-op — the affordance would
-simply not exist, and the "distinguishable from a static label" requirement would fail on every
-device.
+title is **already** at full foreground colour, so applying `hover:text-foreground` to it would be a
+visually indistinguishable no-op.
 
-`hover:underline` with `underline-offset-4` is chosen instead. It is already this project's link
-convention: the `link` variant of the shadcn `Button` and `Badge` components in
-`src/components/ui/` is exactly `text-primary underline-offset-4 hover:underline`, and
-`src/features/history/index.tsx` uses the same pair. So the title adopts the app's established
-appearance for "this is a link" rather than inventing a new cue.
+That leaves two options: substitute a different affordance (an underline was the first proposal, since
+it is this project's own link convention in the shadcn `Button`/`Badge` `link` variants), or change
+nothing visually. **The owner chose no visual change** on review: the title becomes a link and
+nothing else. The top bar looks exactly as it did before.
+
+The consequence is stated rather than papered over: with no visual cue, the title is discoverable
+only by trying it. That is an accepted trade for this change, and it is cheaper on touch than it
+sounds — an underline is a pointing-device cue and would not have appeared on a phone anyway, which
+is the surface the request was motivated by.
 
 Alternative considered: muting the title at rest to `text-muted-foreground` so the existing
 `hover:text-foreground` would brighten it. Rejected — it would visibly de-emphasise the app's brand
-mark to solve a styling problem, which is a regression traded for a feature.
+mark to solve a styling problem, and it is a visual change of exactly the kind that was declined.
+
+The class constant is kept anyway, pinned to a single value with a test, so that reintroducing a
+hover treatment later is a conscious decision rather than a drift.
 
 ### 4. Touch tap target left at its current size
 
 The title keeps its current size and padding. The shell's 44px tap-target requirement applies to the
 narrow-viewport **menu items** (an existing spec requirement), not to the header title. Growing the
-title into a large touch target would change the top bar's appearance, which is beyond what the
-issue asks for. Recorded as assumption A2 rather than decided silently.
+title into a large touch target would change the top bar's appearance, which the owner's ruling
+against visual changes rules out here.
 
 ### 5. No `aria-current` on the title, ever
 
@@ -124,32 +129,37 @@ role/name queries in tests unambiguous.
 
 ## Assumptions
 
-Recorded because they were not settled by the issue and were not derivable from the code.
+Recorded because they were not settled by the issue and were not derivable from the code. A1 and A2
+were flagged on the pull request and have since been **answered by the owner**; they are kept below
+with the ruling recorded rather than deleted, because the reasoning is what explains the final
+styling.
 
-### A1 — The hover affordance is an underline, not a colour shift _(load-bearing)_
+### A1 — The title's visual treatment _(load-bearing — RESOLVED)_
 
-**Decision:** the title underlines on hover (and shows the same emphasis on keyboard focus) instead
-of adopting the navigation's brighten-on-hover treatment.
+**Originally proposed:** the title underlines on hover, since the navigation's brighten-on-hover
+cannot apply to a title that already rests at full contrast.
 
-**Why ambiguous:** the issue asked for "the same hover feedback as the other navigation items",
-which is literally impossible here — the navigation links brighten because they rest at a _muted_
-colour, and the title already rests at full contrast. The two surfaces have different rest states, so
-"the same feedback" has to be read as "an equally visible affordance", not "the same class name".
+**Owner's ruling:** no visual change at all. The title becomes a link and keeps exactly the
+appearance it has always had — no underline, no colour shift, no size change.
 
-**Affects:** what the user sees on hover at the top of every screen. **How hard to reverse:** trivial
-— one class name on one element; the tests assert the affordance is present, not which one.
+**Why it was ambiguous:** the issue asked for "the same hover feedback as the other navigation
+items", which cannot literally apply to this element, so some substitute cue was needed if the title
+was to be visibly interactive at all.
 
-### A2 — The title is not enlarged into a larger touch target _(load-bearing)_
+**Affects:** what the user sees at the top of every screen — by ruling, nothing. **How hard to
+reverse:** trivial; the test that pins the class value will fail loudly if anyone adds styling back.
 
-**Decision:** the title keeps its current visual size; no extra padding or minimum tap size is added.
+### A2 — The title is not enlarged into a larger touch target _(load-bearing — RESOLVED)_
 
-**Why ambiguous:** the issue's motivation is explicitly mobile ("on a phone it is the obvious place
-to tap"), which argues for a bigger target, but no acceptance criterion asked for one, and enlarging
-it changes the top bar's appearance. Scope discipline and the mobile motivation pull in opposite
-directions and the issue does not settle it.
+**Owner's ruling:** the title keeps its current size. Enlarging it would itself be a visual change,
+so the ruling against visual changes settles this too.
 
-**Affects:** how easy the title is to hit on a phone, and the top bar's appearance. **How hard to
-reverse:** trivial — padding/size classes on the same element.
+**Why it was ambiguous:** the issue's motivation is explicitly mobile ("on a phone it is the obvious
+place to tap"), which argues for a bigger target, while no acceptance criterion asked for one. The
+two pulled in opposite directions.
+
+**Affects:** how easy the title is to hit on a phone. **How hard to reverse:** trivial — padding and
+size classes on the same element. Recorded as a known limitation rather than a defect.
 
 ### A3 — "Home page" means the Calendar at `/` _(routine, but recorded)_
 
@@ -193,14 +203,15 @@ updated instead. Both satisfy the issue.
   `Calendar`/`Status`/… already do) → Mitigation: this mirrors the existing convention for the four
   nav links, which the test suite already queries with `getAllByRole` and a length assertion. New
   tests follow the same pattern rather than assuming a single match.
-- **The underline is a mouse affordance and will not appear on touch** → Accepted. The link's
-  behaviour is the discovery path on touch; enlarging the tap target is deliberately out of scope and
-  recorded as A2 for the owner to decide.
-- **A future change might accidentally mark the title as the current page** → Mitigation: the spec
-  delta states "at most one entry SHALL be marked as the current page", and a test asserts the
-  title carries no `aria-current` even on `/`.
+- **With no visual treatment, the title is discoverable only by trying it** → Accepted, per the
+  owner's ruling. There is no hover cue, no underline, and no size change to signal interactivity.
+  The keyboard and screen-reader path is unaffected — it is a real link with a real accessible name
+  either way. Accepted as the cost of leaving the top bar visually untouched.
+- **A future change might reintroduce a hover treatment or mark the title as current** → Mitigation:
+  one test pins the title's class to exactly its resting value with no `hover:`/`focus:`/`active:`
+  variant, and another asserts it never carries `aria-current` even on `/`. Both fail loudly if
+  either decision is quietly reversed.
 
 ## Open Questions
 
-None that change the approach. A2 (tap target) is the one item the owner may want to answer
-differently; it is isolated to one element and does not affect the spec delta.
+None. A1 and A2 were both raised on the pull request and answered; the owner's ruling closes them.
