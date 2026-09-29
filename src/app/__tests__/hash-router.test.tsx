@@ -1,6 +1,6 @@
 import "fake-indexeddb/auto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { todayKey } from "@/core/dateKeys";
 import { useAppStore } from "@/core/store/useAppStore";
 import { App } from "../main";
@@ -78,5 +78,21 @@ describe("App hash routing", () => {
 
     expect(await screen.findByText(/no cycle chart yet/i)).toBeInTheDocument();
     expect(window.location.hash).toBe("#/cycle/missing-cycle");
+  });
+
+  it("returns to the Calendar from #/settings when the title is activated", async () => {
+    window.location.hash = "#/settings";
+    render(<App />);
+    await screen.findByRole("heading", { name: "Settings" });
+
+    // The title is a shortcut home, not a primary destination, so it is not covered by the nav
+    // queries above. One copy per viewport surface; either one drives the navigation.
+    const [title] = screen.getAllByRole("link", { name: "Marquette Tracker", hidden: true });
+    expect(title).toHaveAttribute("href", "#/");
+    fireEvent.click(title);
+
+    // In-app transition: the Calendar renders and the fragment updates, with no reload.
+    expect(await screen.findByRole("button", { name: /previous month/i })).toBeInTheDocument();
+    expect(window.location.hash).toBe("#/");
   });
 });

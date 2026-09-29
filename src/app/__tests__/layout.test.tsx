@@ -160,3 +160,82 @@ describe("RootLayout navigation (app-shell)", () => {
     expect(labels).toEqual(["Calendar", "Status", "History", "Settings"]);
   });
 });
+
+/**
+ * The app title is a shortcut home, not a primary destination. These cover both viewport surfaces,
+ * the one copy per surface, the link affordance, and the rule that the Calendar nav item keeps sole
+ * ownership of the current-page marker.
+ */
+describe("RootLayout title link (app-shell)", () => {
+  afterEach(() => cleanup());
+
+  const TITLE = "Marquette Tracker";
+
+  const titleLinks = () => screen.getAllByRole("link", { name: TITLE, hidden: true });
+
+  it("renders the title as a link to the root route on both viewport surfaces", () => {
+    renderLayout();
+
+    // Exactly one copy per surface: the narrow top bar and the wide-viewport bar.
+    const links = titleLinks();
+    expect(links).toHaveLength(2);
+    for (const link of links) {
+      expect(link).toHaveAttribute("href", "/");
+    }
+  });
+
+  it("renders the title as a real anchor, so it is keyboard-operable and announced as a link", () => {
+    const { container } = renderLayout();
+
+    // A <span> is not focusable and is not exposed as a link; an <a href> is both.
+    for (const link of titleLinks()) {
+      expect(link.tagName).toBe("A");
+      expect(link).toHaveAttribute("href");
+    }
+    expect(
+      Array.from(container.querySelectorAll("span")).some(
+        (s) => s.textContent === TITLE && !s.querySelector("a"),
+      ),
+    ).toBe(false);
+  });
+
+  it("gives the title a visible hover affordance so it does not read as a static label", () => {
+    renderLayout();
+
+    for (const link of titleLinks()) {
+      expect(link.className).toContain("hover:underline");
+      // `hover:text-foreground` is the nav links' cue, but the title already rests at full
+      // foreground, so that class would be a visual no-op. Underline is the project's own link
+      // convention (shadcn Button/Badge `link` variant).
+      expect(link.className).not.toContain("hover:opacity-0");
+    }
+  });
+
+  it("never marks the title as the current page, and leaves that marker to the Calendar item", () => {
+    // Rendered on `/` specifically: this is where a naive implementation would highlight both.
+    renderLayout(["/"]);
+
+    for (const link of titleLinks()) {
+      expect(link).not.toHaveAttribute("aria-current");
+    }
+    const [calendar] = screen.getAllByRole("link", { name: "Calendar", hidden: true });
+    expect(calendar).toHaveAttribute("aria-current", "page");
+  });
+
+  it("keeps the title out of the primary navigation's destination list", () => {
+    // The title is a brand link, not a fifth destination. This is the invariant that
+    // `does not add a document route to the primary navigation` protects.
+    const { container } = renderLayout();
+
+    const nav = container.querySelector("nav") as HTMLElement;
+    const labels = Array.from(nav.querySelectorAll("a")).map((a) => a.textContent);
+    expect(labels).toEqual(["Calendar", "Status", "History", "Settings"]);
+    expect(labels).not.toContain(TITLE);
+
+    // Stronger than the anchor check: the title must not sit inside the navigation element at all,
+    // whether it is text or a link. A brand link nested in the nav landmark is the wrong semantics.
+    expect(Array.from(nav.querySelectorAll("*")).some((el) => el.textContent === TITLE)).toBe(
+      false,
+    );
+  });
+});

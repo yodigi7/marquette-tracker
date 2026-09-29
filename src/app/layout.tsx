@@ -12,6 +12,23 @@ const NAV_ITEMS = [
   { to: "/settings", label: "Settings" },
 ];
 
+/**
+ * The title is a shortcut home, not a primary destination and not a current-page marker, so it
+ * carries no `aria-current` — the Calendar nav item owns that. The affordance is an underline
+ * rather than the nav links' brighten-on-hover, because the title already rests at full foreground
+ * and `hover:text-foreground` would be a visual no-op here. One constant so the two viewport
+ * surfaces cannot drift apart.
+ */
+const TITLE_CLASS = "font-semibold underline-offset-4 hover:underline";
+
+function AppTitle() {
+  return (
+    <Link to="/" className={TITLE_CLASS}>
+      Marquette Tracker
+    </Link>
+  );
+}
+
 export function RootLayout() {
   const { pathname } = useLocation();
 
@@ -28,7 +45,7 @@ export function RootLayout() {
       {/* Print-hidden: a document route prints on its own, with no navigation on the paper. */}
       <header className="print:hidden border-b">
         <div className="flex items-center justify-between px-4 py-3 md:hidden">
-          <span className="font-semibold">Marquette Tracker</span>
+          <AppTitle />
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="Open navigation">
@@ -53,10 +70,12 @@ export function RootLayout() {
             </SheetContent>
           </Sheet>
         </div>
-        <nav className="hidden items-center gap-4 px-4 py-3 md:flex">
-          <span className="font-semibold">Marquette Tracker</span>
+        {/* The title is deliberately outside the <nav>: it is a brand link to the root route, not
+            one of the four primary destinations, so the nav landmark stays exactly those four. */}
+        <div className="hidden items-center gap-4 px-4 py-3 md:flex">
+          <AppTitle />
           <Separator orientation="vertical" className="h-5" />
-          <div className="flex gap-3 text-sm">
+          <nav className="flex gap-3 text-sm">
             {NAV_ITEMS.map((item) => (
               <Link
                 key={item.to}
@@ -67,8 +86,8 @@ export function RootLayout() {
                 {item.label}
               </Link>
             ))}
-          </div>
-        </nav>
+          </nav>
+        </div>
       </header>
       <main className="flex-1 px-4 py-6 print:p-0">
         <Outlet />
