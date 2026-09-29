@@ -1,11 +1,25 @@
 import "fake-indexeddb/auto";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { addDays } from "@/core/engine/dateUtils";
-import { todayKey } from "@/core/dateKeys";
+import { parseDateKey, todayKey } from "@/core/dateKeys";
 import { useAppStore } from "@/core/store/useAppStore";
 import { StatusView } from "../index";
+
+/**
+ * The clock is pinned so this file cannot pass or fail on the day it runs.
+ *
+ * Every assertion here is relative to `todayKey()`, and the date picker renders one month at a time, so
+ * a test asking for a date a few days ahead of "today" is only findable while that date happens to fall
+ * inside the current month's grid. Near the end of a month the target crosses into the next one and the
+ * cell is never rendered. That is not a flake: the window of days on which the file passes is a fixed
+ * handful, and it moves with the wall clock.
+ *
+ * Midday on the 15th, so no assertion sits near a midnight boundary and the pinned month is comfortably
+ * wide on both sides of today. Only `Date` is faked, leaving real timers for `userEvent`.
+ */
+const PINNED_NOW = new Date(2026, 5, 15, 12, 0, 0);
 
 const store = () => useAppStore.getState();
 
@@ -18,6 +32,8 @@ async function bootWithCycle() {
 }
 
 beforeEach(async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(PINNED_NOW);
   useAppStore.setState({ hydrated: false });
   await useAppStore.getState().hydrate();
   await store().clearAllData();
@@ -25,6 +41,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
 });
 
 describe("StatusView", () => {
@@ -670,18 +687,42 @@ describe("StatusView: expected Peak-day range", () => {
  * months at once, so a day-number query is ambiguous; `data-day` is not. The Calendar writes `data-day`
  * as the ISO key alongside a locale-formatted twin, so the ISO form is the one to match.
  */
+/** How many months the picker may be paged in either direction before a lookup gives up. */
+const MONTH_PAGING_STEPS = 24;
+
+/**
+ * The picker's button for a given date, paging the calendar to reach it.
+ *
+ * The picker renders a single month, so a date in an adjacent month is not on screen until the calendar
+ * is paged to it. This decides *which way* to page from the range actually rendered rather than always
+ * going backwards, which is what made a lookup of a date a few days ahead fail whenever that date fell
+ * into the next month — a failure that read as a broken assertion rather than a missing cell, and that
+ * CI hit while a developer's machine at a different UTC offset did not.
+ */
 async function pickDateButton(
   user: ReturnType<typeof userEvent.setup>,
   iso: string,
 ): Promise<HTMLElement | null> {
-  const selector = `[data-day="${iso}"]`;
+  const target = parseDateKey(iso).getTime();
 
-  for (let tries = 0; tries < 3; tries++) {
-    const cell = document.querySelector(selector);
+  for (let step = 0; step < MONTH_PAGING_STEPS; step++) {
+    const cell = document.querySelector(`[data-day="${iso}"]`);
     if (cell) return cell.querySelector("button");
-    const previous = screen.queryByRole("button", { name: /previous month/i });
-    if (!previous) return null;
-    await user.click(previous);
+
+    // Only ISO cells are compared. The grid also carries a second set of day elements in a different
+    // format, and mixing the two would order the range wrongly.
+    const rendered = [...document.querySelectorAll("[data-day]")]
+      .map((el) => el.getAttribute("data-day") ?? "")
+      .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value))
+      .map((value) => parseDateKey(value).getTime());
+    if (rendered.length === 0) return null;
+
+    const backwards = target < Math.min(...rendered);
+    const navigation = screen.queryByRole("button", {
+      name: backwards ? /previous month/i : /next month/i,
+    });
+    if (!navigation) return null;
+    await user.click(navigation);
   }
   return null;
 }
@@ -701,3 +742,54 @@ async function pickDayButton(
   }
   return null;
 }
+
+describe("the date picker's paging", () => {
+  /**
+   * These cover `pickDateButton` itself rather than the Status view, because the tests above stopped
+   * exercising it the moment the clock was pinned: with "today" on the 15th, "today + 5" is comfortably
+   * inside the current month's grid and the lookup never has to page. That would have left a broken
+   * helper looking green — the paging only ever happened to be needed near a month boundary, which is
+   * exactly the condition that was failing.
+   */
+  it("reaches a date in a later month by paging forward", async () => {
+    const user = userEvent.setup();
+    render(<StatusView />);
+    await user.click(await screen.findByTestId("date-trigger"));
+
+    // Two months past the pinned month, so a helper that only ever went backwards could not find it.
+    const target = "2026-08-20";
+    expect(document.querySelector(`[data-day="${target}"]`)).toBeNull();
+
+    const button = await pickDateButton(user, target);
+    expect(button).not.toBeNull();
+    expect(button).toBeInTheDocument();
+  });
+
+  it("reaches a date in an earlier month by paging backward", async () => {
+    const user = userEvent.setup();
+    render(<StatusView />);
+    await user.click(await screen.findByTestId("date-trigger"));
+
+    const target = "2026-03-10";
+    expect(document.querySelector(`[data-day="${target}"]`)).toBeNull();
+
+    const button = await pickDateButton(user, target);
+    expect(button).not.toBeNull();
+    expect(button).toBeInTheDocument();
+  });
+
+  it("returns null rather than hanging when the date does not exist", async () => {
+    const user = userEvent.setup();
+    render(<StatusView />);
+    await user.click(await screen.findByTestId("date-trigger"));
+
+    // A day the calendar can never render, so the helper has to give up instead of paging forever.
+    expect(await pickDateButton(user, "2026-02-30")).toBeNull();
+  });
+
+  it("pinned the clock, so the file's results do not depend on the day it runs", () => {
+    // A guard on the guard: if the pin is ever removed, this fails loudly rather than the file quietly
+    // becoming day-of-month sensitive again.
+    expect(todayKey()).toBe("2026-06-15");
+  });
+});
