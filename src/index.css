@@ -186,28 +186,19 @@
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
 
-    /* Two quiet phase fills, and two constraints fight over them.
+    /* Two quiet phase fills, and two constraints that used to fight over them.
        A fill is capped in lightness by the monitor marker painted on it -- 0.0435 luminance here, set by
-       the Low reading -- and that cap is the whole of the available headroom, whatever the hue. Before
-       sits at 98% of it. The next value up is 3.00:1 against the reading, so this is the last one that
-       clears the floor. There is no value that is both bright and far from the window: the two are the
-       same knob, and it is turned as far as the reading floor allows.
+       the Low reading -- so within that cap there is no value that is both bright and far from the
+       window: the two are the same knob, and it was turned as far as the floor allowed.
 
-       Darkening the Low reading dot is NOT the way past this, which is worth recording because it looks
-       like it should be. A dot darker than its background has to clear 3:1 the other way round, so a
-       dark Low dot forces a *light* background (>= 0.1439) while Peak, being lighter, forces a *dark*
-       one (<= 0.0922). The two readings straddle the fill and ask for opposite things about the same day,
-       so there is no background that serves all three once Low goes dark.
-       Before used to be amber at hue 46 while the window is rose at hue 14, thirty degrees apart, so
-       every step of lift walked it toward the window: brightening it made the two look more alike, which
-       is the opposite of what was asked for. Before is a warm gold at hue 86 now, seventy-one degrees
-       from the window. An indigo was tried and rejected -- a cool fill spends its luminance budget on
-       being cool, is capped harder, and came out darker than the amber it replaced, which is the very
-       thing the review had complained about. Both fills sit below the window in lightness and chroma,
-       so the window is still the most prominent surface on the calendar. Light mode is
-       unchanged: it has the same shape of problem but the markers there are darker and nobody has
-       reported it. See scripts/__tests__/fertility-palette.test.mjs. */
-    --fertility-status-pre-bg: #4c3700;
+       This fill and the window above were both capped by the Low reading, and both are now free of that
+       cap because Low is teal-400 rather than teal-600. The cap was never a property of the fills: it was
+       the Low dot holding both of them down, and the floor it came from is a property of the pair, not of
+       the background. So nothing here is excepted any more. At 0.0711 this measures 4.66:1 against the
+       Low reading, 3.83:1 against High and 3.52:1 against Peak, and the day number holds at 7.79:1. It
+       is 1.67x the luminance the old cap allowed, and it stays closer to the card than the window bar
+       does, so the window is still the most prominent surface on the calendar. */
+    --fertility-status-pre-bg: #5a4a10;
     --fertility-status-pre-fg: #fef3c7;
     --fertility-status-pre-border: #f59e0b;
     --fertility-status-fertile-bg: #4c0519;
@@ -216,10 +207,23 @@
     /* The window's own surface, and the colour of the day cell behind it as well. A full-height shape at
        the cell tint's lightness is not distinguishable from the page, so the Calendar does not use the
        tint here; the status tint above stays the right value for every surface with no bar, which is the
-       Status view. The bar carries the readings, so it is held to the same 3:1 as any other fill, and the
-       binding reading here is LOW -- 0.0435 luminance is what it permits -- not the Peak, at 0.0922.
-       #700b25 sits at 0.0382, clears all three, and is a 0.209 step above the page. */
-    --fertility-status-fertile-window: #700b25;
+       Status view. The bar carries the readings, so it is held to the same 3:1 as any other fill.
+
+       This was pinned at 0.0382 luminance by the Low reading, the same cap that pinned the phase fills,
+       and it is free of that cap now that Low is teal-400. It was then raised to 0.0755, and that was
+       too far: the bar is the LIGHTEST surface a reading has to clear, so its luminance sets the floor for
+       all three markers, and at 0.0755 that floor was 0.3265 -- which squeezed the readings into a band
+       too narrow to tell apart, and inverted the palette's own rule that Low recedes and Peak is the
+       brightest mark. Lightening Low was what made all three readings nearly the same lightness, and
+       brightening the window is what stopped them being pulled apart again.
+
+       0.0493 is the point where the two constraints stop competing. The window still out-separates the
+       Before fill from the card, 0.2355 against 0.2232, so the window remains the most prominent surface
+       and the gold does not need to move. The reading floor falls to 0.2480, which lets the three
+       readings spread back out on lightness -- 0.67, 0.73 and 0.76 -- restoring the progression. The
+       margin over the gold is 0.0123 and is thin; the guard holds the rule, and a later edit that eats it
+       fails rather than passing quietly. */
+    --fertility-status-fertile-window: #800630;
     --fertility-status-post-peak-bg: #053b2c;
     --fertility-status-post-peak-fg: #d1fae5;
     --fertility-status-post-peak-border: #34d399;
@@ -230,10 +234,33 @@
     --fertility-marker-intercourse: #fb7185;
     --fertility-monitor-none: #44403c;
     /* Dark mode has the contrast headroom to carry the progression on lightness as well as hue:
-       Low recedes, Peak is the brightest mark. */
-    --fertility-monitor-low: #0d9488; /* teal-600 */
-    --fertility-monitor-high: #fb923c; /* orange-400 */
-    --fertility-monitor-peak: #e879f9; /* fuchsia-400 */
+       Low recedes, Peak is the brightest mark.
+
+       These three were moved for contrast and then re-spaced for legibility, in two steps.
+
+       The 3:1 floor is a property of the pair, not of the tile. It had been solved for the background
+       alone, and the background was capped because Low was the darkest of the three, so raising Low
+       raised what the floor permits a tile to be. That is what let the Before fill be lightened and the
+       window bar raised without a reading being the thing that broke -- and with the Low reading no
+       longer dark, nothing was pinning the other two either.
+
+       With that headroom the three were re-spaced on LIGHTNESS, which is the channel that survives a small
+       target. The reported failure was that Low and Peak read alike while High did not, and the reason is
+       that all three had been within 0.04 of each other in lightness, so hue was doing all the work: at
+       6px in the legend, and 10px in a day cell, two marks of equal lightness read as one whatever their
+       hues. They now sit at 0.31, 0.44 and 0.47 luminance, a spread of 0.16.
+
+       Peak at OKLab L 0.80 was chosen by looking at it rather than by the metric, and it is knowingly
+       under the 0.25 separation floor against High at 0.231. That is the one place the guard is bent, it
+       is bent by name, and the pair is asserted individually below. Bringing it over the floor needs Peak
+       darker, at L 0.76 or below, which visibly pinks it down; or High moved down, which is untried.
+
+       Light mode is deliberately not moved to match: its markers sit on pale fills and are dark for the
+       same reason these are light, so teal-800 is correct there and the two themes differ by step on
+       purpose. */
+    --fertility-monitor-low: #04ab96;
+    --fertility-monitor-high: #ff9853;
+    --fertility-monitor-peak: #f195ff;
     --fertility-forecast-bg: #2e1065;
     --fertility-forecast-border: #c4b5fd;
     --fertility-forecast-fg: #ede9fe;

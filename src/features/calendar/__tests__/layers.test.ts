@@ -62,12 +62,12 @@ describe("the layer declaration", () => {
     expect(swatchSample(phase("fertile")), "the key shows the bar").toBe(LAYER_PAINT.fertile.bar);
   });
 
-  it("gives each phase key the shape its day cells draw", () => {
-    // A key that shows a tall block for a tint, or a tile for the window, misdescribes the calendar.
-    for (const id of ["before", "after"] as const) {
-      expect(phase(id).footprint, `${id} footprint`).toBe("h-2.5 w-2.5 rounded");
-    }
-    expect(phase("fertile").footprint, "fertile footprint").toBe("h-3.5 w-3.5 rounded-sm");
+  it("gives all three phase keys the same footprint", () => {
+    // The colours are what tell the phases apart. Drawing the window's key at a different size made it
+    // read as a claim about importance rather than about the treatment, and it is the key most often
+    // compared against its two neighbours.
+    const sizes = (["before", "fertile", "after"] as const).map((id) => phase(id).footprint);
+    expect(new Set(sizes).size, `phase key sizes: ${sizes.join(" / ")}`).toBe(1);
   });
 
   it("draws a bar on no layer but the window", () => {

@@ -1094,3 +1094,81 @@ describe("cycle band configurability (band-shift)", () => {
     expect(accepted.forecast?.outOfBandCount).toBe(0);
   });
 });
+
+/**
+ * The invariant the Calendar's palette guard leans on, asserted here rather than assumed there.
+ *
+ * A day is `pre-fertile` exactly when it is before the window's begin, and the begin is
+ * `min(first High-or-Peak day, the calendar begin)`. So the begin is never *after* the first High or
+ * Peak reading, which means every pre-fertile day is strictly before it and cannot hold one. A
+ * pre-fertile day therefore only ever carries a Low reading or no reading at all.
+ *
+ * This is what lets the guard check the readings that can actually land on each fill rather than the
+ * full cross product, and it is why relaxing the marker floor on the `pre` fill costs a Low reading and
+ * nothing else. If the engine ever changed so that a High or Peak could sit before the begin, this test
+ * fails and the guard's scoping becomes a lie.
+ */
+describe("a pre-fertile day can only hold a Low reading or none", () => {
+  const LENGTH = 28;
+  const CYCLE_NO = 1;
+
+  function cycleWithReadings(readings: Partial<Record<number, DayRecordInput["monitor"]>>) {
+    const records = Object.entries(readings).map(([day, monitor]) =>
+      record("c1", Number(day), monitor ? { monitor } : {}),
+    );
+    return computeCycle(cycle(), records, CYCLE_NO, LENGTH, emptyHistory(), settings(), TODAY);
+  }
+
+  /** The status the engine gives a cycle day, which is what decides the fill the day is painted with. */
+  function statusAt(result: ReturnType<typeof cycleWithReadings>, day: number): DayStatus {
+    return statusForCycleDay(result.fertileWindow, result.lastPeakDay !== null, day);
+  }
+
+  it("holds when the calendar rule opens the window", () => {
+    // No High or Peak at all, so the begin is cycle day 6 and days 1-5 are pre-fertile.
+    const result = cycleWithReadings({ 1: "low", 2: "low", 3: "low", 4: "low", 5: "low" });
+    for (let day = 1; day < result.fertileWindow.begin; day++) {
+      expect(statusAt(result, day), `day ${day}`).toBe("pre-fertile");
+    }
+  });
+
+  it("holds when a High opens the window earlier than the calendar rule", () => {
+    // A High on day 3 pulls the begin back to day 3, so days 1-2 are pre-fertile and neither can be
+    // the High's own day.
+    const result = cycleWithReadings({ 1: "low", 2: "low", 3: "high", 4: "high" });
+    expect(result.fertileWindow.begin).toBe(3);
+    expect(statusAt(result, 1)).toBe("pre-fertile");
+    expect(statusAt(result, 2)).toBe("pre-fertile");
+    expect(statusAt(result, 3)).toBe("fertile");
+  });
+
+  it("holds when a Peak opens it, and when the earliest-Peak rule sets the begin", () => {
+    const peak = cycleWithReadings({ 1: "low", 2: "low", 4: "peak", 5: "peak" });
+    expect(peak.fertileWindow.begin).toBe(4);
+    for (const day of [1, 2, 3]) {
+      expect(statusAt(peak, day), `day ${day}`).toBe("pre-fertile");
+    }
+  });
+
+  it("leaves every High and Peak reading on a day the window covers or follows", () => {
+    // The direct statement of the invariant: sweep readings across a whole cycle and assert that no
+    // pre-fertile day ever carries one, whatever else the cycle holds.
+    for (let highOrPeakDay = 3; highOrPeakDay <= 20; highOrPeakDay++) {
+      for (const reading of ["high", "peak"] as const) {
+        // Assigned rather than written as a literal, because a computed key is not a known property and
+        // the type would reject it -- which would be the type system objecting to the one thing the
+        // test exists to vary.
+        const readings: Partial<Record<number, DayRecordInput["monitor"]>> = { 1: "low", 2: "low" };
+        readings[highOrPeakDay] = reading;
+        const result = cycleWithReadings(readings);
+        for (let day = 1; day < result.fertileWindow.begin; day++) {
+          const logged = readings[day];
+          expect(
+            logged === undefined || logged === "low" || logged === "none",
+            `${reading} on day ${highOrPeakDay} made day ${day} pre-fertile while holding ${logged}`,
+          ).toBe(true);
+        }
+      }
+    }
+  });
+});

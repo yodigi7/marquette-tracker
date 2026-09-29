@@ -48,6 +48,31 @@ const MARKER_CONTRAST = 3;
 const TEXT_CONTRAST = 4.5;
 
 /**
+ * The one surface where the marker floor is knowingly not met, and why.
+ *
+ * There is no such surface at present, and the declaration below is empty for that reason. It is kept
+ * because the arrangement it was written for is easy to fall back into, and a guard that cannot express
+ * "this one is excepted" is a guard whose author will lower the floor instead.
+ *
+ * The history, because the reasoning is not obvious. A fill was capped at `0.0435` luminance because the
+ * Low reading, the darkest of the three, would drop under 3:1 against anything brighter, and a run of
+ * review rounds pushed the dark `Before` fill past that cap anyway -- at the product owner's direction,
+ * against the explanation, with the shortfall recorded in a named exception rather than by weakening
+ * `MARKER_CONTRAST` for everything.
+ *
+ * The way out was not available in the fill. The floor is a property of the *pair*: it had only ever been
+ * solved for the background, and the background was pinned by the marker rather than the marker by the
+ * background. Lightening the Low reading to teal-400 raised what the floor permits a fill to be, so the
+ * Before fill could stay light *and* the reading on it could clear 3:1 honestly. The exception is
+ * therefore gone rather than widened, and `MARKER_CONTRAST` is back to being the rule everywhere.
+ *
+ * To reinstate one, name a theme, the status, and the ratio it is held to, e.g.
+ * `{ theme: "dark", status: "pre", ratio: 1.5 }`. The rule that consumes it checks that it still covers
+ * exactly the one surface-and-reading pair, so it cannot quietly become a loophole.
+ */
+const MARKER_CONTRAST_SET_ASIDE = null;
+
+/**
  * Minimum OKLab distance between any two things drawn at marker size.
  *
  * `MARKER_SEPARATION` covers the three monitor readings at 10px. Low/Peak was the reported bug at 0.198
@@ -57,6 +82,22 @@ const TEXT_CONTRAST = 4.5;
  * relaxing this floor. Two accessibility rules in direct conflict, and this one should not give.
  */
 const MARKER_SEPARATION = 0.25;
+
+/**
+ * The one reading pair knowingly under that floor, and why.
+ *
+ * Peak at OKLab L 0.80 is what the product owner chose after being shown the sweep, and it sits 0.231
+ * from High. The rule is bent for that one pair by name rather than by lowering `MARKER_SEPARATION`,
+ * which would weaken the check for all three pairs in both themes. The pair is asserted individually at
+ * the floor this sets, so a *further* regression on it still fails.
+ *
+ * Worth recording that this floor is not a reliable proxy for legibility, because it is what it disagreed
+ * with. OKLab distance sums hue and lightness into one figure, so a pair backed only by hue scores the
+ * same as one backed by lightness, and at 6px those are not the same thing. The readings are now spread on
+ * lightness -- 0.31, 0.44 and 0.47 luminance -- which is the part that reads, and this exception is a
+ * single pair inside that spread rather than a symptom of it.
+ */
+const SEPARATION_SET_ASIDE = { theme: "dark", pair: ["high", "peak"], ratio: 0.2 };
 
 /**
  * Minimum OKLab distance between the window's bar and the surfaces it has to be told from.
@@ -90,10 +131,24 @@ function extractBlock(css, selector) {
     if (css[i] === "{") depth++;
     if (css[i] === "}") {
       depth--;
-      if (depth === 0) return css.slice(start, i + 1);
+      if (depth === 0) return stripComments(css.slice(start, i + 1));
     }
   }
   throw new Error(`unterminated "${selector} {" block in index.css`);
+}
+
+/**
+ * Removes comments, because a token inside one is not a token.
+ *
+ * This is not tidiness. A CSS block comment that is never closed swallows every declaration after it,
+ * which deletes a whole theme's tokens; a regex match on the raw text still finds them inside the
+ * comment, so the palette guard reports a clean pass for colours the app no longer paints. That is
+ * exactly what happened: the dark `Before` fill and three fertile tokens were commented out for an
+ * entire review cycle and every assertion here stayed green. Comments are stripped before anything is
+ * read, so a token that is not live is now a hard error instead of a silent pass.
+ */
+function stripComments(css) {
+  return css.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
 function hexToRgb(hex) {
@@ -238,6 +293,36 @@ function readPalette() {
 
 const palette = readPalette();
 
+describe("the stylesheet the palette is read from", () => {
+  it("has no unterminated comment", () => {
+    // A comment that never closes silently deletes every declaration after it. It is invisible in review
+    // and it is invisible to the rules below, so it is checked here on its own terms.
+    const css = readFileSync(CSS_PATH, "utf8");
+    const opens = (css.match(/\/\*/g) ?? []).length;
+    const closes = (css.match(/\*\//g) ?? []).length;
+    expect(
+      { opens, closes },
+      "index.css has a comment that is never closed, which comments out the tokens after it",
+    ).toEqual({ opens, closes: opens });
+  });
+
+  it("defines every Calendar colour in both themes, outside any comment", () => {
+    // `readPalette` throws on a token it cannot find, so reaching this point means each one resolved.
+    // Asserting it explicitly names the guarantee: a colour the app paints is a live declaration.
+    const css = stripComments(readFileSync(CSS_PATH, "utf8"));
+    for (const theme of THEMES) {
+      const names = [
+        ...READINGS.map((r) => `fertility-monitor-${r}`),
+        ...STATUSES.flatMap((s) => [`fertility-status-${s}-bg`, `fertility-status-${s}-fg`]),
+        "fertility-status-fertile-window",
+        "fertility-forecast-bg",
+      ];
+      const missing = names.filter((n) => !new RegExp(`--${n}:`).test(css));
+      expect(missing, `${theme} tokens missing from index.css`).toEqual([]);
+    }
+  });
+});
+
 /**
  * Every surface a Calendar reading marker can be painted on, in the given theme.
  *
@@ -246,6 +331,43 @@ const palette = readPalette();
  * brightened past what a reading can survive, which is the mistake the bar is most likely to invite --
  * it is the one mark on the calendar whose whole job is to be loud.
  */
+/**
+ * Which readings can actually be painted on each surface a Calendar day can present.
+ *
+ * This is not a convenience list. A day is `pre-fertile` exactly when it falls before the window's
+ * begin, and the begin is `min(first High-or-Peak day, the calendar begin)` -- so it is never *after*
+ * the first High or Peak reading, and every pre-fertile day is strictly before one. A pre-fertile day
+ * therefore carries a Low reading or none, never a High or a Peak.
+ *
+ * `marquette.test.ts` asserts that against the engine, sweeping High and Peak across a whole cycle, so
+ * this list is a consequence that is checked rather than one that is assumed. It matters because checking
+ * the full cross product is how a palette ends up held to combinations that cannot occur, and how a real
+ * exception gets lost among them.
+ */
+const READINGS_ON = {
+  pre: ["low"],
+  fertile: ["low", "high", "peak"],
+  "post-peak": ["low", "high", "peak"],
+  "post-calendar": ["low", "high", "peak"],
+  // A day with no phase, and the page or card behind it. A projected day is in the future and holds no
+  // reading, but a day outside every cycle can carry one, so all three are held here.
+  base: ["low", "high", "peak"],
+  card: ["low", "high", "peak"],
+  bar: ["low", "high", "peak"],
+  predicted: ["low", "high", "peak"],
+};
+
+/**
+ * The separation floor that applies to one reading pair in one theme: the real one, or the set-aside ratio
+ * if this is the pair `SEPARATION_SET_ASIDE` names. Applied here rather than by lowering the floor, so every
+ * other pair in both themes is still held to `MARKER_SEPARATION`.
+ */
+function exceptedPair(theme, a, b) {
+  const e = SEPARATION_SET_ASIDE;
+  if (e && theme === e.theme && e.pair[0] === a && e.pair[1] === b) return e.ratio;
+  return MARKER_SEPARATION;
+}
+
 function cellFills(theme) {
   const t = palette[theme];
   return {
@@ -290,17 +412,71 @@ describe("palette is read from the stylesheet the app loads", () => {
 describe("monitor marker contrast", () => {
   for (const theme of THEMES) {
     for (const reading of READINGS) {
-      it(`${theme} ${reading} clears ${MARKER_CONTRAST}:1 against every Calendar fill`, () => {
+      it(`${theme} ${reading} clears the floor against every surface it can land on`, () => {
         const hex = palette[theme].markers[reading];
+        // The exception, when there is one, applies to a single surface in a single theme. It is applied
+        // here rather than by weakening the floor, so every other surface is still held to 3:1.
+        const floor =
+          MARKER_CONTRAST_SET_ASIDE && theme === MARKER_CONTRAST_SET_ASIDE.theme
+            ? MARKER_CONTRAST_SET_ASIDE.ratio
+            : MARKER_CONTRAST;
         const failures = Object.entries(cellFills(theme))
+          // Only the readings that can land on this surface at all. Checking the full cross product would
+          // hold the palette to combinations the engine cannot produce, and would bury a genuinely
+          // excepted combination among impossible ones.
+          .filter(([name]) => READINGS_ON[name]?.includes(reading))
           .map(([name, fill]) => [name, contrast(hex, fill)])
-          .filter(([, ratio]) => ratio < MARKER_CONTRAST)
+          .filter(([, ratio]) => ratio < floor)
           .map(([name, ratio]) => `${name} ${ratio.toFixed(2)}:1`);
 
         expect(failures, `${theme} ${reading} is ${hex}`).toEqual([]);
       });
     }
   }
+
+  it("leaves no surface under the floor, or excepts exactly one and names it", () => {
+    // The guard against an exception becoming a loophole. Whatever is under 3:1 has to be precisely what
+    // `MARKER_CONTRAST_SET_ASIDE` names -- one surface, and because `pre` can only ever carry a Low
+    // reading, one surface-and-reading pair -- and nothing else may join it. With no exception declared
+    // the list has to be empty, which is the state the palette is in now.
+    const themes = MARKER_CONTRAST_SET_ASIDE
+      ? [
+          MARKER_CONTRAST_SET_ASIDE.theme,
+          ...THEMES.filter((t) => t !== MARKER_CONTRAST_SET_ASIDE.theme),
+        ]
+      : THEMES;
+    const below = themes
+      .flatMap((theme) =>
+        Object.entries(cellFills(theme)).flatMap(([name, fill]) =>
+          (READINGS_ON[name] ?? []).map(
+            (reading) =>
+              `${theme}/${name}/${reading} ` +
+              `${contrast(palette[theme].markers[reading], fill).toFixed(2)}:1`,
+          ),
+        ),
+      )
+      .filter((entry) => Number.parseFloat(entry.split(" ").at(-1)) < MARKER_CONTRAST);
+
+    if (!MARKER_CONTRAST_SET_ASIDE) {
+      expect(
+        below,
+        "nothing may sit under the marker floor; if one surface genuinely has to, declare it in " +
+          "MARKER_CONTRAST_SET_ASIDE rather than lowering the floor",
+      ).toEqual([]);
+      return;
+    }
+    expect(
+      below,
+      `only ${MARKER_CONTRAST_SET_ASIDE.status} in ${MARKER_CONTRAST_SET_ASIDE.theme} may sit under ` +
+        "the floor, and only while the cap is knowingly set aside for it",
+    ).toEqual([
+      `${MARKER_CONTRAST_SET_ASIDE.theme}/${MARKER_CONTRAST_SET_ASIDE.status}/low ` +
+        `${contrast(
+          palette[MARKER_CONTRAST_SET_ASIDE.theme].markers.low,
+          palette[MARKER_CONTRAST_SET_ASIDE.theme].fill[MARKER_CONTRAST_SET_ASIDE.status],
+        ).toFixed(2)}:1`,
+    ]);
+  });
 });
 
 describe("monitor marker separation", () => {
@@ -313,14 +489,41 @@ describe("monitor marker separation", () => {
   for (const theme of THEMES) {
     for (const [a, b] of PAIRS) {
       it(`${theme} ${a} and ${b} are distinguishable at marker size`, () => {
+        const floor = exceptedPair(theme, a, b);
         const distance = separation(palette[theme].markers[a], palette[theme].markers[b]);
         expect(
           distance,
-          `${theme} ${a}/${b} separation is ${distance.toFixed(4)}`,
-        ).toBeGreaterThanOrEqual(MARKER_SEPARATION);
+          `${theme} ${a}/${b} separation is ${distance.toFixed(4)}` +
+            (floor < MARKER_SEPARATION ? `, against the set-aside floor of ${floor}` : ""),
+        ).toBeGreaterThanOrEqual(floor);
       });
     }
   }
+
+  it("bends the separation floor for one named pair and no other", () => {
+    // The guard against an exception becoming a loophole. Anything under the real floor has to be exactly
+    // the pair `SEPARATION_SET_ASIDE` names, in the theme it names.
+    const themes = [
+      SEPARATION_SET_ASIDE.theme,
+      ...THEMES.filter((t) => t !== SEPARATION_SET_ASIDE.theme),
+    ];
+    const below = themes.flatMap((theme) =>
+      PAIRS.map(([a, b]) => {
+        const distance = separation(palette[theme].markers[a], palette[theme].markers[b]);
+        return distance < MARKER_SEPARATION ? `${theme}/${a}-${b} ${distance.toFixed(4)}` : null;
+      }),
+    );
+    expect(
+      below.filter(Boolean),
+      `only ${SEPARATION_SET_ASIDE.pair.join("-")} in ${SEPARATION_SET_ASIDE.theme} may sit under the ` +
+        "separation floor, and only while Peak is held at the lightness that was chosen",
+    ).toEqual([
+      `${SEPARATION_SET_ASIDE.theme}/${SEPARATION_SET_ASIDE.pair.join("-")} ${separation(
+        palette[SEPARATION_SET_ASIDE.theme].markers[SEPARATION_SET_ASIDE.pair[0]],
+        palette[SEPARATION_SET_ASIDE.theme].markers[SEPARATION_SET_ASIDE.pair[1]],
+      ).toFixed(4)}`,
+    ]);
+  });
 });
 
 describe("the phase fills are visible against the page", () => {
@@ -348,11 +551,23 @@ describe("the phase fills are visible against the page", () => {
         // things in the two themes: in dark the window is the lightest thing on the calendar, in light it
         // is the darkest. Comparing lightness across themes gets one of the two exactly backwards, which
         // is what an earlier draft of this rule did.
+        //
+        // This one is not relaxed, and holding it is part of what fixing the Low reading bought. When the
+        // Before fill was pushed past the marker cap, it ended up further from the card than the window
+        // was -- so Before out-shouted the window, and this rule had to be excepted too. Lightening the
+        // Low dot let the fill stay light without out-shouting anything, so the exception is gone and the
+        // window is the most prominent surface on the calendar again.
+        const setAside =
+          MARKER_CONTRAST_SET_ASIDE && theme === MARKER_CONTRAST_SET_ASIDE.theme && phase === "pre";
         const surface = palette[theme].surfaces.card;
+        const windowDistance = separation(palette[theme].bar, surface);
+        const phaseDistance = separation(palette[theme].fill[phase], surface);
         expect(
-          separation(palette[theme].bar, surface),
-          `${theme} the window is no more prominent than the ${phase} fill against ${surface}`,
-        ).toBeGreaterThan(separation(palette[theme].fill[phase], surface));
+          phaseDistance,
+          `${theme} the window is ${windowDistance.toFixed(4)} from ${surface} and the ${phase} fill is ` +
+            `${phaseDistance.toFixed(4)}` +
+            (setAside ? ", which is the known consequence of the cap being set aside" : ""),
+        ).toBeLessThan(setAside ? Infinity : windowDistance);
       });
     }
   }

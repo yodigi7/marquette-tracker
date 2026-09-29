@@ -114,16 +114,19 @@ export const LAYER_GROUP_LABELS: Record<LayerGroup, string> = {
 const SQUARE = "h-2.5 w-2.5 rounded";
 
 /**
- * A phase key shows the shape its day cells draw. The window is drawn as a full-height bar, so its key is
- * a tall block. Before and After are tints, so their key is a small square tile — the shape a tinted day
- * actually reads as now that there is no band on it.
+ * A phase key shows the colour its day cells draw, at the size they are compared at.
+ *
+ * All three are the same footprint, deliberately. The window is drawn on the calendar as a full-height
+ * bar and the other two as tints, so a taller key for the window was an attempt to show that difference
+ * in shape — and it read as a claim about importance rather than about the treatment, with the key that
+ * most needs to be compared against its two neighbours being the one drawn at a different size. The
+ * colours are what tell the phases apart, and the review that asked for equal keys is right: a
+ * difference you have to look for is not doing the job of one you can see.
  */
-const BAR_FOOTPRINT = "h-3.5 w-3.5 rounded-sm";
-const TINT_FOOTPRINT = "h-2.5 w-2.5 rounded";
+const PHASE_FOOTPRINT = "h-2.5 w-2.5 rounded";
 
 function phaseLayer(id: CalendarPhase, label: string): CalendarLayer {
-  const footprint = LAYER_PAINT[id].bar ? BAR_FOOTPRINT : TINT_FOOTPRINT;
-  return { id, label, group: "status", needs: "algorithm", footprint };
+  return { id, label, group: "status", needs: "algorithm", footprint: PHASE_FOOTPRINT };
 }
 
 function monitorLayer(id: "low" | "high" | "peak", label: string): CalendarLayer {
