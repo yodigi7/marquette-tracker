@@ -3,7 +3,10 @@
 #
 #   1. Format the staged supported files and re-stage them.
 #   2. Lint the whole project (0.7s — cheaper than filtering staged paths).
-#   3. Validate all OpenSpec artifacts (0.6s).
+#
+# OpenSpec validation used to be step 3 here. It was removed when OpenSpec
+# was retired as the workflow: openspec/ is frozen history that no longer
+# changes, so re-validating it on every commit bought nothing.
 #
 # Type checking and tests are intentionally NOT here: `tsc -b` costs ~4s with
 # no useful incrementality on this tree, so it runs in the pre-push hook via the
@@ -45,12 +48,6 @@ fi
 # --- 2. Lint the whole project -----------------------------------------
 if ! pnpm exec oxlint; then
   echo "pre-commit: lint failed. Fix the reported issues, or bypass with --no-verify." >&2
-  exit 1
-fi
-
-# --- 3. Validate OpenSpec artifacts ------------------------------------
-if ! pnpm exec openspec validate --all --no-interactive; then
-  echo "pre-commit: OpenSpec validation failed. Fix the artifacts, or bypass with --no-verify." >&2
   exit 1
 fi
 

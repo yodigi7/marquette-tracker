@@ -169,13 +169,13 @@ Issues and specs are GitHub issues on `yodigi7/marquette-tracker`, operated with
 
 ### Domain docs
 
-Single-context layout: a root `GLOSSARY.md` and `docs/adr/` when they come into existence. Neither exists yet; skills that read them proceed silently until `/domain-modeling` creates them. See `docs/agents/domain.md`.
+Single-context layout: a root `GLOSSARY.md` and `docs/adr/` when they come into existence. Neither exists yet; skills that read them proceed silently until `@domain-modeling` creates them. See `docs/agents/domain.md`.
+
+### Triage labels
+
+The five canonical roles map 1:1 to labels of the same name on the tracker. See `docs/agents/triage-labels.md`.
 
 ## Development workflow
-
-> **Experiment.** This branch tests Matt Pocock's agent skills in place of OpenSpec. See
-> [`docs/agents/EXPERIMENT.md`](docs/agents/EXPERIMENT.md) for how to revert. On `main`, feature work is
-> still driven by OpenSpec and this section does not apply.
 
 Feature work follows an issue-tracker flow. The skills live in `.agents/skills/`; invoke them by
 mentioning `@skill-name`, since they are user-invoked and will not appear in a picker.
@@ -210,8 +210,20 @@ Rules that survive from the OpenSpec workflow:
 
 `@ask-matt` is installed but describes the upstream skill set, not this configuration. Ignore it.
 
-OpenSpec remains installed and its archived specs remain the historical record of the app's
-behaviour. It is simply not the active workflow on this branch.
+## OpenSpec (retired)
+
+OpenSpec is no longer the workflow. Its tooling is removed: the `/opsx-*` commands, the `issues`
+agent, and the nine generated skills are all gone.
+
+**`openspec/` is kept as frozen history and is not to be edited.** `openspec/specs/` holds the 18
+capability specs describing how the app behaved when the workflow was retired, and
+`openspec/changes/archive/` holds 34 archived changes including decisions that were later reversed.
+That history is the record of _what the app does and why_ — nothing replaces it, so treat it as
+read-only rather than as dead weight. It describes the app as of the retirement date, not as of
+any later change.
+
+Nothing runs OpenSpec automatically. `openspec validate` was removed from the pre-commit hook when
+the workflow was retired; the specs still validate if you run it by hand.
 
 ## Conventions
 
