@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "sortPackageJson": false,
-  "ignorePatterns": [".opencode/**", "openspec/changes/archive/**"],
+  "ignorePatterns": [".opencode/**", ".agents/**", "openspec/changes/archive/**"],
   "overrides": [
     {
       "files": ["src/index.css"],

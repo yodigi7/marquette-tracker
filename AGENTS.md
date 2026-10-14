@@ -49,7 +49,7 @@ Shared rules for both lanes:
 - **The app never generates a document file of its own.** No PDF, PNG, or other document export. Two printable instructor documents exist and are handed to the browser's own print or save action: the single-cycle summary (one cycle, in words) and the instructor chart (a run of cycles, as a grid with days across and observations down). Separately, a read-only CSV export exists in Settings for spreadsheets and is not a backup. "Export" in this app means a file lands on the device; a printable document is handed to the browser, and those two are never conflated.
 - **Algorithm is ON by default** but must have a user-facing toggle to disable computed fertile-window logic (app then logs data without interpreting it).
 - **Normal cycling protocol only** — no postpartum/non-cycling/transitioning rules in MVP.
-- **Current Marquette Institute protocols** (Fehring et al.) — see domain rules below.
+- **Current Marquette Institute protocols** (Fehring et al.) — see the domain rules below.
 - **Day 1 = first day of menses**.
 - **Manual entry only** for monitor readings — no device integration/import.
 - **No reminders/notifications** for now.
@@ -72,40 +72,17 @@ Shared rules for both lanes:
 
 ## Marquette domain rules (cycling protocol — the core logic)
 
-Source: Marquette University College of Nursing, Institute for NFP (Fehring et al.). Used for women with cycles 21–42 days.
+The full protocol lives in [`src/core/engine/AGENTS.md`](src/core/engine/AGENTS.md). It is loaded
+automatically whenever work touches `src/core/engine/`, so it is not repeated here.
 
-Markers: monitor reading (Low / High / Peak), optional cervical mucus (L/H/P style), BBT, intercourse acts, menses.
+In short: fertile-window **begin** is cycle day 6 for the first six cycles, then the earliest Peak day
+of the last 6 cycles minus 6 (pulled earlier by the first High or Peak reading of the current cycle).
+Fertile-window **end** is 3 full days after the last monitor Peak of that same cycle; a cycle with no
+Peak has no end. The post-Peak interval is a fixed protocol constant, never a setting. Contradictions
+in the data are reported as protocol warnings, never resolved by moving the window.
 
-Fertile-window **begin**:
-
-|                | Rule                                                                                                                                                                                                                                                           |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cycles 1–6     | Fertility begins on **cycle day 6** (calendar rule, reflects earliest possible peak day 12 − 6)                                                                                                                                                                |
-| After 6 cycles | Earliest **Peak day** of the last 6 cycles **minus 6 days** — where a cycle's Peak day is its **first** monitor Peak reading — AND the first High or Peak reading of the current cycle triggers the fertile window whenever it appears (whichever comes first) |
-
-The begin **day** is day 6 in both rows above, but the begin **rule** is not the same one: the
-earliest-Peak-minus-6 rule applies only when the history window actually holds a Peak to measure from.
-A cycle beyond the first six whose window holds none falls back to the day-6 rule and is labelled as
-that fallback, so a surface naming the rule names the rule that was applied.
-
-Fertile-window **end**:
-
-|                  | Rule                                                                                                                                                                                                              |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Any cycle number | 3 full (24-h) days after the **last user-entered monitor Peak of that same cycle**                                                                                                                                |
-| No monitor Peak  | No end. The protocol defines the end only through a Peak, so a cycle holding none has no end day, in every cycle including cycles beyond the first six, and every day from the window's begin onward is `fertile` |
-
-- Monitor-only evidence: Peak, fertile-window begin/end, and confirmation come from user-entered monitor readings. Mucus stays loggable and visible (calendar/chart overlays) but is never engine evidence.
-- **A cycle holds two Peak days, not one.** The monitor is specified to show Peak for a **minimum of 2 days** (Fehring 2013: "at a minimum the monitor usually will give the user at least one day of 'high' fertility and two days of 'peak' fertility"), and ovulation falls inside "the 2 days of CPFM peak fertility" in 91.1% of cycles (Fehring 2008). The protocol uses a different reading for each end of the window: the **first** Peak reading is the cycle's _Peak day_, and the **last** is what the end is measured from. Never collapse the pair, and never report a last reading as "the Peak day".
-- **The end is never earlier than the Peak day that defines it.** The end is measured from the cycle's own monitor Peak and from no other reading, so a cycle 7+ whose Peak is later than every Peak in the last 6 still ends three days after its own Peak. No date borrowed from another cycle may shorten it, in either direction. The symmetric invariant holds on the other side: the begin is never later than the cycle's own first Peak day, because the first High **or Peak** reading of the current cycle opens the window whenever it precedes the calendar day. Both are asserted by tests, not by prose.
-- **Recorded evidence never moves the window.** If a monitor `high`/`peak` is logged on a day after the computed end, that contradiction is _reported_ as a protocol warning, not resolved by moving the end. `low` outside the window is consistent and is not reported. The window opens on evidence (first High or Peak before the calendar begin pulls it earlier) and closes on the Peak alone — the two halves deliberately differ, because the published protocol defines the end only through the last Peak.
-- **An open cycle whose computed end has passed is reported.** The cycle is still in progress, so its remaining days are not settled. A closed cycle with an end in the past is ordinary.
-- **A cycle with no Peak (8–10% of cycles) has no end, in every cycle** — and the app raises a `no-peak-end` protocol warning saying so, so the absence is explained rather than silent. It is not a defect and no substitute end is invented.
-- **A run of 9 or more consecutive monitor `high` readings is reported** as a `high-run` protocol warning naming the run's length: that is the point at which the monitor's own guidance is to stop testing, because a Peak is no longer expected. A `peak` reading ends the run, as does any cycle day that is not a `high` (an unlogged day is not a `high`). The run is an observation only — it is never treated as a Peak and never moves `begin`, `end`, or either rule.
-- The post-Peak interval is a **fixed protocol constant of 3**, not a preference. The published protocol ends the window "three full days past the last peak reading" (Mu, Fehring & Bouchard, _Linacre Q_ 2022; Fehring 2018), so it is not user-configurable and no stored value can move it. Do not reintroduce a `postPeakDays` setting.
-- Cycles outside 21–42 days: warn if 2+ cycles fall outside the band (protocol says consult a teacher).
-- All computed statuses are **derived at read time** from raw records — never stored — recomputed on every data change.
-- **Projected cycles compute their own window.** A projection has no readings, so its window is the calendar rule over the lookback's Peaks, with each edge taken from the reading its own rule uses: begin = earliest **Peak day** (first reading) − 6, end = latest **last** Peak reading + 3. With no Peak anywhere in the lookback it uses a composed fallback — begin day 6, end day 16, being the earliest possible Peak day (12) plus the minimum Peak run (2 days, so the earliest possible _last_ Peak day is 13) plus the post-Peak interval. That fallback is for projections only and is never applied to a cycle the user recorded.
+**Rules below that line are binding on this directory's code.** Read the linked file before editing
+anything in `src/core/engine/`.
 
 ## Architecture (MVP)
 
@@ -174,8 +151,8 @@ to be green before a change is considered done.
   `git push --no-verify`.
 - **Formatting** is oxfmt, configured in `.oxfmtrc.json`. Style is semicolons, double quotes, 100-column
   width, two-space indent. Three exceptions: `src/index.css` stays 4-space (shadcn), `package.json` key
-  order is preserved, and `.opencode/**` plus `openspec/changes/archive/**` are skipped (vendored tooling
-  and historical records). Do not add a second formatter.
+  order is preserved, and `.opencode/**`, `.agents/**`, plus `openspec/changes/archive/**` are skipped
+  (vendored tooling and historical records). Do not add a second formatter.
 - **Lint baseline is zero warnings.** The one exception, `react/only-export-components` in
   `src/components/ui/`, is disabled by committed `overrides` in `.oxlintrc.json` because shadcn exports
   `cva()` results alongside components. Keep it scoped to that directory, and do not silence it with inline
