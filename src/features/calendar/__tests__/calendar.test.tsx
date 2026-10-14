@@ -764,6 +764,65 @@ describe("CalendarView", () => {
         });
         expect(screen.queryByTestId("calendar-run-outline")).toBeNull();
       });
+
+      it("starts at the day boundary, not out where the bar is", () => {
+        // Today's ring reaches 2px into the grid gap on this side. A line 2px outside the bar would be
+        // drawn across the recorded day beside it, hard against the ring, and the two marks would read
+        // as one thick band. The predicted run starts at the boundary instead.
+        renderCell("fertile", { forecast: true, windowEdges: INTERIOR, beginsForecast: true });
+        expect(outlineClasses()).toContain("-left-0");
+        expect(outlineClasses()).not.toContain("-left-[6px]");
+      });
+
+      it("keeps a window that genuinely started on the day outset of the bar", () => {
+        renderCell("fertile", { forecast: true, windowEdges: FIRST_DAY });
+        expect(outlineClasses()).toContain("-left-[2px]");
+      });
+
+      it("keeps the run's inner days outset of the bar", () => {
+        renderCell("fertile", { forecast: true, windowEdges: INTERIOR });
+        expect(outlineClasses()).toContain("-left-[6px]");
+      });
+    });
+
+    describe("the today ring", () => {
+      const ring = '[data-testid="calendar-today-ring"]';
+      const cell = () => screen.getByTestId("day-cell");
+
+      it("is drawn as an element after the bar, not as a shadow on the cell", () => {
+        // A box-shadow paints under every child, and the bar bleeds past the cell on both sides, so on
+        // a day inside the window the bar covered the ring's left and right strokes outright.
+        renderCell("fertile", { isToday: true, windowEdges: INTERIOR });
+        const el = cell().querySelector(ring);
+        const barEl = cell().querySelector(bar);
+        expect(el).not.toBeNull();
+        expect(barEl!.compareDocumentPosition(el!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(cell().className).not.toContain("ring-2 ring-foreground");
+      });
+
+      it("lifts the cell, so the next day's bar cannot paint over it", () => {
+        // The next day's cell comes later in the document and its bar reaches back across the grid gap
+        // over this cell's right-hand ring stroke. Document order cannot protect an outset ring.
+        renderCell("fertile", { isToday: true });
+        expect(cell().className).toContain("z-10");
+      });
+
+      it("does not lift any other day", () => {
+        renderCell("fertile");
+        expect(cell().className).not.toContain("z-10");
+        expect(cell().querySelector(ring)).toBeNull();
+      });
+
+      it("outsets the same 2px on a day with no bar as on one inside the window", () => {
+        // The ring must not change shape between window and non-window days, or today would read as
+        // two different things depending on what the app thinks is going on.
+        const inside = renderCell("fertile", { isToday: true, windowEdges: INTERIOR });
+        const insideClass = inside.container.querySelector(ring)!.className;
+        inside.unmount();
+
+        const outside = renderCell(null, { isToday: true });
+        expect(outside.container.querySelector(ring)!.className).toBe(insideClass);
+      });
     });
 
     it.each(["pre-fertile", "post-peak", "post-calendar"] as const)(
@@ -1453,7 +1512,9 @@ describe("day cell layer visibility", () => {
       "intercourse",
     ]);
     expect(cell.textContent).toBe("14");
-    expect(cell.className).toContain("ring-2");
+    // The ring is an element, not a box-shadow on the cell. Matching `ring-2` here would have passed
+    // on `focus-visible:ring-2`, which the cell carries either way.
+    expect(cell.querySelector('[data-testid="calendar-today-ring"]')).not.toBeNull();
     await user.click(cell);
     expect(selected).toBe("2026-01-14");
   });

@@ -103,6 +103,18 @@ export function DayCell({
   // as whichever rows happen to fall inside it. Both the bar and the outline read these straight off
   // `windowEdges`, so they cannot disagree about which days those are.
 
+  // Where the run's dashes begin on the left. A day the window genuinely started on gets a line 2px
+  // outside the bar's own start. A day the window merely ran into gets no line, so its offset only has
+  // to clear the bar. The first PREDICTED day of a run is the third case: today's ring reaches 2px into
+  // the grid gap on this side, so a line 2px outside the bar would be drawn across the recorded day
+  // beside it, hard against the ring. It starts at the day boundary instead, which leaves 2px of window
+  // colour between the two marks and keeps both fully legible.
+  const outlineLeft = beginsForecast
+    ? "-left-0"
+    : windowEdges.start
+      ? "-left-[2px]"
+      : "-left-[6px]";
+
   return (
     <button
       type="button"
@@ -119,7 +131,10 @@ export function DayCell({
         "relative flex h-12 flex-col items-center justify-center rounded-md text-xs transition-colors focus-visible:ring-2 focus-visible:ring-foreground/70 focus-visible:outline-none",
         statusFill,
         statusCue,
-        isToday && "ring-2 ring-foreground/70",
+        // Lifted so nothing later in the calendar paints over today. An outset ring cannot be protected
+        // by document order alone: the next day's cell is later in the DOM, and its bar reaches back
+        // across the grid gap, straight over this cell's right-hand ring stroke.
+        isToday && "z-10",
         "hover:brightness-105 cursor-pointer",
       )}
     >
@@ -169,12 +184,27 @@ export function DayCell({
           className={cn(
             "pointer-events-none absolute border-dashed border-fertility-forecast-border",
             "-top-[2px] -bottom-[2px] border-t border-b",
-            windowEdges.start ? "-left-[2px]" : "-left-[6px]",
+            outlineLeft,
             windowEdges.end ? "-right-[2px] border-r" : "-right-[6px]",
             (windowEdges.start || beginsForecast) && "border-l",
             windowEdges.roundStart && "rounded-l-[10px]",
             windowEdges.roundEnd && "rounded-r-[10px]",
           )}
+        />
+      )}
+
+      {/* Today is marked by a ring drawn AFTER the bar, never by a `ring-2` box-shadow on the cell.
+          A box-shadow paints under every child, and the bar bleeds past the cell on both sides, so on a
+          day inside the window the bar covered the ring's left and right strokes outright — today showed
+          as two arcs rather than a ring. Drawing the ring here puts it on top of the bar instead, and
+          the cell's `z-10` keeps the NEXT day's bar from painting over it, since that cell comes later
+          in the DOM and reaches back across the gap. Same 2px outset, same radius as the cell: on a day
+          with no bar the two are indistinguishable. */}
+      {isToday && (
+        <span
+          data-testid="calendar-today-ring"
+          aria-hidden="true"
+          className="pointer-events-none absolute -inset-[2px] rounded-[10px] border-2 border-foreground/70"
         />
       )}
       <span className={cn("relative text-[11px] leading-none", isToday && "font-bold")}>
