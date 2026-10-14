@@ -76,13 +76,22 @@ export function DayCell({
     (menses && shown("menses")) || (cycleStart && shown(PROJECTED_CYCLE_START_LAYER));
   const showIntercourse = detailMode === "full" && intercourse && shown("intercourse");
 
+  // A predicted day is only named when it carries a prediction worth hearing. The one recurring trap
+  // is a month of equally blank predicted days, which would bury the few that matter, so a day with
+  // no fertility claim attached to it says nothing extra at all.
+  const forecastType = cycleStart
+    ? "predicted period start"
+    : forecast && phase === "fertile"
+      ? "predicted fertile window day"
+      : null;
+
   const accessibleParts = [
     dateKey,
     phaseLabel ?? "no status",
     monitorText,
     menses ? "menses" : null,
     detailMode === "full" && intercourse ? "intercourse" : null,
-    forecast ? "projected" : null,
+    forecastType,
   ].filter((part): part is string => !!part);
 
   // The phase fill is kept when one is known, so a predicted fertile day still

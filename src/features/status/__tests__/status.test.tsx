@@ -187,6 +187,22 @@ describe("StatusView", () => {
     expect(document.body.textContent ?? "").not.toMatch(forbidden);
   });
 
+  it("names the next period as a Predicted value, in the one word", async () => {
+    // Two closed cycles, so there is a next period to predict.
+    const previousStart = addDays(todayKey(), -60);
+    const previous = await store().setNewCycle(previousStart);
+    await store().addDayRecord(previous.id, previousStart, 1, { bloodFlow: "medium" });
+    const currentStart = addDays(todayKey(), -30);
+    const current = await store().setNewCycle(currentStart);
+    await store().addDayRecord(current.id, addDays(currentStart, 2), 3, { monitor: "high" });
+
+    render(<StatusView />);
+
+    const line = await screen.findByTestId("status-forecast");
+    expect(line).toHaveTextContent("Predicted next period:");
+    expect(line).not.toHaveTextContent(/estimated|expected|forecast|projected/i);
+  });
+
   it("shows no status source badge", async () => {
     const cycle = await store().setNewCycle(addDays(todayKey(), -5));
     await store().addDayRecord(cycle.id, addDays(todayKey(), -5), 1, { bloodFlow: "medium" });
@@ -229,7 +245,7 @@ describe("StatusView", () => {
 
     expect(screen.queryByText("confirmed")).not.toBeInTheDocument();
     expect(screen.getByText(/Fertile from cycle day/i)).toBeInTheDocument();
-    expect(screen.getByText(/estimated next period:/i)).toBeInTheDocument();
+    expect(screen.getByText(/predicted next period:/i)).toBeInTheDocument();
   });
 
   it("can inspect a selected date without showing a start-cycle form", async () => {
@@ -309,7 +325,7 @@ describe("StatusView", () => {
     expect(statusBadge.className).not.toContain("predicted");
   });
 
-  it("marks the estimated next period as predictive and uses readable body text", async () => {
+  it("marks the Predicted next period with the forecast text and uses readable body text", async () => {
     const previousStart = addDays(todayKey(), -60);
     const previous = await store().setNewCycle(previousStart);
     await store().addDayRecord(previous.id, previousStart, 1, { bloodFlow: "medium" });
@@ -435,13 +451,17 @@ describe("StatusView: observations about the user's own readings", () => {
 });
 
 /**
- * Where the selected day sits relative to the Peak reading, and the Peak-day range derived from
- * past cycles. Both lines are retrospective: a count off the user's own readings, and a range read
- * off previous cycles. Neither may become a countdown, because a countdown is the one claim this
- * method is defined against.
+ * Where the selected day sits relative to the Peak reading, and where to expect the next Peak.
+ * The first is a count off the user's own readings and is always retrospective; the second now
+ * speaks about a Peak that has not happened yet, and hedges accordingly. Neither may become a
+ * countdown, because a countdown is the one claim this method is defined against.
+ *
+ * This matches countdowns only. An earlier version also banned the bare phrases "next peak" and
+ * "coming peak" as proxies for future-tense language. The Peak-day range now does speak about the
+ * next Peak, so those two alternatives are gone — but "in N days" was never caught, and now is.
  */
 const COUNTDOWN =
-  /\d+ days? (until|to|before)|until (your |the )?peak|days? to (your |the )?peak|next peak|coming peak|countdown|days? remaining/i;
+  /\d+ days? (until|to|before|from now)|in \d+ days?|until (your |the )?peak|days? to (your |the )?peak|countdown|days? remaining/i;
 
 describe("StatusView: days since the Peak reading", () => {
   it("counts the cycle days since the Peak and names the day it falls on", async () => {
@@ -601,8 +621,9 @@ describe("StatusView: expected Peak-day range", () => {
     const line = await screen.findByTestId("status-peak-range");
     expect(line).toHaveTextContent(/based on your last 3 completed cycles/i);
     expect(line).toHaveTextContent(/cycle day 12 to 17/);
-    // A retrospective statement about history, never a forecast of one day.
-    expect(line.textContent).not.toMatch(/predicted|confirmed|ovulation/i);
+    // A range, never a single unhedged day — and no countdown off it.
+    expect(line.textContent).toMatch(/around/i);
+    expect(line.textContent).not.toMatch(COUNTDOWN);
   });
 
   it("takes the range from the configured history window, not from every recorded cycle", async () => {

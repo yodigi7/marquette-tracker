@@ -91,7 +91,7 @@ function ForecastPanel({ forecast, cycles }: { forecast: Forecast | null; cycles
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Forecast</CardTitle>
+          <CardTitle className="text-base">Predicted</CardTitle>
         </CardHeader>
         <CardContent>
           <p className={cn("text-sm", FERTILITY_TEXT_VISUALS.muted)}>
@@ -105,11 +105,10 @@ function ForecastPanel({ forecast, cycles }: { forecast: Forecast | null; cycles
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          Forecast
-          <Badge variant="outline" className={FERTILITY_FORECAST_VISUAL.text}>
-            predicted
-          </Badge>
+        <CardTitle
+          className={cn("flex items-center gap-2 text-base", FERTILITY_FORECAST_VISUAL.text)}
+        >
+          Predicted
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -125,7 +124,7 @@ function ForecastPanel({ forecast, cycles }: { forecast: Forecast | null; cycles
           value={`${forecast.basedOnCycles} cycle${forecast.basedOnCycles === 1 ? "" : "s"}`}
         />
         <p className={cn("text-xs", FERTILITY_TEXT_VISUALS.muted)}>
-          Projected dates use the median of your last {forecast.lookbackWindow} completed cycle
+          Predicted dates use the median of your last {forecast.lookbackWindow} completed cycle
           {forecast.lookbackWindow === 1 ? "" : "s"} — as many as you have on record, up to your
           configured window of {forecast.configuredLookbackWindow}. The median is used so a single
           atypical cycle does not shift every date. The averages above are shown for reference and

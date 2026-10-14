@@ -1042,7 +1042,7 @@ describe("CalendarView", () => {
     expect(cell.className).not.toContain("border-fertility-forecast-border");
     expect(outlineClasses()).toContain("border-dashed border-fertility-forecast-border");
     expect(cell).toHaveAttribute("data-forecast", "true");
-    expect(cell.getAttribute("aria-label")).toContain("projected");
+    expect(cell.getAttribute("aria-label")).toContain("predicted fertile window day");
   });
   it("renders predictive forecast cells and additive raw markers with tokenized cues", () => {
     render(
@@ -1604,12 +1604,32 @@ describe("day cell layer visibility", () => {
     expect(shownLabel).toContain("intercourse");
   });
 
-  it("still reports a projected day as projected once the cue is hidden", () => {
+  it("names what is Predicted about the day, not merely that it is", () => {
+    // A declared period start is named as a period; a fertile day inside a
+    // predicted window is named as a fertile day. A bare "projected" told the
+    // user the day's status and nothing about what the app was predicting.
+    const fertile = renderCell({ info: "fertile", forecast: true });
+    expect(fertile.cell.getAttribute("aria-label")).toContain("predicted fertile window day");
+    fertile.unmount();
+
+    const period = renderCell({ info: null, forecast: true, cycleStart: true });
+    expect(period.cell.getAttribute("aria-label")).toContain("predicted period start");
+    expect(period.cell.getAttribute("aria-label")).not.toContain("fertile window");
+  });
+
+  it("says nothing extra about a predicted day that carries no prediction", () => {
+    // A day inside an invented cycle but outside its window. Naming it would put
+    // a month of equally blank dates between a reader and the two that matter.
+    const { cell } = renderCell({ info: null, forecast: true });
+    expect(cell.getAttribute("aria-label")).not.toMatch(/predicted/i);
+  });
+
+  it("still reports a predicted day after the cue is hidden", () => {
     // The opt-out removes the visual cue only. A day the app is predicting is
     // still announced as one, so the relaxation never becomes a silent one.
     const { cell } = renderCell({ info: "fertile", forecast: true }, ["predicted"]);
     expect(cell.className).not.toContain("border-fertility-forecast-border");
-    expect(cell.getAttribute("aria-label")).toContain("projected");
+    expect(cell.getAttribute("aria-label")).toContain("predicted fertile window day");
   });
 });
 

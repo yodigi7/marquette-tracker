@@ -100,7 +100,7 @@ export function StatusCard({
         {nextPeriod && (
           <p className={cn("text-sm", FERTILITY_TEXT_VISUALS.body)}>
             <span data-testid="status-forecast" className={FERTILITY_FORECAST_VISUAL.text}>
-              Estimated next period:
+              Predicted next period:
             </span>{" "}
             {nextPeriod}
           </p>

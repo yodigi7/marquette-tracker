@@ -29,7 +29,7 @@ describe("CoreSection cycle projection control", () => {
 
   it("names the calendar so the setting is not read as all predictions", () => {
     render(<CoreSection />);
-    expect(screen.getByText("Project future cycles on the calendar")).toBeInTheDocument();
+    expect(screen.getByText("Show predicted cycles on the calendar")).toBeInTheDocument();
   });
 
   it("persists a change immediately", async () => {

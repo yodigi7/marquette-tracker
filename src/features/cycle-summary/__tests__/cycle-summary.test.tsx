@@ -78,7 +78,11 @@ describe("SummaryView", () => {
 
     await screen.findByTestId("summary-sheet");
     const text = document.body.textContent ?? "";
-    expect(text).not.toMatch(/confirmed|predicted/i);
+    expect(text).not.toMatch(/confirmed window|predicted window/i);
+    // Exactly one "Predicted": the footer's exclusion note, naming what is left out. Any predicted
+    // cue on the page itself would put the count above one.
+    expect(text.match(/\bpredicted\b/gi) ?? []).toHaveLength(1);
+    expect(text).not.toMatch(/\bconfirmed\b/i);
   });
 
   it("reports a protocol warning the app raised for the cycle", async () => {

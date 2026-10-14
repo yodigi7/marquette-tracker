@@ -60,11 +60,11 @@ export function CoreSection() {
       <div className="flex items-center justify-between gap-4">
         <div className="space-y-1">
           <Label htmlFor="settings-project-future-cycles">
-            Project future cycles on the calendar
+            Show predicted cycles on the calendar
           </Label>
           <p className="text-sm text-stone-500">
-            Off = only the current cycle is shown. On = projected cycles, their expected period
-            days, and their fertile windows are drawn ahead on the calendar.
+            Off = only the current cycle is shown. On = predicted cycles, their predicted period
+            days, and their predicted fertile windows are drawn ahead on the calendar.
           </p>
         </div>
         <Switch
