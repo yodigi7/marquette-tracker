@@ -161,22 +161,57 @@ to be green before a change is considered done.
   read-only permissions and no deploy step. `deploy.yml` publishes to Pages from `main` only and runs the
   same `pnpm check` first. Never add a deploy step to `ci.yml`.
 
+## Agent skills
+
+### Issue tracker
+
+Issues and specs are GitHub issues on `yodigi7/marquette-tracker`, operated with the `gh` CLI. `gh` needs a one-time `gh auth login` by the user; if it is not authenticated, ask the user to run it rather than attempting auth yourself. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context layout: a root `GLOSSARY.md` and `docs/adr/` when they come into existence. Neither exists yet; skills that read them proceed silently until `/domain-modeling` creates them. See `docs/agents/domain.md`.
+
 ## Development workflow
 
-All feature work is driven by **OpenSpec** (via slash commands, never auto-triggered). The spec-system layout:
+> **Experiment.** This branch tests Matt Pocock's agent skills in place of OpenSpec. See
+> [`docs/agents/EXPERIMENT.md`](docs/agents/EXPERIMENT.md) for how to revert. On `main`, feature work is
+> still driven by OpenSpec and this section does not apply.
 
-- `openspec/specs/` — authoritative project spec (what the app does now; grows as changes archive).
-- `openspec/changes/*/` — active/in-flight changes: `proposal.md`, `specs/<capability>/spec.md` (delta), `design.md`, `tasks.md`.
+Feature work follows an issue-tracker flow. The skills live in `.agents/skills/`; invoke them by
+mentioning `@skill-name`, since they are user-invoked and will not appear in a picker.
 
-Workflow commands (see `.opencode/commands/opsx-*.md`):
+| Step                | Skill                                                       | Produces                                                         |
+| ------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------- |
+| Sharpen the idea    | `@grill-with-docs`                                          | A shared understanding, plus a glossary and ADRs as terms settle |
+| Turn it into a spec | `@to-spec`                                                  | A GitHub issue                                                   |
+| Split it into work  | `@to-tickets`                                               | GitHub issues with blocking edges                                |
+| Build it            | `@implement` (per ticket) or `@implement-spec` (whole spec) | The change, driven by `@tdd`                                     |
+| Review before merge | `@code-review`                                              | Standards + spec findings, as two parallel reviews               |
+| Shape the PR        | `@pr`                                                       | The pull request body                                            |
+| Close the loop      | `@retro`                                                    | Proposed improvements to this environment                        |
 
-- `/opsx-propose` — draft a change (`openspec new change <name>` + proposal/specs).
-- `/opsx-apply` — implement the change's `tasks.md` (tests-before-code per task).
-- `/opsx-archive` — archive a completed change into `openspec/specs/` after all tasks are done and validation passes.
-- `openspec validate` — lint specs; `openspec status --change <name>` — change progress.
+On-ramps when work arrives from elsewhere:
 
-- Before implementing, read `openspec/changes/<name>/specs/**/spec.md`, `design.md`, and `tasks.md` — those are the authoritative spec; implement what they say, no more (**YAGNI**).
-- `pnpm test` is required for any change touching `core/engine` (table-driven tests written first).
+- Something is broken and resisted a first glance → `@diagnosing-bugs`. Its first phase is building a
+  command that goes red on the specific bug; do not theorise before that exists.
+- A message did not land → `@wait-what`.
+- The session is getting long → `@handoff`.
+
+`@code-review` locates the originating spec from issue references in the commit messages. Pass the
+ticket number when invoking it, so it does not have to ask where the spec is.
+
+Rules that survive from the OpenSpec workflow:
+
+- **YAGNI.** Implement what the ticket says, no more.
+- **`pnpm test` is required for any change touching `core/engine`**, with table-driven tests written
+  first. `@tdd` agrees the test seams with the user before writing a test; the engine's seams are
+  already fixed by the protocol rules in `src/core/engine/AGENTS.md`.
+- `pnpm check` green before anything is called done.
+
+`@ask-matt` is installed but describes the upstream skill set, not this configuration. Ignore it.
+
+OpenSpec remains installed and its archived specs remain the historical record of the app's
+behaviour. It is simply not the active workflow on this branch.
 
 ## Conventions
 
