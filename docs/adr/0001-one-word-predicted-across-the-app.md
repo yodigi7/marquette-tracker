@@ -27,6 +27,11 @@ and long forms of one term, never a fourth word.
 Two consequences follow from the collapse. The History panel loses the sense of "this is a computed
 report" that _Forecast_ carried, which is the price paid. And the printables' promise — that nothing
 on them is a prediction — still holds, because the instructor documents exclude both kinds of guess
-and are left saying so in the ordinary way. See
-[ADR 0002](./0002-status-peak-range-looks-forward.md) for the one place this forced a guard to be
-rewritten rather than merely satisfied.
+and are left saying so in the ordinary way.
+
+One place did not survive the collapse intact. The Status screen's Peak-day range was deliberately
+retrospective, guarded by a test that barred it from reading as a promise about the current cycle's
+Peak, and collapsing to a single word left it with nowhere to go. It now looks forward — "Expect your
+next Peak around cycle day 14 to 16" — and the guard is rewritten to keep what its reasoning actually
+protected: no countdown, no disclaimer, and no single unhedged day. That reasoning lives on the
+function that produces the line, where the next reader will already be standing.
