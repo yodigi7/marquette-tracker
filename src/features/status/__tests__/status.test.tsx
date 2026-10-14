@@ -6,6 +6,7 @@ import { addDays } from "@/core/engine/dateUtils";
 import { dateKeyLocal, parseDateKey, todayKey } from "@/core/dateKeys";
 import { useAppStore } from "@/core/store/useAppStore";
 import { StatusView } from "../index";
+import { COUNTDOWN } from "./helpers";
 
 /**
  * The clock is pinned so this file cannot pass or fail on the day it runs.
@@ -450,19 +451,6 @@ describe("StatusView: observations about the user's own readings", () => {
   });
 });
 
-/**
- * Where the selected day sits relative to the Peak reading, and where to expect the next Peak.
- * The first is a count off the user's own readings and is always retrospective; the second now
- * speaks about a Peak that has not happened yet, and hedges accordingly. Neither may become a
- * countdown, because a countdown is the one claim this method is defined against.
- *
- * This matches countdowns only. An earlier version also banned the bare phrases "next peak" and
- * "coming peak" as proxies for future-tense language. The Peak-day range now does speak about the
- * next Peak, so those two alternatives are gone — but "in N days" was never caught, and now is.
- */
-const COUNTDOWN =
-  /\d+ days? (until|to|before|from now)|in \d+ days?|until (your |the )?peak|days? to (your |the )?peak|countdown|days? remaining/i;
-
 describe("StatusView: days since the Peak reading", () => {
   it("counts the cycle days since the Peak and names the day it falls on", async () => {
     // Day 1 fifteen days back, so today is cycle day 15 and the Peak sits on day 12.
@@ -591,7 +579,7 @@ describe("StatusView: days since the Peak reading", () => {
   });
 });
 
-describe("StatusView: expected Peak-day range", () => {
+describe("StatusView: where to expect the next Peak", () => {
   async function logClosedCycle(startOffset: number, cycleLength: number, peakDay: number) {
     const start = addDays(todayKey(), startOffset);
     const cycle = await store().setNewCycle(start);

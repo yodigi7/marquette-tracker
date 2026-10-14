@@ -12,6 +12,7 @@ import {
   windowDescription,
   warningBanner,
 } from "../lib";
+import { COUNTDOWN } from "./helpers";
 
 const RULES: EndRule[] = [
   "current-peak-plus-n",
@@ -254,19 +255,6 @@ describe("warningBanner", () => {
     );
   });
 });
-
-/**
- * A countdown is the one thing this method is defined against, and it is also the easiest thing to
- * reintroduce by accident: a negative `cycleDay - peakDay` is a countdown if it is rendered, and so is
- * a "you are on day N of your window" style line. Every line below is checked against it.
- *
- * This matches countdowns only. An earlier version also banned the bare phrases "next peak" and
- * "coming peak" as proxies, on the grounds that the line was never allowed to speak about a Peak
- * that had not happened yet. The Status Peak-day range now does speak about the next Peak, so those
- * two alternatives are gone — but "in N days" was never caught, and now is.
- */
-const COUNTDOWN =
-  /\d+ days? (until|to|before|from now)|in \d+ days?|until (your |the )?peak|days? to (your |the )?peak|countdown|days? remaining/i;
 
 describe("peakCountLine", () => {
   /**

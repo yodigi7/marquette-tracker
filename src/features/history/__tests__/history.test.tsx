@@ -274,6 +274,13 @@ describe("HistoryView", () => {
     );
 
     expect(screen.getByTestId("history-logging-only")).toBeInTheDocument();
+    // The one word, again: "forecast" left the app's voice when the History panel was swept.
+    expect(screen.getByTestId("history-logging-only")).toHaveTextContent(
+      /predictions and derived summaries are hidden/i,
+    );
+    expect(screen.getByTestId("history-logging-only")).not.toHaveTextContent(
+      /forecast|projected|estimated|expected/i,
+    );
     expect(screen.queryByText("Avg length")).toBeNull();
     expect(screen.queryByText("Fertile days")).toBeNull();
     expect(screen.getByRole("table")).toBeInTheDocument();

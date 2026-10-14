@@ -66,8 +66,8 @@ function LoggingOnlyCard() {
           data-testid="history-logging-only"
           className={cn("text-sm", FERTILITY_TEXT_VISUALS.muted)}
         >
-          Algorithm is off — logged cycle information remains available, but fertility forecasts and
-          derived summaries are hidden.
+          Algorithm is off — logged cycle information remains available, but predictions and derived
+          summaries are hidden.
         </p>
       </CardContent>
     </Card>

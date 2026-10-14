@@ -1604,17 +1604,13 @@ describe("day cell layer visibility", () => {
     expect(shownLabel).toContain("intercourse");
   });
 
-  it("names what is Predicted about the day, not merely that it is", () => {
-    // A declared period start is named as a period; a fertile day inside a
-    // predicted window is named as a fertile day. A bare "projected" told the
-    // user the day's status and nothing about what the app was predicting.
-    const fertile = renderCell({ info: "fertile", forecast: true });
-    expect(fertile.cell.getAttribute("aria-label")).toContain("predicted fertile window day");
-    fertile.unmount();
-
-    const period = renderCell({ info: null, forecast: true, cycleStart: true });
-    expect(period.cell.getAttribute("aria-label")).toContain("predicted period start");
-    expect(period.cell.getAttribute("aria-label")).not.toContain("fertile window");
+  it("names both claims when a predicted day carries both", () => {
+    // A period start the fertile window also covers. The fertile claim is the one that must not be
+    // buried, so it is named alongside the period rather than losing a precedence contest to it.
+    const period = renderCell({ info: "fertile", forecast: true, cycleStart: true });
+    const label = period.cell.getAttribute("aria-label") ?? "";
+    expect(label).toContain("predicted period start");
+    expect(label).toContain("predicted fertile window day");
   });
 
   it("says nothing extra about a predicted day that carries no prediction", () => {
