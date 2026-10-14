@@ -457,8 +457,14 @@ describe("CalendarView", () => {
     const band = '[data-testid="calendar-phase-band"]';
     const bar = '[data-testid="calendar-window-bar"]';
 
-    /** A cell rendering one phase, with the window edges the Calendar would have supplied. */
-    function renderCell(info: DayStatus | null, extra: Partial<DayCellProps> = {}) {
+    /**
+     * A cell rendering one phase, with the window edges the Calendar would have supplied.
+     *
+     * Returns the raw `render()` handle, so read it with `container`/`screen`. The other helper in
+     * this file — `renderCell` — is the mirror image: it takes overrides and returns
+     * `{ cell, unmount }`.
+     */
+    function renderPhaseCell(info: DayStatus | null, extra: Partial<DayCellProps> = {}) {
       return render(
         <DayCell
           dateKey="2026-01-14"
@@ -476,7 +482,7 @@ describe("CalendarView", () => {
     }
 
     function barClasses(info: DayStatus | null, edges?: WindowEdges): string {
-      const { container } = renderCell(info, edges ? { windowEdges: edges } : {});
+      const { container } = renderPhaseCell(info, edges ? { windowEdges: edges } : {});
       return container.querySelector(bar)?.className ?? "";
     }
 
@@ -548,7 +554,7 @@ describe("CalendarView", () => {
       // The two quiet phases are tints, and they were tints before this change. What is new is that they
       // stay that way while the window becomes the loudest thing on the calendar, so all three phases
       // are still on screen and none of them is dropped to make room for the window.
-      const { container } = renderCell(info);
+      const { container } = renderPhaseCell(info);
       expect(screen.getByTestId("day-cell").className).toContain(cls);
       expect(container.querySelector(bar), "a tint is not a bar").toBeNull();
     });
@@ -559,7 +565,7 @@ describe("CalendarView", () => {
       // horizontal lines at opposite cell edges, 8px apart across a week boundary, where they read as a
       // single mark. Nothing on a day cell draws one now, on any phase.
       for (const info of ["pre-fertile", "fertile", "post-peak", "post-calendar"] as const) {
-        const { container, unmount } = renderCell(info, { windowEdges: FIRST_DAY });
+        const { container, unmount } = renderPhaseCell(info, { windowEdges: FIRST_DAY });
         expect(
           container.querySelector('[data-testid="calendar-phase-band"]'),
           `${info} must not paint a band`,
@@ -569,7 +575,7 @@ describe("CalendarView", () => {
     });
 
     it("paints nothing but the tint on a day with no phase", () => {
-      const { container } = renderCell(null);
+      const { container } = renderPhaseCell(null);
       expect(container.querySelector(bar)).toBeNull();
       expect(container.querySelector(band)).toBeNull();
     });
@@ -578,7 +584,7 @@ describe("CalendarView", () => {
       // A band and the menses stripe are both horizontal lines at opposite cell edges, 8px apart
       // across a week boundary, where they read as one mark. A band on the window would put that mark
       // back, so the window is a bar instead.
-      const { container } = renderCell("fertile", { windowEdges: FIRST_DAY });
+      const { container } = renderPhaseCell("fertile", { windowEdges: FIRST_DAY });
       expect(container.querySelector(band)).toBeNull();
       expect(container.querySelector(bar)?.className).toContain(
         "bg-fertility-status-fertile-window",
@@ -598,7 +604,7 @@ describe("CalendarView", () => {
       // A rounded corner cannot paint itself, so whatever is behind the bar's radius shows through. With
       // the cell's darker status tint behind it, each end of the window grew a notch of that tint, which
       // read as a leftover of the old treatment. The cell behind the bar has to be the window's colour.
-      const { container } = renderCell("fertile", { windowEdges: FIRST_DAY });
+      const { container } = renderPhaseCell("fertile", { windowEdges: FIRST_DAY });
       const cells = screen.getByTestId("day-cell").classList;
       expect(cells.contains("bg-fertility-status-fertile-window"), "the cell is the window").toBe(
         true,
@@ -679,7 +685,7 @@ describe("CalendarView", () => {
     });
 
     it("is not clipped by the cell, so the bar can reach across the grid gap", () => {
-      renderCell("fertile", { windowEdges: FIRST_DAY });
+      renderPhaseCell("fertile", { windowEdges: FIRST_DAY });
       expect(screen.getByTestId("day-cell").className).not.toContain("overflow-hidden");
       expect(barClasses("fertile", FIRST_DAY)).not.toContain("overflow");
     });
@@ -692,7 +698,7 @@ describe("CalendarView", () => {
        * off the cell, because that is the whole fix.
        */
       it("marks a predicted window day with an outline, never a border on the cell", () => {
-        renderCell("fertile", { forecast: true, windowEdges: FIRST_DAY });
+        renderPhaseCell("fertile", { forecast: true, windowEdges: FIRST_DAY });
         expect(screen.getByTestId("day-cell").className).not.toContain(
           "border-fertility-forecast-border",
         );
@@ -700,7 +706,7 @@ describe("CalendarView", () => {
       });
 
       it("keeps the plain border on a predicted day outside the window", () => {
-        renderCell("post-peak", { forecast: true });
+        renderPhaseCell("post-peak", { forecast: true });
         expect(screen.getByTestId("day-cell").className).toContain(
           "border-fertility-forecast-border",
         );
@@ -712,7 +718,7 @@ describe("CalendarView", () => {
         // around. The day still has to read as predicted: a Predicted day is the one layer that
         // carries a border as well as a fill, which is what separates it from a plain phase cell
         // without relying on colour.
-        renderCell("fertile", {
+        renderPhaseCell("fertile", {
           forecast: true,
           windowEdges: INTERIOR,
           hiddenLayers: ["fertile"],
@@ -725,7 +731,7 @@ describe("CalendarView", () => {
       });
 
       it("leaves the interior of a run free of dashes", () => {
-        renderCell("fertile", { forecast: true, windowEdges: INTERIOR });
+        renderPhaseCell("fertile", { forecast: true, windowEdges: INTERIOR });
         const classes = outlineClasses();
         expect(classes).not.toContain("border-l");
         expect(classes).not.toContain("border-r");
@@ -734,13 +740,13 @@ describe("CalendarView", () => {
       });
 
       it("caps the run where it starts within its row", () => {
-        renderCell("fertile", { forecast: true, windowEdges: ROW_START_CONTINUED });
+        renderPhaseCell("fertile", { forecast: true, windowEdges: ROW_START_CONTINUED });
         expect(outlineClasses()).toContain("border-l");
         expect(outlineClasses()).not.toContain("border-r");
       });
 
       it("caps the run where it ends within its row", () => {
-        renderCell("fertile", { forecast: true, windowEdges: ROW_END_CONTINUES });
+        renderPhaseCell("fertile", { forecast: true, windowEdges: ROW_END_CONTINUES });
         expect(outlineClasses()).toContain("border-r");
         expect(outlineClasses()).not.toContain("border-l");
       });
@@ -749,32 +755,32 @@ describe("CalendarView", () => {
         // The window runs on from days that happened into days that haven't. Without this the dashes
         // simply stop being at Oct 15 and nothing says that day is the first guess rather than the
         // hundredth record.
-        renderCell("fertile", { forecast: true, windowEdges: INTERIOR, beginsForecast: true });
+        renderPhaseCell("fertile", { forecast: true, windowEdges: INTERIOR, beginsForecast: true });
         expect(outlineClasses()).toContain("border-l");
       });
 
       it("outsets from the bar's box, not the cell's", () => {
         // The bar bleeds 4px into the grid gap wherever the run continues. Measured from the cell the
         // dashes fell short of the bar, and their corner arcs were measured from a different origin.
-        renderCell("fertile", { forecast: true, windowEdges: INTERIOR });
+        renderPhaseCell("fertile", { forecast: true, windowEdges: INTERIOR });
         expect(outlineClasses()).toContain("-left-[6px]");
         expect(outlineClasses()).toContain("-right-[6px]");
       });
 
       it("sets the outline 2px further out where the run ends", () => {
-        renderCell("fertile", { forecast: true, windowEdges: ROW_END_CONTINUES });
+        renderPhaseCell("fertile", { forecast: true, windowEdges: ROW_END_CONTINUES });
         expect(outlineClasses()).toContain("-right-[2px]");
       });
 
       it("rounds the outline to the cell's corner so the fill stays inside it", () => {
-        renderCell("fertile", { forecast: true, windowEdges: FIRST_DAY });
+        renderPhaseCell("fertile", { forecast: true, windowEdges: FIRST_DAY });
         const bar = barClasses("fertile", FIRST_DAY);
         expect(bar).toContain("rounded-l-md");
         expect(outlineClasses()).toContain("rounded-l-[10px]");
       });
 
       it("is dropped when the predictive layer is hidden", () => {
-        renderCell("fertile", {
+        renderPhaseCell("fertile", {
           forecast: true,
           windowEdges: FIRST_DAY,
           hiddenLayers: ["predicted"],
@@ -786,18 +792,18 @@ describe("CalendarView", () => {
         // Today's ring reaches 2px into the grid gap on this side. A line 2px outside the bar would be
         // drawn across the recorded day beside it, hard against the ring, and the two marks would read
         // as one thick band. The predicted run starts at the boundary instead.
-        renderCell("fertile", { forecast: true, windowEdges: INTERIOR, beginsForecast: true });
+        renderPhaseCell("fertile", { forecast: true, windowEdges: INTERIOR, beginsForecast: true });
         expect(outlineClasses()).toContain("-left-0");
         expect(outlineClasses()).not.toContain("-left-[6px]");
       });
 
       it("keeps a window that genuinely started on the day outset of the bar", () => {
-        renderCell("fertile", { forecast: true, windowEdges: FIRST_DAY });
+        renderPhaseCell("fertile", { forecast: true, windowEdges: FIRST_DAY });
         expect(outlineClasses()).toContain("-left-[2px]");
       });
 
       it("keeps the run's inner days outset of the bar", () => {
-        renderCell("fertile", { forecast: true, windowEdges: INTERIOR });
+        renderPhaseCell("fertile", { forecast: true, windowEdges: INTERIOR });
         expect(outlineClasses()).toContain("-left-[6px]");
       });
     });
@@ -809,7 +815,7 @@ describe("CalendarView", () => {
       it("is drawn as an element after the bar, not as a shadow on the cell", () => {
         // A box-shadow paints under every child, and the bar bleeds past the cell on both sides, so on
         // a day inside the window the bar covered the ring's left and right strokes outright.
-        renderCell("fertile", { isToday: true, windowEdges: INTERIOR });
+        renderPhaseCell("fertile", { isToday: true, windowEdges: INTERIOR });
         const el = cell().querySelector(ring);
         const barEl = cell().querySelector(bar);
         expect(el).not.toBeNull();
@@ -820,12 +826,12 @@ describe("CalendarView", () => {
       it("lifts the cell, so the next day's bar cannot paint over it", () => {
         // The next day's cell comes later in the document and its bar reaches back across the grid gap
         // over this cell's right-hand ring stroke. Document order cannot protect an outset ring.
-        renderCell("fertile", { isToday: true });
+        renderPhaseCell("fertile", { isToday: true });
         expect(cell().className).toContain("z-10");
       });
 
       it("does not lift any other day", () => {
-        renderCell("fertile");
+        renderPhaseCell("fertile");
         expect(cell().className).not.toContain("z-10");
         expect(cell().querySelector(ring)).toBeNull();
       });
@@ -833,11 +839,11 @@ describe("CalendarView", () => {
       it("outsets the same 2px on a day with no bar as on one inside the window", () => {
         // The ring must not change shape between window and non-window days, or today would read as
         // two different things depending on what the app thinks is going on.
-        const inside = renderCell("fertile", { isToday: true, windowEdges: INTERIOR });
+        const inside = renderPhaseCell("fertile", { isToday: true, windowEdges: INTERIOR });
         const insideClass = inside.container.querySelector(ring)!.className;
         inside.unmount();
 
-        const outside = renderCell(null, { isToday: true });
+        const outside = renderPhaseCell(null, { isToday: true });
         expect(outside.container.querySelector(ring)!.className).toBe(insideClass);
       });
     });
@@ -847,31 +853,31 @@ describe("CalendarView", () => {
       (info) => {
         // Only a fertile day is part of a run. A bar on another phase would be advertising a window
         // the cell is not painting.
-        const { container } = renderCell(info, { windowEdges: FIRST_DAY });
+        const { container } = renderPhaseCell(info, { windowEdges: FIRST_DAY });
         expect(container.querySelector(bar)).toBeNull();
       },
     );
 
     it("paints no bar on a day with no phase", () => {
-      const { container } = renderCell(null, { windowEdges: FIRST_DAY });
+      const { container } = renderPhaseCell(null, { windowEdges: FIRST_DAY });
       expect(container.querySelector(bar)).toBeNull();
     });
 
     it("paints no bar on a projected day that has no phase", () => {
-      const { container } = renderCell(null, { forecast: true });
+      const { container } = renderPhaseCell(null, { forecast: true });
       expect(container.querySelector(bar)).toBeNull();
       expect(screen.getByTestId("day-cell").className).toContain("bg-fertility-forecast-bg");
     });
 
     it("draws a bar on a projected fertile day, so a forecast window is the same kind of shape", () => {
-      const { container } = renderCell("fertile", { forecast: true, windowEdges: FIRST_DAY });
+      const { container } = renderPhaseCell("fertile", { forecast: true, windowEdges: FIRST_DAY });
       expect(container.querySelector(bar)).not.toBeNull();
     });
 
     it("draws no separate mark beside the bar, so nothing reads as a stray dot", () => {
       // An earlier attempt drew a stub below the band's edge in the band's own colour. It was the same
       // colour as the band and therefore invisible, and at true size it read as a floating period.
-      const { container } = renderCell("fertile", { windowEdges: FIRST_DAY });
+      const { container } = renderPhaseCell("fertile", { windowEdges: FIRST_DAY });
       expect(container.querySelectorAll('[data-testid="calendar-run-edge"]')).toHaveLength(0);
       expect(container.querySelectorAll(bar)).toHaveLength(1);
     });
@@ -879,7 +885,7 @@ describe("CalendarView", () => {
     it("keeps the bar, the menses stripe, and the monitor marker on the same day", () => {
       // Menses days and window days never overlap in the protocol, but the positioning still has to
       // coexist rather than one layer covering another.
-      const { container } = renderCell("fertile", {
+      const { container } = renderPhaseCell("fertile", {
         windowEdges: INTERIOR,
         menses: true,
         monitor: "high",
@@ -893,7 +899,7 @@ describe("CalendarView", () => {
     });
 
     it("paints neither band nor bar when the phase layer is hidden, and keeps the label", () => {
-      const { container } = renderCell("fertile", {
+      const { container } = renderPhaseCell("fertile", {
         windowEdges: FIRST_DAY,
         hiddenLayers: ["fertile" as never],
       });
@@ -1458,6 +1464,12 @@ describe("day cell layer visibility", () => {
     onSelect: () => {},
   };
 
+  /**
+   * A cell with every marker loaded and `isToday`, for the layer and cue tests.
+   *
+   * Returns `{ cell, unmount }`. The other helper in this file — `renderPhaseCell` — takes a
+   * phase status instead and returns the raw `render()` handle.
+   */
   function renderCell(overrides: Partial<DayCellProps> = {}, hidden: string[] = []) {
     const { unmount } = render(
       <DayCell
@@ -1504,6 +1516,49 @@ describe("day cell layer visibility", () => {
   it("hiding the predictive layer removes the dashed cue as well as the forecast fill", () => {
     const { cell } = renderCell({ info: null, forecast: true }, ["predicted"]);
     expect(cell.className).not.toContain("border-fertility-forecast-border");
+  });
+
+  /**
+   * The table above hides one layer and checks that layer's own paint. That is one direction, and the
+   * direction this defect lived in was the other: a Predicted day must keep its dashes under EVERY
+   * combination of hidden layers.
+   *
+   * It lost them because two places asked "does this day draw a window bar?" and disagreed. One asked
+   * whether the status is fertile; the other asked whether the Fertile layer is on as well. Hide
+   * Fertile and the bar went while the cue decision did not, leaving a forecast fill with no dashes —
+   * and the dashes are the only sign that the day has not happened. One layer at a time never showed
+   * it, because both answers agree whenever only one layer is touched.
+   */
+  const RUN_MIDDLE: WindowEdges = {
+    start: false,
+    end: false,
+    continuesUp: false,
+    continuesDown: false,
+    roundStart: false,
+    roundEnd: false,
+  };
+
+  it.each(CALENDAR_LAYERS.map((layer) => layer.id).filter((id) => id !== "predicted"))(
+    "a predicted window day keeps its dashed cue with the %s layer hidden",
+    (hidden) => {
+      const { cell } = renderCell({ info: "fertile", forecast: true, windowEdges: RUN_MIDDLE }, [
+        hidden,
+      ]);
+      const dashed =
+        cell.classList.contains("border-dashed") ||
+        cell.querySelector('[data-testid="calendar-run-outline"]') !== null;
+      expect(dashed, `a predicted day lost its cue with "${hidden}" hidden`).toBe(true);
+    },
+  );
+
+  it("hiding every layer at once still leaves a predicted day marked", () => {
+    // The same invariant at the extreme: no layer is painted, but the day is still a prediction and
+    // the user must still be able to tell.
+    const { cell } = renderCell(
+      { info: "fertile", forecast: true, windowEdges: RUN_MIDDLE },
+      CALENDAR_LAYERS.map((layer) => layer.id).filter((id) => id !== "predicted"),
+    );
+    expect(cell.className).toContain("border-dashed");
   });
 
   it("hiding one layer leaves every other layer painted", () => {
