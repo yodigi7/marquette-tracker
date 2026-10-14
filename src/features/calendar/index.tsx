@@ -212,23 +212,25 @@ export function CalendarView() {
             if (!cell) {
               return <div key={`${w}-${d}`} />;
             }
-            const cellProps = {
-              dateKey,
-              dayNumber: Number(dateKey.slice(8)),
-              info: interpreted ? cell.info : null,
-              forecast: interpreted ? cell.forecast : false,
-              menses: cell.menses,
-              cycleStart: cell.cycleStart,
-              monitor: cell.monitor,
-              intercourse: cell.intercourse,
-              windowEdges: interpreted ? edges[dateKey] : undefined,
-              beginsForecast: beginsForecast.has(dateKey),
-              isToday: dateKey === today,
-              detailMode,
-              hiddenLayers,
-              onSelect: onSelectDate,
-            };
-            return <DayCell key={dateKey} {...cellProps} />;
+            return (
+              <DayCell
+                key={dateKey}
+                dateKey={dateKey}
+                dayNumber={Number(dateKey.slice(8))}
+                info={interpreted ? cell.info : null}
+                forecast={interpreted ? cell.forecast : false}
+                menses={cell.menses}
+                cycleStart={cell.cycleStart}
+                monitor={cell.monitor}
+                intercourse={cell.intercourse}
+                windowEdges={interpreted ? edges[dateKey] : undefined}
+                beginsForecast={beginsForecast.has(dateKey)}
+                isToday={dateKey === today}
+                detailMode={detailMode}
+                hiddenLayers={hiddenLayers}
+                onSelect={onSelectDate}
+              />
+            );
           }),
         )}
       </div>

@@ -707,6 +707,23 @@ describe("CalendarView", () => {
         expect(screen.queryByTestId("calendar-run-outline")).toBeNull();
       });
 
+      it("keeps a dashed cue on a predicted window day whose fertile layer is hidden", () => {
+        // Hiding the Fertile layer takes the bar away, so there is no run left to draw an outline
+        // around. The day still has to read as predicted: a Predicted day is the one layer that
+        // carries a border as well as a fill, which is what separates it from a plain phase cell
+        // without relying on colour.
+        renderCell("fertile", {
+          forecast: true,
+          windowEdges: INTERIOR,
+          hiddenLayers: ["fertile"],
+        });
+        expect(screen.queryByTestId("calendar-window-bar")).toBeNull();
+        expect(screen.queryByTestId("calendar-run-outline")).toBeNull();
+        expect(screen.getByTestId("day-cell").className).toContain(
+          "border-fertility-forecast-border",
+        );
+      });
+
       it("leaves the interior of a run free of dashes", () => {
         renderCell("fertile", { forecast: true, windowEdges: INTERIOR });
         const classes = outlineClasses();

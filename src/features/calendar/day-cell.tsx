@@ -89,14 +89,19 @@ export function DayCell({
   // reads as fertile; the dashes are what say "this day has not happened yet".
   // The forecast fill is the fallback for a day with no phase shown.
   const marked = forecast && predictedShown;
-  const inWindow = phase === "fertile";
   const statusFill = phaseFill ?? (marked ? LAYER_PAINT.predicted.fill : undefined);
-  // Only a predicted day OUTSIDE the window carries the dashed border. A border is drawn inside the
-  // day box, and it shrinks the padding box with it — and the window bar is positioned against the
-  // padding box, so on a bordered day the bar came out 2px short and 2px narrow, with the border
-  // crossing its bottom edge. A day in the window is marked by an outline drawn outside the bar
-  // instead, which touches nothing the bar relies on.
-  const statusCue = marked && !inWindow ? LAYER_PAINT.predicted.border : undefined;
+  // A predicted day is marked by dashes either way. When it draws a window bar the dashes go OUTSIDE
+  // that bar, as a run outline. With no bar — a day outside the window, or a window day whose fertile
+  // layer the user has hidden — it keeps the plain dashed border on the cell, because a Predicted day
+  // is the one layer that carries a border as well as a fill, and that is what separates it from a
+  // plain phase cell without colour. The question is therefore "is a bar being drawn", not "is the
+  // phase fertile": those differ on a window day with the fertile layer hidden, and reading the phase
+  // left that day with a forecast fill and no cue at all.
+  //
+  // A border is drawn inside the day box and shrinks the padding box with it, and the window bar is
+  // positioned against the padding box. So a border and a bar on the same day cannot coexist: the bar
+  // came out 2px short and 2px narrow, with the border crossing its bottom edge.
+  const statusCue = marked && !windowBar ? LAYER_PAINT.predicted.border : undefined;
 
   // The window's two true ends are its only rounded ends. A row that opens or closes mid-window keeps
   // a square edge there, which is what makes the window's ends legible as the window's ends rather than
@@ -175,9 +180,12 @@ export function DayCell({
           the bar bleeds 4px into the grid gap wherever the run continues — measured from the cell the
           dashes fell short of the bar and the two corner arcs were measured from different origins.
           A side whose neighbour is in the same horizontal run gets no line at all, which is what keeps
-          the interior of the run free of dividers. Top and bottom are always drawn: the run never
-          continues vertically, so those edges are always outer ones. */}
-      {windowBar && marked && inWindow && (
+          the interior of the run free of dividers.
+          Top and bottom are drawn on every day, including one whose run carries on into the row above
+          or below: a window does continue vertically across a week boundary. Those edges are still
+          outer ones for this bar, because the bar never bleeds vertically — each row's segment is its
+          own shape, and the dashes trace that shape rather than the window as a whole. */}
+      {windowBar && marked && (
         <span
           data-testid="calendar-run-outline"
           aria-hidden="true"
