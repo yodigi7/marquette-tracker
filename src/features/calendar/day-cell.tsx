@@ -23,6 +23,11 @@ export interface DayCellProps {
    * decide these alone: it does not know whether the day above or beside it is inside the window.
    */
   windowEdges?: WindowEdges;
+  /**
+   * The window runs on to the left in this row, but that day was recorded and this one is predicted.
+   * The run's dashes begin here, so the day the app starts guessing is visible rather than implied.
+   */
+  beginsForecast?: boolean;
   isToday: boolean;
   detailMode?: CalendarDetailMode;
   /** Layers the user has hidden. Anything absent is painted. */
@@ -40,6 +45,7 @@ export function DayCell({
   monitor,
   intercourse,
   windowEdges = NO_WINDOW_EDGES,
+  beginsForecast = false,
   isToday,
   detailMode = "simple",
   hiddenLayers = [],
@@ -79,18 +85,40 @@ export function DayCell({
     forecast ? "projected" : null,
   ].filter((part): part is string => !!part);
 
-  // The phase fill is kept when one is known, so a projected fertile day still
-  // reads as fertile; the dashed border carries "this day has not happened yet".
+  // The phase fill is kept when one is known, so a predicted fertile day still
+  // reads as fertile; the dashes are what say "this day has not happened yet".
   // The forecast fill is the fallback for a day with no phase shown.
-  const statusFill =
-    phaseFill ?? (forecast && predictedShown ? LAYER_PAINT.predicted.fill : undefined);
-  const statusCue = forecast && predictedShown ? LAYER_PAINT.predicted.border : undefined;
+  const marked = forecast && predictedShown;
+  const statusFill = phaseFill ?? (marked ? LAYER_PAINT.predicted.fill : undefined);
+  // A predicted day is marked by dashes either way. When it draws a window bar the dashes go OUTSIDE
+  // that bar, as a run outline. With no bar — a day outside the window, or a window day whose fertile
+  // layer the user has hidden — it keeps the plain dashed border on the cell, because a Predicted day
+  // is the one layer that carries a border as well as a fill, and that is what separates it from a
+  // plain phase cell without colour. The question is therefore "is a bar being drawn", not "is the
+  // phase fertile": those differ on a window day with the fertile layer hidden, and reading the phase
+  // left that day with a forecast fill and no cue at all.
+  //
+  // A border is drawn inside the day box and shrinks the padding box with it, and the window bar is
+  // positioned against the padding box. So a border and a bar on the same day cannot coexist: the bar
+  // came out 2px short and 2px narrow, with the border crossing its bottom edge.
+  const statusCue = marked && !windowBar ? LAYER_PAINT.predicted.border : undefined;
 
   // The window's two true ends are its only rounded ends. A row that opens or closes mid-window keeps
   // a square edge there, which is what makes the window's ends legible as the window's ends rather than
-  // as whichever rows happen to fall inside it.
-  const roundStart = windowEdges.roundStart;
-  const roundEnd = windowEdges.roundEnd;
+  // as whichever rows happen to fall inside it. Both the bar and the outline read these straight off
+  // `windowEdges`, so they cannot disagree about which days those are.
+
+  // Where the run's dashes begin on the left. A day the window genuinely started on gets a line 2px
+  // outside the bar's own start. A day the window merely ran into gets no line, so its offset only has
+  // to clear the bar. The first PREDICTED day of a run is the third case: today's ring reaches 2px into
+  // the grid gap on this side, so a line 2px outside the bar would be drawn across the recorded day
+  // beside it, hard against the ring. It starts at the day boundary instead, which leaves 2px of window
+  // colour between the two marks and keeps both fully legible.
+  const outlineLeft = beginsForecast
+    ? "-left-0"
+    : windowEdges.start
+      ? "-left-[2px]"
+      : "-left-[6px]";
 
   return (
     <button
@@ -108,7 +136,10 @@ export function DayCell({
         "relative flex h-12 flex-col items-center justify-center rounded-md text-xs transition-colors focus-visible:ring-2 focus-visible:ring-foreground/70 focus-visible:outline-none",
         statusFill,
         statusCue,
-        isToday && "ring-2 ring-foreground/70",
+        // Lifted so nothing later in the calendar paints over today. An outset ring cannot be protected
+        // by document order alone: the next day's cell is later in the DOM, and its bar reaches back
+        // across the grid gap, straight over this cell's right-hand ring stroke.
+        isToday && "z-10",
         "hover:brightness-105 cursor-pointer",
       )}
     >
@@ -134,9 +165,54 @@ export function DayCell({
             // run that filled it would dissolve the row structure inside the window -- losing the one
             // cue that tells you which week you are looking at. A run that wraps weeks is therefore two
             // bars, one per row, and the gap between them is the calendar's own.
-            roundStart && "rounded-l-2xl",
-            roundEnd && "rounded-r-2xl",
+            //
+            // The rounded ends take the CELL's radius, not a larger one of their own. The cell's own
+            // background sits behind the bar, and a sharper corner on the cell than on the bar fills
+            // the space the bar curves away from — reaching further out than the bar and poking past
+            // whatever is drawn beyond it. Matching the cell keeps the two arcs concentric.
+            windowEdges.roundStart && "rounded-l-md",
+            windowEdges.roundEnd && "rounded-r-md",
           )}
+        />
+      )}
+      {/* A predicted day inside the window is marked by dashes drawn OUTSIDE the bar, never by a
+          border on the cell. The outline is offset from the BAR's box rather than the cell's, because
+          the bar bleeds 4px into the grid gap wherever the run continues — measured from the cell the
+          dashes fell short of the bar and the two corner arcs were measured from different origins.
+          A side whose neighbour is in the same horizontal run gets no line at all, which is what keeps
+          the interior of the run free of dividers.
+          Top and bottom are drawn on every day, including one whose run carries on into the row above
+          or below: a window does continue vertically across a week boundary. Those edges are still
+          outer ones for this bar, because the bar never bleeds vertically — each row's segment is its
+          own shape, and the dashes trace that shape rather than the window as a whole. */}
+      {windowBar && marked && (
+        <span
+          data-testid="calendar-run-outline"
+          aria-hidden="true"
+          className={cn(
+            "pointer-events-none absolute border-dashed border-fertility-forecast-border",
+            "-top-[2px] -bottom-[2px] border-t border-b",
+            outlineLeft,
+            windowEdges.end ? "-right-[2px] border-r" : "-right-[6px]",
+            (windowEdges.start || beginsForecast) && "border-l",
+            windowEdges.roundStart && "rounded-l-[10px]",
+            windowEdges.roundEnd && "rounded-r-[10px]",
+          )}
+        />
+      )}
+
+      {/* Today is marked by a ring drawn AFTER the bar, never by a `ring-2` box-shadow on the cell.
+          A box-shadow paints under every child, and the bar bleeds past the cell on both sides, so on a
+          day inside the window the bar covered the ring's left and right strokes outright — today showed
+          as two arcs rather than a ring. Drawing the ring here puts it on top of the bar instead, and
+          the cell's `z-10` keeps the NEXT day's bar from painting over it, since that cell comes later
+          in the DOM and reaches back across the gap. Same 2px outset, same radius as the cell: on a day
+          with no bar the two are indistinguishable. */}
+      {isToday && (
+        <span
+          data-testid="calendar-today-ring"
+          aria-hidden="true"
+          className="pointer-events-none absolute -inset-[2px] rounded-[10px] border-2 border-foreground/70"
         />
       )}
       <span className={cn("relative text-[11px] leading-none", isToday && "font-bold")}>

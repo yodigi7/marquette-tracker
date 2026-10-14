@@ -97,6 +97,7 @@ export function CalendarView() {
   // each cell twice during the render below.
   const cells = useMemo(() => {
     const byDate = new Map<string, CellInfo>();
+    const beginsForecast = new Set<string>();
     const slots: WindowSlot[] = [];
     grid.weeks.forEach((week, row) => {
       week.forEach((dateKey, column) => {
@@ -107,14 +108,23 @@ export function CalendarView() {
         // it: a month padded with leading blanks has fewer real days in its first row, and counting
         // instead of positioning puts every later row in the wrong row.
         slots.push({ dateKey, inWindow: cell.info === "fertile", row, column });
+        // Where a window runs on from days that happened into days that haven't, the predicted
+        // marking has to start somewhere. This is that day: the window's shape only ever knew
+        // "inside" or "outside", so the first predicted day of a run has to be found from the row.
+        if (cell.info === "fertile" && cell.forecast && column > 0 && week[column - 1] !== "") {
+          const prev = byDate.get(week[column - 1] ?? "");
+          if (prev && prev.info === "fertile" && !prev.forecast) {
+            beginsForecast.add(dateKey);
+          }
+        }
       });
     });
     // The window's true last day, when it is on screen, so a run that merely runs off the end of the
     // displayed month is not rounded as though the window ended there.
     const windowEndsOn = slots.find((slot) => byDate.get(slot.dateKey)?.windowEnd)?.dateKey;
-    return { byDate, edges: windowEdgesByDay(slots, windowEndsOn) };
+    return { byDate, beginsForecast, edges: windowEdgesByDay(slots, windowEndsOn) };
   }, [grid, cycles, dayRecords, results, forecast, today, projected]);
-  const { edges } = cells;
+  const { edges, beginsForecast } = cells;
 
   useEffect(() => {
     if (autoOpenAttempted.current) {
@@ -214,6 +224,7 @@ export function CalendarView() {
                 monitor={cell.monitor}
                 intercourse={cell.intercourse}
                 windowEdges={interpreted ? edges[dateKey] : undefined}
+                beginsForecast={beginsForecast.has(dateKey)}
                 isToday={dateKey === today}
                 detailMode={detailMode}
                 hiddenLayers={hiddenLayers}

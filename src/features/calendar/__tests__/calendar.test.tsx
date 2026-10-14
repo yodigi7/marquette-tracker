@@ -448,6 +448,11 @@ describe("CalendarView", () => {
     }
   });
 
+  /** The class of the run outline: the cue a predicted day inside the window carries. */
+  function outlineClasses(): string {
+    return screen.queryByTestId("calendar-run-outline")?.className ?? "";
+  }
+
   describe("the window bar and the phase band", () => {
     const band = '[data-testid="calendar-phase-band"]';
     const bar = '[data-testid="calendar-window-bar"]';
@@ -654,19 +659,22 @@ describe("CalendarView", () => {
     });
 
     it.each([
-      ["the window's first day", FIRST_DAY, "rounded-l-2xl", "rounded-r-2xl"],
-      ["the window's last day", LAST_DAY, "rounded-r-2xl", "rounded-l-2xl"],
+      ["the window's first day", FIRST_DAY, "rounded-l-md", "rounded-r-md"],
+      ["the window's last day", LAST_DAY, "rounded-r-md", "rounded-l-md"],
       // A one-day window is both of its ends, so it is rounded at both of them.
-      ["a one-day window", ALONE, "rounded-l-2xl", null],
+      ["a one-day window", ALONE, "rounded-l-md", null],
       // Everything else stays square. Rounding a row that merely opens or closes inside the window
       // would present a week boundary as the window's boundary.
-      ["a day the run merely continues past", INTERIOR, null, "rounded-l-2xl"],
-      ["a row opening mid-window", ROW_START_CONTINUED, null, "rounded-l-2xl"],
-      ["a row closing mid-window", ROW_END_CONTINUES, null, "rounded-r-2xl"],
+      ["a day the run merely continues past", INTERIOR, null, "rounded-l-md"],
+      ["a row opening mid-window", ROW_START_CONTINUED, null, "rounded-l-md"],
+      ["a row closing mid-window", ROW_END_CONTINUES, null, "rounded-r-md"],
     ] as const)("rounds %s", (_l, edges, has, lacks) => {
+      // The bar rounds to the CELL's radius, not to a larger one of its own: the cell's background
+      // sits behind the bar, and a sharper corner on the cell than on the bar fills the space the
+      // bar curves out of, reaching past whatever is drawn beyond it.
       const className = barClasses("fertile", edges);
       if (has) expect(className, `expected ${has}`).toContain(has);
-      else expect(className, "expected no rounding at all").not.toContain("rounded-l-2xl");
+      else expect(className, "expected no rounding at all").not.toContain("rounded-l-md");
       if (lacks) expect(className, `expected no ${lacks}`).not.toContain(lacks);
     });
 
@@ -674,6 +682,164 @@ describe("CalendarView", () => {
       renderCell("fertile", { windowEdges: FIRST_DAY });
       expect(screen.getByTestId("day-cell").className).not.toContain("overflow-hidden");
       expect(barClasses("fertile", FIRST_DAY)).not.toContain("overflow");
+    });
+
+    describe("the run outline on a predicted day inside the window", () => {
+      /**
+       * A border on the cell is what broke this in the first place: the bar is positioned against
+       * the padding box, and a border shrinks it, so a bordered window day drew its bar 2px short
+       * and 2px narrow with the border crossing its bottom edge. These pin that the cue has moved
+       * off the cell, because that is the whole fix.
+       */
+      it("marks a predicted window day with an outline, never a border on the cell", () => {
+        renderCell("fertile", { forecast: true, windowEdges: FIRST_DAY });
+        expect(screen.getByTestId("day-cell").className).not.toContain(
+          "border-fertility-forecast-border",
+        );
+        expect(outlineClasses()).toContain("border-dashed border-fertility-forecast-border");
+      });
+
+      it("keeps the plain border on a predicted day outside the window", () => {
+        renderCell("post-peak", { forecast: true });
+        expect(screen.getByTestId("day-cell").className).toContain(
+          "border-fertility-forecast-border",
+        );
+        expect(screen.queryByTestId("calendar-run-outline")).toBeNull();
+      });
+
+      it("keeps a dashed cue on a predicted window day whose fertile layer is hidden", () => {
+        // Hiding the Fertile layer takes the bar away, so there is no run left to draw an outline
+        // around. The day still has to read as predicted: a Predicted day is the one layer that
+        // carries a border as well as a fill, which is what separates it from a plain phase cell
+        // without relying on colour.
+        renderCell("fertile", {
+          forecast: true,
+          windowEdges: INTERIOR,
+          hiddenLayers: ["fertile"],
+        });
+        expect(screen.queryByTestId("calendar-window-bar")).toBeNull();
+        expect(screen.queryByTestId("calendar-run-outline")).toBeNull();
+        expect(screen.getByTestId("day-cell").className).toContain(
+          "border-fertility-forecast-border",
+        );
+      });
+
+      it("leaves the interior of a run free of dashes", () => {
+        renderCell("fertile", { forecast: true, windowEdges: INTERIOR });
+        const classes = outlineClasses();
+        expect(classes).not.toContain("border-l");
+        expect(classes).not.toContain("border-r");
+        expect(classes).toContain("border-t");
+        expect(classes).toContain("border-b");
+      });
+
+      it("caps the run where it starts within its row", () => {
+        renderCell("fertile", { forecast: true, windowEdges: ROW_START_CONTINUED });
+        expect(outlineClasses()).toContain("border-l");
+        expect(outlineClasses()).not.toContain("border-r");
+      });
+
+      it("caps the run where it ends within its row", () => {
+        renderCell("fertile", { forecast: true, windowEdges: ROW_END_CONTINUES });
+        expect(outlineClasses()).toContain("border-r");
+        expect(outlineClasses()).not.toContain("border-l");
+      });
+
+      it("draws the leading edge where the predicting begins", () => {
+        // The window runs on from days that happened into days that haven't. Without this the dashes
+        // simply stop being at Oct 15 and nothing says that day is the first guess rather than the
+        // hundredth record.
+        renderCell("fertile", { forecast: true, windowEdges: INTERIOR, beginsForecast: true });
+        expect(outlineClasses()).toContain("border-l");
+      });
+
+      it("outsets from the bar's box, not the cell's", () => {
+        // The bar bleeds 4px into the grid gap wherever the run continues. Measured from the cell the
+        // dashes fell short of the bar, and their corner arcs were measured from a different origin.
+        renderCell("fertile", { forecast: true, windowEdges: INTERIOR });
+        expect(outlineClasses()).toContain("-left-[6px]");
+        expect(outlineClasses()).toContain("-right-[6px]");
+      });
+
+      it("sets the outline 2px further out where the run ends", () => {
+        renderCell("fertile", { forecast: true, windowEdges: ROW_END_CONTINUES });
+        expect(outlineClasses()).toContain("-right-[2px]");
+      });
+
+      it("rounds the outline to the cell's corner so the fill stays inside it", () => {
+        renderCell("fertile", { forecast: true, windowEdges: FIRST_DAY });
+        const bar = barClasses("fertile", FIRST_DAY);
+        expect(bar).toContain("rounded-l-md");
+        expect(outlineClasses()).toContain("rounded-l-[10px]");
+      });
+
+      it("is dropped when the predictive layer is hidden", () => {
+        renderCell("fertile", {
+          forecast: true,
+          windowEdges: FIRST_DAY,
+          hiddenLayers: ["predicted"],
+        });
+        expect(screen.queryByTestId("calendar-run-outline")).toBeNull();
+      });
+
+      it("starts at the day boundary, not out where the bar is", () => {
+        // Today's ring reaches 2px into the grid gap on this side. A line 2px outside the bar would be
+        // drawn across the recorded day beside it, hard against the ring, and the two marks would read
+        // as one thick band. The predicted run starts at the boundary instead.
+        renderCell("fertile", { forecast: true, windowEdges: INTERIOR, beginsForecast: true });
+        expect(outlineClasses()).toContain("-left-0");
+        expect(outlineClasses()).not.toContain("-left-[6px]");
+      });
+
+      it("keeps a window that genuinely started on the day outset of the bar", () => {
+        renderCell("fertile", { forecast: true, windowEdges: FIRST_DAY });
+        expect(outlineClasses()).toContain("-left-[2px]");
+      });
+
+      it("keeps the run's inner days outset of the bar", () => {
+        renderCell("fertile", { forecast: true, windowEdges: INTERIOR });
+        expect(outlineClasses()).toContain("-left-[6px]");
+      });
+    });
+
+    describe("the today ring", () => {
+      const ring = '[data-testid="calendar-today-ring"]';
+      const cell = () => screen.getByTestId("day-cell");
+
+      it("is drawn as an element after the bar, not as a shadow on the cell", () => {
+        // A box-shadow paints under every child, and the bar bleeds past the cell on both sides, so on
+        // a day inside the window the bar covered the ring's left and right strokes outright.
+        renderCell("fertile", { isToday: true, windowEdges: INTERIOR });
+        const el = cell().querySelector(ring);
+        const barEl = cell().querySelector(bar);
+        expect(el).not.toBeNull();
+        expect(barEl!.compareDocumentPosition(el!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(cell().className).not.toContain("ring-2 ring-foreground");
+      });
+
+      it("lifts the cell, so the next day's bar cannot paint over it", () => {
+        // The next day's cell comes later in the document and its bar reaches back across the grid gap
+        // over this cell's right-hand ring stroke. Document order cannot protect an outset ring.
+        renderCell("fertile", { isToday: true });
+        expect(cell().className).toContain("z-10");
+      });
+
+      it("does not lift any other day", () => {
+        renderCell("fertile");
+        expect(cell().className).not.toContain("z-10");
+        expect(cell().querySelector(ring)).toBeNull();
+      });
+
+      it("outsets the same 2px on a day with no bar as on one inside the window", () => {
+        // The ring must not change shape between window and non-window days, or today would read as
+        // two different things depending on what the app thinks is going on.
+        const inside = renderCell("fertile", { isToday: true, windowEdges: INTERIOR });
+        const insideClass = inside.container.querySelector(ring)!.className;
+        inside.unmount();
+
+        const outside = renderCell(null, { isToday: true });
+        expect(outside.container.querySelector(ring)!.className).toBe(insideClass);
+      });
     });
 
     it.each(["pre-fertile", "post-peak", "post-calendar"] as const)(
@@ -864,9 +1030,11 @@ describe("CalendarView", () => {
     );
 
     const cell = screen.getByTestId("day-cell");
-    // the phase survives; the dashed border is what says "not yet"
+    // The phase survives; the dashes are what say "not yet". They sit on a descendant, because a
+    // border on the cell itself shrinks the padding box the window bar is positioned against.
     expect(cell.className).toContain("bg-fertility-status-fertile");
-    expect(cell.className).toContain("border-dashed border-fertility-forecast-border");
+    expect(cell.className).not.toContain("border-fertility-forecast-border");
+    expect(outlineClasses()).toContain("border-dashed border-fertility-forecast-border");
     expect(cell).toHaveAttribute("data-forecast", "true");
     expect(cell.getAttribute("aria-label")).toContain("projected");
   });
@@ -918,10 +1086,10 @@ describe("CalendarView", () => {
       />,
     );
     const projectedCell = screen.getByTestId("day-cell");
-    const projectedClasses = projectedCell.className;
-    expect(projectedClasses).toContain("border-fertility-forecast-border");
-    // the phase survives, which is what distinguishes a projected day
-    expect(projectedClasses).toContain("bg-fertility-status-fertile");
+    // A predicted day inside the window is marked by an outline outside the bar, not by a border on
+    // the cell. The phase survives, which is what distinguishes a predicted day.
+    expect(projectedCell.className).toContain("bg-fertility-status-fertile");
+    expect(outlineClasses()).toContain("border-fertility-forecast-border");
     projected.unmount();
 
     render(
@@ -939,10 +1107,11 @@ describe("CalendarView", () => {
       />,
     );
     const forecastCell = screen.getByTestId("day-cell");
-    // a forecast day with no status yet falls back to the forecast fill, but
-    // the predictive border is the same cue in both cases
+    // A forecast day with no status falls back to the forecast fill. It is outside the window, so it
+    // keeps the plain dashed border rather than the run outline — same cue, simpler shape.
     expect(forecastCell.className).toContain("border-fertility-forecast-border");
     expect(forecastCell.className).toContain("bg-fertility-forecast-bg");
+    expect(screen.queryByTestId("calendar-run-outline")).toBeNull();
   });
 
   it("keeps raw markers but removes interpretation styling when the algorithm is off", async () => {
@@ -1111,12 +1280,16 @@ describe("CalendarView with cycle projection", () => {
       const projected = screen
         .getAllByTestId("day-cell")
         .filter((el) => el.getAttribute("data-forecast") === "true");
-      // every projected day with a status keeps a real phase fill, and the
-      // dashed border is what marks it as not yet happened
+      // Every projected day with a status keeps a real phase fill, and the dashes are what mark it as
+      // not yet happened. A day inside the window carries the run outline; a day outside it carries
+      // the plain border. Either way the cue is dashed.
       const phased = projected.filter((el) => el.getAttribute("data-phase"));
       expect(phased.length).toBeGreaterThan(0);
       for (const el of phased) {
-        expect(el.className).toContain("border-dashed");
+        const dashed =
+          el.className.includes("border-dashed") ||
+          !!el.querySelector('[data-testid="calendar-run-outline"]');
+        expect(dashed, `${el.getAttribute("data-date")} carries no dashed cue`).toBe(true);
       }
     });
   });
@@ -1356,7 +1529,9 @@ describe("day cell layer visibility", () => {
       "intercourse",
     ]);
     expect(cell.textContent).toBe("14");
-    expect(cell.className).toContain("ring-2");
+    // The ring is an element, not a box-shadow on the cell. Matching `ring-2` here would have passed
+    // on `focus-visible:ring-2`, which the cell carries either way.
+    expect(cell.querySelector('[data-testid="calendar-today-ring"]')).not.toBeNull();
     await user.click(cell);
     expect(selected).toBe("2026-01-14");
   });
