@@ -11,7 +11,7 @@ import { buildSummaryModel } from "./lib";
  * The cycle summary: one cycle, one page, produced by printing.
  *
  * Reads the same store snapshot every other view reads and derives nothing the engine has not already
- * derived — see `openspec/changes/instructor-cycle-summary/design.md`. Nothing is written, and the
+ * derived. Nothing is written, and the
  * future-cycle projection is never consulted, so a projected day cannot reach the document.
  */
 export function SummaryView() {

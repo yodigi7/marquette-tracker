@@ -35,7 +35,7 @@ describe("CSV export documentation (csv-export)", () => {
 
   it("documents how a missing value is represented", () => {
     expect(README).toMatch(/empty cell/i);
-    expect(README).toMatch(/not recorded/i);
+    expect(README).toMatch(/not logged/i);
   });
 
   it("states that the JSON backup remains the only restorable format", () => {
