@@ -16,8 +16,7 @@ import { BEGIN_RULE_LABELS, endRuleLabel, warningBanner } from "@/features/statu
  * The cycle summary: a single-cycle document for a person to read, produced by printing.
  *
  * Everything here is existing derived output or a logged record, restated. No value is computed that
- * the engine does not already compute, and nothing is stored. The engine is untouched — see
- * `openspec/changes/instructor-cycle-summary/design.md`.
+ * the engine does not already compute, and nothing is stored. The engine is untouched.
  *
  * The rule and warning wording is imported from the Status view's vocabulary rather than restated, so
  * the document cannot describe the window differently from the app that computed it.

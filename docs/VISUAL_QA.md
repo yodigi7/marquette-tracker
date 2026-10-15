@@ -21,7 +21,7 @@ checklist covers the rendered result.
 ## Shared contrast checks
 
 - [ ] Normal text in Calendar, Status, Cycle chart, and History/Stats is readable at a contrast ratio of at least 4.5:1.
-- [ ] Status boundaries, forecast borders, monitor dots, chart bands, and marker shapes are distinguishable at a contrast ratio of at least 3:1.
+- [ ] Status boundaries, Predicted borders, monitor dots, chart bands, and marker shapes are distinguishable at a contrast ratio of at least 3:1.
 - [ ] Legend swatches have distinct footprints, so entries separate without color: a square for a day phase, a dot for a monitor reading, a bar for menses, a glyph for intercourse.
 - [ ] A Predicted day is separable from a plain phase cell without color. Predicted is the only layer carrying a border as well as a fill; the three phase layers are fill alone.
 - [ ] No text or marker disappears into the active theme background.
@@ -29,7 +29,7 @@ checklist covers the rendered result.
 ## Calendar (`/`)
 
 - [ ] Before, Fertile, and After days have distinct fills in both themes. Calendar names the three phases, not the engine's four statuses.
-- [ ] A Predicted day — the next fertile window, a projected cycle's days, or a projected period start — carries the predictive fill and border, and reads as predictive rather than recorded.
+- [ ] A Predicted day — the next fertile window, a Predicted cycle's days, or a Predicted period start — carries the predictive fill and border, and reads as predictive rather than logged.
 - [ ] Unlogged days remain blank/base cells; they do not gain a status fill merely because they fall inside a window.
 - [ ] Menses, Low, High, and Peak markers remain visible. Menses uses a bar and the monitor readings use dots, so they separate from each other without color.
 - [ ] The Intercourse marker appears only in the full detail mode, and the legend offers it only there.
@@ -46,7 +46,7 @@ checklist covers the rendered result.
 - [ ] For a cycle holding two Peak readings, the readout names the cycle's Peak day and the later reading the end was measured from, and states how many readings there were.
 - [ ] The next-period estimate is visibly predictive.
 - [ ] A protocol warning is readable and describes the user's own readings, with no error, invalid, or malfunction language.
-- [ ] With the algorithm off, the logging-only explanation is shown and no computed status, window, or forecast is rendered.
+- [ ] With the algorithm off, the logging-only explanation is shown and no computed status, window, or Predicted value is rendered.
 
 ## Cycle chart (`/cycle/:cycleId`)
 
@@ -66,15 +66,15 @@ checklist covers the rendered result.
 
 ## History/Stats (`/history`)
 
-- [ ] Forecast values, stat labels and values, warnings, and empty states are readable in both themes.
-- [ ] Forecast values remain numerically identical when switching themes.
+- [ ] Predicted values, stat labels and values, warnings, and empty states are readable in both themes.
+- [ ] Predicted values remain numerically identical when switching themes.
 - [ ] The per-cycle Peak cell names the cycle's Peak day and, where the cycle holds more than one reading, also states the later reading the end came from — as `day 12 (end from 13)` on one line.
 - [ ] The Peak-day range in the stats is built from the cycles' _first_ Peak readings, and is scoped to the configured history window rather than widening to the whole history.
 - [ ] No average or median Peak day is shown anywhere. The protocol's calendar rule produces a range, not a statistic.
-- [ ] With the algorithm off, the forecast and derived summaries are hidden, a logging-only explanation is shown, and the cycle table remains with its logged fields.
-- [ ] Re-enabling the algorithm restores the forecast and derived summaries without data loss.
+- [ ] With the algorithm off, the Predicted values and derived summaries are hidden, a logging-only explanation is shown, and the cycle table remains with its logged fields.
+- [ ] Re-enabling the algorithm restores the Predicted values and derived summaries without data loss.
 
-## Printable cycle summary (`/summary/:cycleId`)
+## Cycle summary (`/summary/:cycleId`)
 
 Reached from a cycle's own chart. Judge this in print preview.
 
@@ -87,7 +87,7 @@ Reached from a cycle's own chart. Judge this in print preview.
 - [ ] The generation date is shown and does not change while the page stays open.
 - [ ] Printed from dark mode, the sheet is still legible. A dark page with dark text is a release blocker.
 
-## Printable instructor chart (`/instructor-chart`)
+## Instructor chart (`/instructor-chart`)
 
 Reached from History. Landscape suits its width.
 
@@ -106,18 +106,3 @@ Reached from History. Landscape suits its width.
 Note the theme, viewport, route, and any failure above in the change notes before marking the visual QA
 task complete. A contrast, scanability, or print-legibility failure is a release blocker for this change
 even when the automated suite is green.
-
-## Manual QA results
-
-**Stale — needs re-running.** The pass below was recorded 2026-09-25 against a build that predates both
-printable documents, cycle compare, and the correction of which Peak reading each window edge is
-measured from. The measurements are kept as a reference point, not as a current claim.
-
-- Viewports checked: approximately 980px desktop and 320px narrow mobile.
-- Themes checked: light and dark.
-- Routes checked: Calendar, Status, History/Stats, and Cycle chart.
-- Modes checked: algorithm on and off; Cycle chart overlays on.
-- Status foreground/background token pairs measured at 6.78:1 or better in light mode and 12.08:1 or better in dark mode. Body, muted, and warning text tokens measured at 4.80:1 or better in light mode and 7.83:1 or better in dark mode. Meaningful marker/border colors were selected to meet the 3:1 graphical target; the empty chart track remains intentionally faint because it represents no reading rather than a meaningful state.
-- Finding fixed during QA: algorithm-off mode still showed interpretation-only Calendar and Cycle-chart legend entries. The legends now hide status/source/forecast/provenance entries when interpretation is disabled, with regression coverage in the algorithm-off and chart tests.
-- No remaining contrast, scanability, legend-sync, or forecast-certainty failure was observed. At 320px, the History table and Cycle chart retain their existing horizontal scrolling behavior so all content remains reachable.
-- Never checked: the cycle summary, the instructor chart, and cycle compare have not been through this checklist at all, and neither has the two-reading Peak readout. The next pass should start there.

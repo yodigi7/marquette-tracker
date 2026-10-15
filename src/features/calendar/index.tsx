@@ -243,10 +243,14 @@ export function CalendarView() {
           updateSettings({ calendarDetailMode: detailMode === "simple" ? "full" : "simple" })
         }
         onToggleLayer={(id) =>
-          updateSettings({ hiddenCalendarLayers: toggleLayer(hiddenLayers, id) })
+          updateSettings((s) => ({
+            hiddenCalendarLayers: toggleLayer(s.hiddenCalendarLayers, id),
+          }))
         }
         onShowAll={() =>
-          updateSettings({ hiddenCalendarLayers: hiddenOutsideOffered(hiddenLayers, offered) })
+          updateSettings((s) => ({
+            hiddenCalendarLayers: hiddenOutsideOffered(s.hiddenCalendarLayers, offered),
+          }))
         }
       />
 

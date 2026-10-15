@@ -71,7 +71,17 @@ export interface AppState {
   ): Promise<void>;
   removeDayRecord(id: string): Promise<void>;
   setNewCycle(day1: DateKey): Promise<CycleEntity>;
-  updateSettings(patch: Omit<Partial<SettingsEntity>, "key">): Promise<void>;
+  /**
+   * Accepts a function as well as a patch, so a caller that has to read the current value to
+   * compute the next one does not lose a write to a concurrent one. The function runs inside the
+   * serialised transaction, against the value that transaction commits on top of — not against
+   * whatever the screen happened to be holding when the click landed.
+   */
+  updateSettings(
+    patch:
+      | Omit<Partial<SettingsEntity>, "key">
+      | ((current: SettingsEntity) => Omit<Partial<SettingsEntity>, "key">),
+  ): Promise<void>;
   clearAllData(): Promise<void>;
   createBackup(): Promise<BackupDocument>;
   restoreBackup(prepared: PreparedBackup): Promise<BackupRestoreResult>;
@@ -278,7 +288,10 @@ export function createAppStore(db: AppDb) {
       },
 
       async updateSettings(patch) {
-        await runMutationWithReconciliation(() => repos.settings.update(patch));
+        await runMutationWithReconciliation(async () => {
+          const current = await repos.settings.get();
+          await repos.settings.update(typeof patch === "function" ? patch(current) : patch);
+        });
       },
 
       async createBackup() {
