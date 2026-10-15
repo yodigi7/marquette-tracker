@@ -1942,6 +1942,23 @@ describe("Show all", () => {
     );
   });
 
+  it("builds a later toggle on the restore that preceded it in the same tick", async () => {
+    render(<CalendarView />);
+
+    // Seeded rather than clicked, so the only thing under test is the pair below and not whether
+    // two setup clicks happened to collide.
+    await store().updateSettings({ hiddenCalendarLayers: ["menses", "fertile"] });
+    await screen.findByRole("button", { name: /show all/i });
+
+    // "Show all" and a toggle fired together. Both handlers used to read the snapshot from before
+    // the restore, so the toggle landed on top of it: Fertile came back hidden while Menses was
+    // left shown, which is the opposite of both clicks.
+    fireEvent.click(screen.getByRole("button", { name: /show all/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Menses/i }));
+
+    await waitFor(() => expect(store().settings.hiddenCalendarLayers).toEqual(["menses"]));
+  });
+
   it("restores every key currently on screen", async () => {
     const user = userEvent.setup();
     render(<CalendarView />);
