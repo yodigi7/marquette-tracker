@@ -10,10 +10,10 @@ not an oversight: a wrong Peak prediction is costlier than a wrong period predic
 is the one the whole method hangs on. A prediction that misses it can leave a user distrusting a reading
 that was correct.
 
-This reverses that choice. The line now looks forward, hedged — "Expect your next Peak around cycle day
-14 to 15" — on the grounds that a retrospective range answers a question the user did not ask, and that
-the hedge buys the risk back. The hedge does the work: the line never counts down to a single named day,
-and the word "around" keeps the claim at a range rather than a date.
+This reverses that choice. The line now looks forward, hedged — it predicts the next Peak falls around a
+range of cycle days, naming the completed cycles the range rests on. The hedge does the work: the line
+never counts down to a single named day, and the word "around" keeps the claim at a range rather than a
+date. The line is labelled Predicted, because it is the app's estimate and not a reading.
 
 The hedge is the whole safety argument, so it is load-bearing. If the line ever loses "around", it has
 stopped being a safe prediction and has started being a wrong promise with extra steps.
