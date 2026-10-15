@@ -388,7 +388,7 @@ describe("expectedPeakRangeLine", () => {
     expect(line).toContain("17");
     expect(line).toMatch(/last 6 completed cycles/i);
     expect(line).toMatch(/your next Peak/i);
-    expect(line).toMatch(/expect/i);
+    expect(line).toMatch(/predicted/i);
   });
 
   it("is pluralised for one completed cycle", () => {
@@ -430,7 +430,7 @@ describe("expectedPeakRangeLine", () => {
     expect(line).not.toMatch(/Peak day is cycle day 15\./);
   });
 
-  it("never names a single unhedged day, a countdown, or a disclaimer", () => {
+  it("hedges the range, never counts down, and is labelled Predicted", () => {
     const lines = [
       expectedPeakRangeLine(forecastWith({ earliest: 12, latest: 17, cycles: 6 })),
       expectedPeakRangeLine(forecastWith({ earliest: 14, latest: 15, cycles: 2 })),
@@ -440,6 +440,7 @@ describe("expectedPeakRangeLine", () => {
     for (const line of lines) {
       expect(line).not.toMatch(COUNTDOWN);
       expect(line).toMatch(/around/i);
+      expect(line).toMatch(/predicted/i);
       expect(line).not.toMatch(/disclaimer|medical advice|consult (a|your)/i);
     }
   });
