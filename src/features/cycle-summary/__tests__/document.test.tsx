@@ -193,11 +193,11 @@ describe("SummaryDocument", () => {
     expect(screen.getByTestId("summary-snapshot")).toHaveTextContent(/does not update/i);
   });
 
-  it("states that predictions and projected cycles are excluded", () => {
+  it("states that predicted dates are excluded", () => {
     renderDocument();
 
     expect(screen.getByTestId("summary-exclusions")).toHaveTextContent(/not included/i);
-    expect(screen.getByTestId("summary-exclusions")).toHaveTextContent(/projected future cycles/i);
+    expect(screen.getByTestId("summary-exclusions")).toHaveTextContent(/predicted dates/i);
   });
 
   it("prints no confirmed or predicted window cue anywhere", () => {
@@ -207,7 +207,11 @@ describe("SummaryDocument", () => {
 
     const text = document.body.textContent ?? "";
     expect(text).not.toMatch(/confirmed window|predicted window/i);
-    expect(text).not.toMatch(/\bconfirmed\b|\bpredicted\b/i);
+    // "Predicted" now appears exactly once: the footer's exclusion note, which names what is
+    // deliberately left out rather than labelling anything on the page. Any predicted *cue* —
+    // a window, a day, a status — would push the count above one.
+    expect(text.match(/\bpredicted\b/gi) ?? []).toHaveLength(1);
+    expect(text).not.toMatch(/\bconfirmed\b/i);
   });
 
   it("carries the print sheet class so the print rules can find it", () => {

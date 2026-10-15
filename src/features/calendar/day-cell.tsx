@@ -76,13 +76,21 @@ export function DayCell({
     (menses && shown("menses")) || (cycleStart && shown(PROJECTED_CYCLE_START_LAYER));
   const showIntercourse = detailMode === "full" && intercourse && shown("intercourse");
 
+  // A predicted day can carry both claims at once — a period that opens on a day the window also
+  // covers. Both are named: the fertile claim is the one that must never be buried behind the period,
+  // and dropping it made the announcement depend on which check happened to run first.
+  const predictedParts = [
+    cycleStart ? "predicted period start" : null,
+    forecast && phase === "fertile" ? "predicted fertile window day" : null,
+  ].filter((part): part is string => !!part);
+
   const accessibleParts = [
     dateKey,
     phaseLabel ?? "no status",
     monitorText,
     menses ? "menses" : null,
     detailMode === "full" && intercourse ? "intercourse" : null,
-    forecast ? "projected" : null,
+    ...predictedParts,
   ].filter((part): part is string => !!part);
 
   // The phase fill is kept when one is known, so a predicted fertile day still

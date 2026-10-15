@@ -612,11 +612,11 @@ describe("header lines", () => {
     expect(line).toMatch(/does not update/i);
   });
 
-  it("states that predictions and projected cycles are excluded", () => {
+  it("states that predicted dates are excluded", () => {
     const note = exclusionsNote();
 
-    expect(note).toMatch(/predictions/i);
-    expect(note).toMatch(/projected future cycles/i);
+    expect(note).toMatch(/predicted dates/i);
+    expect(note).not.toMatch(/forecast|projected|estimated|expected/i);
     expect(note).toMatch(/not included/i);
   });
 
