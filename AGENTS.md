@@ -32,6 +32,7 @@ Shared rules for both lanes:
 - **Reading code is your job, not mine.** If an answer requires code inspection, inspect it yourself, then report the consequence in plain language.
 - **Routine internal work with an obvious right answer** (refactor, dependency bump, test or tooling wiring): do not ask. Implement it and report one line of user impact ("no visible change"). Ask only when a genuine tradeoff exists that I would want to weigh in on.
 - **Never read the artifacts back to me as a summary of their contents.** Report the decision and its user-visible effect instead.
+- Be succinct with your responses. It is ok to sacrifice grammar for concision.
 
 ### Reporting workflow results (verify, apply, archive, sync)
 
@@ -169,7 +170,7 @@ Issues and specs are GitHub issues on `yodigi7/marquette-tracker`, operated with
 
 ### Domain docs
 
-Single-context layout: a root `GLOSSARY.md` and `docs/adr/` when they come into existence. Neither exists yet; skills that read them proceed silently until `@domain-modeling` creates them. See `docs/agents/domain.md`.
+Single-context layout: `GLOSSARY.md` at the root, ADRs in `docs/adr/`. Read the glossary before naming a domain concept — its `_Avoid_` lists are binding. Read any ADR touching the area you are about to change, and surface a conflict rather than silently overriding it. See `docs/agents/domain.md`.
 
 ### Triage labels
 
@@ -206,7 +207,7 @@ Rules that survive from the OpenSpec workflow:
 - **`pnpm test` is required for any change touching `core/engine`**, with table-driven tests written
   first. `@tdd` agrees the test seams with the user before writing a test; the engine's seams are
   already fixed by the protocol rules in `src/core/engine/AGENTS.md`.
-- `pnpm check` green before anything is called done.
+- **`pnpm check` green for any code change.**
 
 `@ask-matt` is installed but describes the upstream skill set, not this configuration. Ignore it.
 
