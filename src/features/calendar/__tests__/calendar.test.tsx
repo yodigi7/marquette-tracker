@@ -1,6 +1,6 @@
 import "fake-indexeddb/auto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { addDays } from "@/core/engine/dateUtils";
 import type { DayStatus } from "@/core/engine/types";
@@ -1910,6 +1910,20 @@ describe("Show all", () => {
   it("is absent while nothing is hidden", () => {
     render(<CalendarView />);
     expect(screen.queryByRole("button", { name: /show all/i })).toBeNull();
+  });
+
+  it("keeps both choices when two keys are toggled before the screen redraws", async () => {
+    render(<CalendarView />);
+
+    // Two toggles fired without a redraw in between, which is what a fast double-tap does. Each
+    // handler computes the whole list from the value it captured when the screen last drew, so the
+    // second write used to land on top of the first and drop it.
+    fireEvent.click(screen.getByRole("button", { name: /^Menses/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Fertile/i }));
+
+    await waitFor(() =>
+      expect([...store().settings.hiddenCalendarLayers].sort()).toEqual(["fertile", "menses"]),
+    );
   });
 
   it("restores every key currently on screen", async () => {
