@@ -33,3 +33,41 @@ _Avoid_: ovulation, confirmed ovulation
 **Fertile window**:
 The interval of days the Marquette protocol marks as fertile, derived from monitor readings.
 _Avoid_: fertile days, fertile period
+
+## Time
+
+**Day 1**:
+The first day of menses. Every cycle day number counts from it.
+_Avoid_: period start (as a synonym for Day 1)
+
+**Monitor reading**:
+What the monitor reports for a day — Low, High, or Peak. Always entered by hand; the app has no device
+connection.
+_Avoid_: test, test result, reading level
+
+## Surfaces
+
+**Cycle summary**:
+The printable sheet for one cycle, in words: the basis of each window edge plus the protocol warnings it
+raised. Reached from a cycle's own chart.
+_Avoid_: Instructor summary, Printable cycle summary, summary page
+
+**Instructor chart**:
+The printable grid of recent cycles, cycle days across as columns and observations down as rows, with the
+fertile window banded across. Reached from History.
+_Avoid_: Printable instructor chart, chart export, multi-cycle summary
+
+**Export**:
+An action that writes a file onto your device — the versioned JSON backup, or the CSV. The two printables
+are not exports; the browser prints them.
+_Avoid_: print, download, save
+
+**Protocol warning**:
+An observation the app reports about your readings — a contradiction, a long run of Highs, a cycle with no
+Peak. It never moves the window and never implies you did something wrong.
+_Avoid_: error, warning, defect
+
+**Logging-only mode**:
+What the app does with the algorithm switched off. Readings are still entered and shown; nothing is
+computed.
+_Avoid_: disabled mode, raw mode

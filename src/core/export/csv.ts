@@ -5,8 +5,7 @@ import type { CycleEntity, DayRecordEntity } from "@/core/store/entities";
  *
  * Deliberately outside `core/backup`: the JSON backup is the lossless, restorable
  * path, and this file is not one. It carries only what the user entered, so
- * nothing computed by the engine and no record identity ever reaches it (see
- * `openspec/specs/csv-export/spec.md`).
+ * nothing computed by the engine and no record identity ever reaches it.
  *
  * A pure module like the backup contract: no React, no Dexie, no browser API.
  */
