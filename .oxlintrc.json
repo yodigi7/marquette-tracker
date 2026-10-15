@@ -11,6 +11,32 @@
       "rules": {
         "react/only-export-components": "off"
       }
+    },
+    {
+      "files": ["src/core/engine/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              { "name": "react" },
+              { "name": "react-dom" },
+              { "name": "dexie" },
+              { "name": "dexie-react-hooks" },
+              { "name": "zustand" }
+            ]
+          }
+        ],
+        "no-restricted-globals": [
+          "error",
+          "window",
+          "document",
+          "localStorage",
+          "sessionStorage",
+          "navigator",
+          "fetch"
+        ]
+      }
     }
   ]
 }

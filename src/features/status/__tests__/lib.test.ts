@@ -12,6 +12,7 @@ import {
   windowDescription,
   warningBanner,
 } from "../lib";
+import { COUNTDOWN } from "./helpers";
 
 const RULES: EndRule[] = [
   "current-peak-plus-n",
@@ -255,14 +256,6 @@ describe("warningBanner", () => {
   });
 });
 
-/**
- * A countdown is the one thing this method is defined against, and it is also the easiest thing to
- * reintroduce by accident: a negative `cycleDay - peakDay` is a countdown if it is rendered, and so is
- * a "you are on day N of your window" style line. Every line below is checked against it.
- */
-const COUNTDOWN =
-  /\d+ days? (until|to|before)|until (your |the )?peak|days? to (your |the )?peak|next peak|coming peak|countdown|days? remaining/i;
-
 describe("peakCountLine", () => {
   /**
    * `todayCycleDay` defaults high so an ordinary case is not accidentally in the future; the
@@ -388,13 +381,14 @@ describe("expectedPeakRangeLine", () => {
     };
   }
 
-  it("reports the range and says it comes from past cycles", () => {
+  it("looks forward to your next Peak and says it comes from past cycles", () => {
     const line = expectedPeakRangeLine(forecastWith({ earliest: 12, latest: 17, cycles: 6 }))!;
 
     expect(line).toContain("12");
     expect(line).toContain("17");
-    expect(line).toMatch(/based on your last 6 completed cycles/i);
-    expect(line).toMatch(/past cycles|last 6 completed/i);
+    expect(line).toMatch(/last 6 completed cycles/i);
+    expect(line).toMatch(/your next Peak/i);
+    expect(line).toMatch(/expect/i);
   });
 
   it("is pluralised for one completed cycle", () => {
@@ -424,14 +418,19 @@ describe("expectedPeakRangeLine", () => {
     expect(expectedPeakRangeLine(forecastWith(null))).toBeNull();
   });
 
-  it("reports a single day when the window's Peaks all fall on one day", () => {
+  it("hedges a single day rather than naming one", () => {
+    // Every cycle in the window peaked on the same day. That is still a range
+    // of one, and an unhedged day would read as a firm claim about a day that
+    // has not happened yet.
     const line = expectedPeakRangeLine(forecastWith({ earliest: 15, latest: 15, cycles: 6 }))!;
 
     expect(line).toContain("15");
+    expect(line).toContain("around cycle day 15");
     expect(line).not.toMatch(/15 (to|-|–) 15/);
+    expect(line).not.toMatch(/Peak day is cycle day 15\./);
   });
 
-  it("never presents a specific day, a countdown, or a source cue", () => {
+  it("never names a single unhedged day, a countdown, or a disclaimer", () => {
     const lines = [
       expectedPeakRangeLine(forecastWith({ earliest: 12, latest: 17, cycles: 6 })),
       expectedPeakRangeLine(forecastWith({ earliest: 14, latest: 15, cycles: 2 })),
@@ -440,7 +439,7 @@ describe("expectedPeakRangeLine", () => {
 
     for (const line of lines) {
       expect(line).not.toMatch(COUNTDOWN);
-      expect(line).not.toMatch(/predicted|confirmed|ovulation/i);
+      expect(line).toMatch(/around/i);
       expect(line).not.toMatch(/disclaimer|medical advice|consult (a|your)/i);
     }
   });

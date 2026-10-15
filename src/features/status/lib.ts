@@ -187,12 +187,21 @@ export function peakCountLine({
 }
 
 /**
- * The expected Peak-day range, labelled as coming from past cycles.
+ * Where to expect your next Peak, derived from the cycles in the configured history window.
  *
- * Reports the monitor Peak days inside the configured history window, which is the range the app's
- * own calendar rule derived the current cycle's window from. A retrospective statement about history,
- * not a forecast: it is always a range, never a day, and it carries no source cue. Returns null when
- * there is nothing to derive, so the caller renders no line at all rather than an empty one.
+ * The underlying data is the monitor Peak days inside that window — the same range the app's own
+ * calendar rule derived the current cycle's window from — but the line speaks about the *next* Peak,
+ * not a past one, so it says so and hedges with "around".
+ *
+ * This reversed a deliberate decision. The line used to be written as a retrospective statement
+ * about history, carrying no prediction word at all, on the grounds that a wrong Peak prediction is
+ * costlier than a wrong period prediction: Peak is the day the whole method hangs on, so a
+ * prediction that misses it can leave the user distrusting their own correct reading. The hedge is
+ * what buys that risk back. The line never names a single unhedged day, even when every cycle in
+ * the window agrees, and it never counts down to a day.
+ *
+ * Returns null when there is nothing to derive, so the caller renders no line at all rather than an
+ * empty one.
  */
 export function expectedPeakRangeLine(forecast: Forecast | null): string | null {
   const range = forecast?.peakDayRangeInWindow;
@@ -204,7 +213,7 @@ export function expectedPeakRangeLine(forecast: Forecast | null): string | null 
     range.earliest === range.latest
       ? `cycle day ${range.earliest}`
       : `cycle day ${range.earliest} to ${range.latest}`;
-  const basis = `Based on your last ${cycles} completed cycle${cycles === 1 ? "" : "s"}, your expected Peak day is ${span}.`;
+  const basis = `Expect your next Peak around ${span}, based on your last ${cycles} completed cycle${cycles === 1 ? "" : "s"}.`;
   // The window is `cycles` wide but only the cycles carrying a Peak contribute, so say so rather than
   // letting the range imply more evidence than it rests on.
   const coverage =

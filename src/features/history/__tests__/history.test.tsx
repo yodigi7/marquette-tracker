@@ -33,7 +33,7 @@ describe("HistoryView", () => {
         <HistoryView />
       </MemoryRouter>,
     );
-    expect(await screen.findByText(/Forecast/i)).toBeInTheDocument();
+    expect(await screen.findByText("Predicted", { exact: true })).toBeInTheDocument();
     expect(screen.getByText(/Avg length/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Peak day/i).length).toBeGreaterThanOrEqual(1);
     // One table row per seeded cycle.
@@ -46,7 +46,7 @@ describe("HistoryView", () => {
         <HistoryView />
       </MemoryRouter>,
     );
-    expect(await screen.findByText(/Forecast/i)).toBeInTheDocument();
+    expect(await screen.findByText("Predicted", { exact: true })).toBeInTheDocument();
 
     const open = store().cycles.find((c) => c.closedAt === null)!;
     expect(store().output!.cycles.find((c) => c.cycleId === open.id)!.firstPeakDay).toBeNull();
@@ -82,7 +82,7 @@ describe("HistoryView", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("predicted")).toHaveClass("text-fertility-forecast-fg");
+    expect(screen.getByText("Predicted")).toHaveClass("text-fertility-forecast-fg");
     expect(screen.getByText("Avg length")).toHaveClass("text-fertility-muted");
     expect(screen.getByText("Next fertile window")).toHaveClass("text-fertility-muted");
   });
@@ -274,6 +274,13 @@ describe("HistoryView", () => {
     );
 
     expect(screen.getByTestId("history-logging-only")).toBeInTheDocument();
+    // The one word, again: "forecast" left the app's voice when the History panel was swept.
+    expect(screen.getByTestId("history-logging-only")).toHaveTextContent(
+      /predictions and derived summaries are hidden/i,
+    );
+    expect(screen.getByTestId("history-logging-only")).not.toHaveTextContent(
+      /forecast|projected|estimated|expected/i,
+    );
     expect(screen.queryByText("Avg length")).toBeNull();
     expect(screen.queryByText("Fertile days")).toBeNull();
     expect(screen.getByRole("table")).toBeInTheDocument();
@@ -483,7 +490,7 @@ describe("HistoryView peak-day statistics", () => {
       </MemoryRouter>,
     );
 
-    const disclosure = await screen.findByText(/Projected dates use the median/i);
+    const disclosure = await screen.findByText(/Predicted dates use the median/i);
     const forecast = store().output?.forecast;
     expect(forecast).not.toBeNull();
     // the fixture must actually exercise the "fewer cycles than configured"
@@ -508,6 +515,6 @@ describe("HistoryView peak-day statistics", () => {
     );
 
     expect(await screen.findByText(/Not enough data yet/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Projected dates use the median/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Predicted dates use the median/i)).not.toBeInTheDocument();
   });
 });

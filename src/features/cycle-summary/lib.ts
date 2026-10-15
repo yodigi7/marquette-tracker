@@ -380,7 +380,7 @@ export function snapshotLine(generatedOn: DateKey): string {
 
 /** What the document deliberately leaves out, so its absence is accounted for. */
 export function exclusionsNote(): string {
-  return "Predictions and projected future cycles are not included in this document.";
+  return "Predicted dates are not included in this document.";
 }
 
 /** Why the derived half is missing when interpretation is off. */

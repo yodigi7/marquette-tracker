@@ -15,7 +15,7 @@ interface StatusCardProps {
   windowLine: string;
   /** Cycle days elapsed since the anchoring Peak reading, or null when interpretation is off. */
   peakLine: string | null;
-  /** Expected Peak-day range derived from past cycles, or null when there is none to report. */
+  /** Where to expect the next Peak, or null when there is none to report. */
   rangeLine: string | null;
   nextPeriod: string | null;
   algorithmEnabled: boolean;
@@ -100,7 +100,7 @@ export function StatusCard({
         {nextPeriod && (
           <p className={cn("text-sm", FERTILITY_TEXT_VISUALS.body)}>
             <span data-testid="status-forecast" className={FERTILITY_FORECAST_VISUAL.text}>
-              Estimated next period:
+              Predicted next period:
             </span>{" "}
             {nextPeriod}
           </p>

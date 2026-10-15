@@ -14,7 +14,8 @@
     "format:check": "oxfmt --check .",
     "typecheck": "tsc -b",
     "icons": "node scripts/generate-icons.mjs",
-    "check": "pnpm format:check && pnpm lint && pnpm test && pnpm build",
+    "check:links": "node scripts/check-markdown-links.mjs",
+    "check": "pnpm format:check && pnpm lint && pnpm check:links && pnpm test && pnpm build",
     "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {

@@ -60,7 +60,7 @@ describe("App hash routing", () => {
     window.location.hash = "#/history";
     render(<App />);
 
-    expect(await screen.findByText("Forecast")).toBeInTheDocument();
+    expect(await screen.findByText("Predicted")).toBeInTheDocument();
     expect(window.location.hash).toBe("#/history");
   });
 
