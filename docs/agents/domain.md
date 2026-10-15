@@ -22,4 +22,4 @@ use (reconsider), or there's a real gap (note it for `@domain-modeling`).
 
 If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
 
-> _Contradicts ADR-0002 (no generated document files), but worth reopening because…_
+> _Contradicts ADR-0002 (the Status Peak range looks forward), but worth reopening because…_

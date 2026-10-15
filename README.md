@@ -155,22 +155,22 @@ replace the JSON backup, and it exists only to be read.
 | `row_type`         | `day` for a logged day, `cycle` for a cycle with no logged days | Never                         |
 | `date`             | The day, as `YYYY-MM-DD`                                        | On a `cycle` row only         |
 | `day_in_cycle`     | Cycle day, counting Day 1 as the first day of menses            | On a `cycle` row only         |
-| `monitor`          | `low`, `high`, `peak`, or `none`                                | Never recorded                |
-| `mucus`            | Cervical mucus reading: `low`, `high`, `peak`, or `none`        | Never recorded                |
-| `blood_flow`       | `light`, `medium`, `heavy`, or `none`                           | Never recorded                |
-| `intercourse`      | `true` or `false`                                               | Never recorded                |
-| `intercourse_time` | The time entered for that act                                   | Not recorded                  |
-| `bbt_c`            | Basal temperature in Celsius                                    | Never recorded, or cleared    |
-| `bbt_f`            | The same reading in Fahrenheit, converted for you               | Never recorded, or cleared    |
-| `symptoms`         | The day's symptoms, separated by `;`                            | None recorded                 |
-| `pregnancy_test`   | `negative` or `positive`                                        | Never recorded                |
+| `monitor`          | `low`, `high`, `peak`, or `none`                                | Never logged                  |
+| `mucus`            | Cervical mucus reading: `low`, `high`, `peak`, or `none`        | Never logged                  |
+| `blood_flow`       | `light`, `medium`, `heavy`, or `none`                           | Never logged                  |
+| `intercourse`      | `true` or `false`                                               | Never logged                  |
+| `intercourse_time` | The time of that act                                            | Not logged                    |
+| `bbt_c`            | Basal temperature in Celsius                                    | Never logged, or cleared      |
+| `bbt_f`            | The same reading in Fahrenheit, converted for you               | Never logged, or cleared      |
+| `symptoms`         | The day's symptoms, separated by `;`                            | None logged                   |
+| `pregnancy_test`   | `negative` or `positive`                                        | Never logged                  |
 | `notes`            | That day's note                                                 | Empty                         |
 | `cycle_number`     | Which cycle the day belongs to                                  | Only if the cycle is missing  |
 | `cycle_start`      | The cycle's Day 1, as `YYYY-MM-DD`                              | Only if the cycle is missing  |
 | `cycle_closed`     | The cycle's last day, as `YYYY-MM-DD`                           | While the cycle is still open |
 | `cycle_notes`      | The cycle's note, repeated on each of its days                  | Empty                         |
 
-**Missing values.** An empty cell always means "not recorded". That is different from a value you did
+**Missing values.** An empty cell always means "not logged". That is different from a value you did
 record: a monitor or mucus reading of `none`, or `intercourse` of `false`, is written out as the word
 itself, so you can filter on it. Several symptoms share one cell, separated by semicolons.
 
