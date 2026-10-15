@@ -28,7 +28,9 @@ Three decisions are hard enough that the code alone misleads about them. Those c
 ## Scope
 
 - **Personal use** — mine and my partner's. Opening it up to other users is not MVP scope.
-- **No reminders or notifications.** Nothing is scheduled or pushed.
+- **Reminders are deferred until we adopt a backend.** Nothing is scheduled or pushed today. A daily
+  logging reminder is wanted and will follow a server. See
+  [ADR-0008](adr/0008-reminders-wait-for-a-backend.md).
 - **No Python backend in MVP**, deferred entirely. The engine stays pure TS so the logic can be ported
   later for parity. See [ADR-0007](adr/0007-pure-engine-for-a-later-python-port.md).
 - **The post-Peak interval is a fixed protocol constant**, not a preference. There is no setting for it
