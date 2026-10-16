@@ -4,6 +4,22 @@ on:
   push:
     branches:
       - main
+    # Publish only when a build input changes. Everything listed here feeds the
+    # production build; nothing outside this list does, so a documentation or
+    # tooling commit would rebuild a byte-identical bundle. The validation
+    # workflow still gates every push to main, so those commits are still
+    # checked — they just do not publish.
+    paths:
+      - src/**
+      - public/**
+      - index.html
+      - vite.config.ts
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      # Editing the filter itself must be able to publish.
+      - .github/workflows/deploy.yml
+  # Unfiltered by `paths` above, which is what keeps manual recovery possible.
   workflow_dispatch:
 
 permissions:
