@@ -15,7 +15,8 @@
     "typecheck": "tsc -b",
     "icons": "node scripts/generate-icons.mjs",
     "check:links": "node scripts/check-markdown-links.mjs",
-    "check": "pnpm format:check && pnpm lint && pnpm check:links && pnpm test && pnpm build",
+    "check:workflows": "node scripts/check-workflows.mjs",
+    "check": "pnpm format:check && pnpm lint && pnpm check:links && pnpm check:workflows && pnpm test && pnpm build",
     "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {

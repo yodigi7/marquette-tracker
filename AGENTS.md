@@ -97,8 +97,6 @@ Reach for these on the branch named, not before.
   rules: how a cycle's fertile window begins and ends, what a Peak day is, and what the engine reports.
   Loads automatically whenever work touches that directory. When code and those rules disagree, one of
   them is a bug — determine which, do not quietly reconcile them.
-- **[`src/core/engine/predict.ts`](src/core/engine/predict.ts) — forecasting.** Next period start and the
-  next fertile window, both worked out from the lookback. Always rendered as Predicted.
 - **[`docs/decisions.md`](docs/decisions.md) — scope decisions.** Adding a feature, a dependency, or a
   data path (backup, export, sync).
 - **[`docs/agents/quality-gates.md`](docs/agents/quality-gates.md) — the gate and its gotchas.** Before
@@ -112,6 +110,5 @@ Reach for these on the branch named, not before.
   contradict something deliberate. Surface a conflict rather than silently overriding it.
 - **[`docs/VISUAL_QA.md`](docs/VISUAL_QA.md) — per-surface behaviour.** Changing what a view renders;
   `src/app/router.tsx` holds the routes.
-- **`package.json` — the scripts.** Which command runs what.
 - **`src/core/store/entities.ts` — the persisted types.** Touching storage; the type definitions are the
   source of truth for fields.
