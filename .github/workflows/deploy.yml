@@ -11,6 +11,9 @@ on:
       - public/**
       - index.html
       - vite.config.ts
+      # The bundler's transform reads this for `target`, `jsx`, and friends.
+      # Verified: changing `target` alone changes the emitted bundle.
+      - tsconfig.app.json
       - package.json
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
