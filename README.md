@@ -112,7 +112,7 @@ The app uses hash-based routes so direct links work on the static Pages host:
 Already done: **Settings -> Pages -> Build and deployment -> Source** is set to **GitHub Actions**. A new
 clone or fork needs it set once before deployment will run.
 
-After that setup, every push to `main` runs the deployment workflow automatically. The workflow can also be started manually from the repository's **Actions** tab for a recovery rebuild.
+After that setup, a push to `main` runs the deployment workflow automatically when it changes a **build input**: the application source, the public assets, the HTML entry, the Vite config and the app's TypeScript config, the dependency manifest or lockfile, or the deployment workflow itself. A commit that changes none of those is still validated by the read-only workflow but publishes nothing, because it cannot produce a different bundle. The filter is an explicit list rather than an exclusion list, so anything that becomes a build input later must be added to it or that change will not publish. The workflow can also be started manually from the repository's **Actions** tab for a recovery rebuild; a manual run ignores the file filter.
 
 The workflow installs the locked pnpm dependencies, runs the same `pnpm check` gate used locally, then publishes `dist/` to GitHub Pages. Use `pnpm build && pnpm preview` locally to verify the production PWA and offline shell before pushing.
 
