@@ -4,11 +4,8 @@ on:
   push:
     branches:
       - main
-    # Publish only when a build input changes. Everything listed here feeds the
-    # production build; nothing outside this list does, so a documentation or
-    # tooling commit would rebuild a byte-identical bundle. The validation
-    # workflow still gates every push to main, so those commits are still
-    # checked — they just do not publish.
+    # Publish only when a build input changes — the bundle would be identical
+    # otherwise. See the Deployment section of README.md for what counts.
     paths:
       - src/**
       - public/**
@@ -17,9 +14,8 @@ on:
       - package.json
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
-      # Editing the filter itself must be able to publish.
       - .github/workflows/deploy.yml
-  # Unfiltered by `paths` above, which is what keeps manual recovery possible.
+  # `paths` does not apply to a manual run, so this stays a recovery hatch.
   workflow_dispatch:
 
 permissions:
