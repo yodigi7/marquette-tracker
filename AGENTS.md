@@ -83,6 +83,9 @@ findings, incomplete work, and recommendations as outcome and user impact:
 ## Working rules
 
 - **`pnpm check` green for any code change.** It is the only command that needs to be green.
+- **There is no `openspec/`.** It was retired as a workflow and deleted. Do not recreate it and do not
+  reintroduce its conventions. If a skill or document tells you to write there, that instruction is
+  stale — say so rather than following it.
 - **Predictions stay labelled.** Anything the app works out about a day that has not happened is
   **Predicted** on screen and stays labelled until a reading confirms it.
 

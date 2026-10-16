@@ -225,8 +225,8 @@ The app is deployed and in daily use. One leftover is still marked for removal b
 demo-seed block in `providers.tsx` seeds demo data on first startup (`TODO(remove-after-dev)`), along with
 `src/core/store/seedDemo.ts`.
 
-Two protocol decisions are easy to get backwards, so they are stated here rather than left to the archived
-specs. [`GLOSSARY.md`](./GLOSSARY.md) holds the terms; [`src/core/engine/AGENTS.md`](./src/core/engine/AGENTS.md)
+Two protocol decisions are easy to get backwards, so they are stated here rather than left to a separate
+specification. [`GLOSSARY.md`](./GLOSSARY.md) holds the terms; [`src/core/engine/AGENTS.md`](./src/core/engine/AGENTS.md)
 holds the protocol:
 
 - **A cycle's Peak day is its _first_ monitor Peak reading, and the window _end_ is measured from the
