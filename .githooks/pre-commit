@@ -5,8 +5,8 @@
 #   2. Lint the whole project (0.7s — cheaper than filtering staged paths).
 #
 # OpenSpec validation used to be step 3 here. It was removed when OpenSpec
-# was retired as the workflow: openspec/ is frozen history that no longer
-# changes, so re-validating it on every commit bought nothing.
+# was retired as the workflow; the directory has since been deleted, and
+# re-validating it on every commit had already bought nothing.
 #
 # Type checking and tests are intentionally NOT here: `tsc -b` costs ~4s with
 # no useful incrementality on this tree, so it runs in the pre-push hook via the

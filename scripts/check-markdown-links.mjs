@@ -8,8 +8,7 @@
  *
  * Deliberately skipped: `.agents/` and `.opencode/` are vendored tooling whose
  * docs carry illustrative paths (`[x](./src/billing/GLOSSARY.md)`) and
- * placeholders (`[link](link)`) that are not real references. `openspec/` is
- * NOT skipped — it is checked like any other markdown.
+ * placeholders (`[link](link)`) that are not real references.
  */
 
 import fs from "node:fs";
